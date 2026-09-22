@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AccountDialog } from './components/AccountDialog'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { Flame, Icon, StarMark } from './components/Icon'
 import { MusicDialog } from './components/MusicDialog'
 import { PlankTimer, type FinishSummary, type PlankSession, type PlankShare } from './components/PlankTimer'
 import { Setlist } from './components/Setlist'
+import { ShareDialog } from './components/ShareDialog'
 import { LadderProgress, SongLine, SongRow } from './components/SongRow'
 import { StreakPanel } from './components/StreakPanel'
 import { LADDER, formatDuration, type Song } from './data/songs'
@@ -12,7 +13,8 @@ import { accountsEnabled, bumpDailyCount, fetchDailyCount, saveLadderCursor, use
 import { fromDayKey } from './lib/dates'
 import { useToday } from './lib/hooks'
 import { dailyView, ladderView, plankedDays, songFor, type Completion, type Pause } from './lib/progress'
-import { plankSummary, shareOrCopy, shareText } from './lib/share'
+import { dailyNumber } from './lib/daily'
+import { plankSummary, type ShareInput } from './lib/share'
 import { getData, recordPlank, setLadderLevel, useAppData } from './lib/store'
 import { streakInfo } from './lib/streaks'
 
@@ -23,9 +25,8 @@ export function App() {
   const [session, setSession] = useState<PlankSession | null>(null)
   const [dialog, setDialog] = useState<'music' | 'account' | null>(null)
   const [dailyCount, setDailyCount] = useState<number | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
   const [jumpTo, setJumpTo] = useState<number | null>(null)
-  const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const [sharing, setSharing] = useState<ShareInput | null>(null)
 
   const daily = dailyView(data, today)
   const ladder = ladderView(data, today)
@@ -42,26 +43,17 @@ export function App() {
     }
   }, [today])
 
-  const showToast = (message: string) => {
-    setToast(message)
-    clearTimeout(toastTimer.current)
-    toastTimer.current = setTimeout(() => setToast(null), 2500)
-  }
-
-  // Shares one plank: what it counted for, the green/orange bar of how it went, and the streak.
-  const sharePlank = async ({ song, pauses, counted }: PlankShare) => {
-    const now = getData()
-    const text = shareText({
-      dailyNumber: dailyView(now, today).number,
-      streak: streakInfo(plankedDays(now.completions), today).current,
+  // Opens the share box for one plank: what it counted for, how it went, and the streak.
+  const sharePlank = ({ song, pauses, counted }: PlankShare, day = today) => {
+    setSharing({
+      dailyNumber: dailyNumber(day),
+      day,
+      streak: streakInfo(plankedDays(getData().completions), today).current,
       song,
       daily: counted.some((c) => c.mode === 'daily'),
       level: counted.find((c) => c.mode === 'ladder')?.level,
       pauses,
     })
-    const result = await shareOrCopy(text)
-    if (result === 'copied') showToast('Copied. Paste it anywhere.')
-    if (result === 'failed') showToast("Couldn't share from this browser.")
   }
 
   /** Share a plank from today's list. One plank can have counted for both rows. */
@@ -69,7 +61,7 @@ export function App() {
     const song = songFor(completion)
     if (!song) return
     const counted = getData().completions.filter((c) => c.day === completion.day && c.at === completion.at)
-    void sharePlank({ song, pauses: completion.pauses ?? [], counted })
+    sharePlank({ song, pauses: completion.pauses ?? [], counted }, completion.day)
   }
 
   const dailyDone = data.completions.find((c) => c.mode === 'daily' && c.day === today)
@@ -244,7 +236,7 @@ export function App() {
           session={session}
           prefs={data.prefs}
           onFinish={finish}
-          onShare={(plank) => void sharePlank(plank)}
+          onShare={(plank) => sharePlank(plank)}
           onClose={() => setSession(null)}
           onSignIn={offerSignIn}
         />
@@ -262,9 +254,7 @@ export function App() {
         {jumpTo !== null && <SongLine song={LADDER[jumpTo - 1]} />}
         <p>Your ladder picks up from this song. Your calendar and streak stay as they are.</p>
       </ConfirmDialog>
-      <div className={`toast${toast ? ' show' : ''}`} role="status">
-        {toast}
-      </div>
+      <ShareDialog share={sharing} onClose={() => setSharing(null)} />
     </>
   )
 }

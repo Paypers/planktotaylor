@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { useId, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { Icon } from './Icon'
 
 interface Props {
@@ -12,7 +12,8 @@ export function Dialog({ open, title, onClose, children }: Props) {
   const ref = useRef<HTMLDialogElement>(null)
   const titleId = useId()
 
-  useEffect(() => {
+  // Before paint, so the box never shows up empty on the way in or out.
+  useLayoutEffect(() => {
     const dialog = ref.current
     if (!dialog) return
     if (open && !dialog.open) dialog.showModal()

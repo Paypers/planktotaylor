@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ALBUMS, formatDuration, type Song } from '../data/songs'
 import { useWakeLock } from '../lib/hooks'
 import type { Completion, Pause, Prefs } from '../lib/progress'
-import { pausedSeconds } from '../lib/share'
+import { pausedSeconds, plankHeadline } from '../lib/share'
 import { sounds, unlockAudio } from '../lib/sound'
 import { youtubeUrl } from '../lib/youtube'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -530,14 +530,13 @@ function DoneView({
   const ladder = summary.counted.find((c) => c.mode === 'ladder')
   const daily = summary.counted.some((c) => c.mode === 'daily')
   const length = formatDuration(song.seconds)
-  const [title, text] =
+  const title = plankHeadline(daily, ladder?.level)
+  const text =
     ladder && daily
-      ? ['Two for one.', `${song.title} counted for today's song and level ${ladder.level}.`]
-      : ladder
-        ? [`Level ${ladder.level} done.`, `You held a plank for all of ${song.title}, ${length}.`]
-        : daily
-          ? ["Today's song, done.", `You held a plank for all of ${song.title}, ${length}.`]
-          : ['Extra credit.', `Today was already in the bag. That's ${length} more.`]
+      ? `${song.title} counted for today's song and level ${ladder.level}.`
+      : ladder || daily
+        ? `You held a plank for all of ${song.title}, ${length}.`
+        : `Today was already in the bag. That's ${length} more.`
   const next = summary.next
 
   return (

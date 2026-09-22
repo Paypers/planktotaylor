@@ -1335,38 +1335,44 @@ a {
   gap: 8px;
 }
 
-/* Toast */
+/* Sharing: the card image first, then the same result as text */
 
-.toast {
-  position: fixed;
-  left: 16px;
-  bottom: calc(16px + env(safe-area-inset-bottom));
-  z-index: 60;
-  padding: 12px 16px;
+.share-card img,
+.share-card-waiting {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  border: 1px solid var(--rule);
   border-radius: 4px;
-  background: var(--ink);
-  color: var(--paper);
+}
+
+.share-card-waiting {
+  display: grid;
+  place-items: center;
+  background: var(--well);
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.share-text {
+  padding: 12px 14px;
+  border-radius: 4px;
+  background: var(--well);
   font-size: 15px;
-  font-weight: 500;
-  line-height: 20px;
-  opacity: 0;
-  translate: 0 8px;
-  pointer-events: none;
-  transition:
-    opacity 0.2s ease,
-    translate 0.2s ease;
+  line-height: 24px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
-.toast.show {
-  opacity: 1;
-  translate: 0 0;
-}
-
-@media (min-width: 760px) {
-  .toast {
-    left: 24px;
-    bottom: 24px;
-  }
+.dialog-section .share-text {
+  color: var(--ink);
 }
 
 /* The plank screen */
@@ -1710,8 +1716,5 @@ a {
   .plank,
   .plank-time.counting {
     animation: none;
-  }
-  .toast {
-    transition: none;
   }
 }

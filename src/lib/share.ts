@@ -1,4 +1,5 @@
 import { formatDuration, type Song } from '../data/songs'
+import type { DayKey } from './dates'
 import type { Pause } from './progress'
 
 /** Squares that stand for the whole song in a shared result. */
@@ -22,6 +23,28 @@ export function plankBar(pauses: readonly Pause[], songSeconds: number): string 
   return bar
 }
 
+export interface Segment {
+  kind: 'hold' | 'pause'
+  ms: number
+}
+
+/** The plank in order: stretches held, and the breaks between them (a break doesn't use up song). */
+export function plankSegments(pauses: readonly Pause[], songSeconds: number): Segment[] {
+  const segments: Segment[] = []
+  let cursor = 0
+  for (const pause of [...pauses].sort((a, b) => a.at - b.at)) {
+    const at = Math.min(pause.at, songSeconds)
+    if (at > cursor) segments.push({ kind: 'hold', ms: (at - cursor) * 1000 })
+    segments.push({ kind: 'pause', ms: pause.ms })
+    cursor = at
+  }
+  if (songSeconds > cursor) segments.push({ kind: 'hold', ms: (songSeconds - cursor) * 1000 })
+  return segments
+}
+
+/** "9s", or "1:05" for a long one. */
+export const pauseLabel = (ms: number) => (ms < 59_500 ? `${Math.round(ms / 1000)}s` : formatDuration(ms / 1000))
+
 export function pausedSeconds(pauses: readonly Pause[]): number {
   return pauses.reduce((sum, p) => sum + p.ms, 0) / 1000
 }
@@ -36,6 +59,8 @@ export function plankSummary(pauses: readonly Pause[], songSeconds: number): str
 
 export interface ShareInput {
   dailyNumber: number
+  /** The day the plank was done. */
+  day: DayKey
   streak: number
   song: Song
   /** What this plank counted for. */
@@ -43,6 +68,16 @@ export interface ShareInput {
   level?: number
   pauses: readonly Pause[]
 }
+
+/** The finished screen's headline, also printed on the share card. */
+export function plankHeadline(daily: boolean, level?: number): string {
+  if (daily && level) return 'Two for one.'
+  if (level) return `Level ${level} done.`
+  if (daily) return "Today's song, done."
+  return 'Extra credit.'
+}
+
+export const siteLink = () => window.location.origin + import.meta.env.BASE_URL
 
 export function shareText({ dailyNumber, streak, song, daily, level, pauses }: ShareInput): string {
   const what =
@@ -53,24 +88,6 @@ export function shareText({ dailyNumber, streak, song, daily, level, pauses }: S
     plankBar(pauses, song.seconds),
     plankSummary(pauses, song.seconds),
     // The invite: most apps turn this into a preview card (see the og: tags in index.html).
-    `Plank along: ${window.location.origin + import.meta.env.BASE_URL}`,
+    `Plank along: ${siteLink()}`,
   ].join('\n')
-}
-
-export async function shareOrCopy(text: string): Promise<'shared' | 'copied' | 'cancelled' | 'failed'> {
-  if (navigator.share && matchMedia('(pointer: coarse)').matches) {
-    try {
-      await navigator.share({ text })
-      return 'shared'
-    } catch (error) {
-      // Closing the share sheet isn't an error; anything else falls back to copying.
-      if ((error as Error).name === 'AbortError') return 'cancelled'
-    }
-  }
-  try {
-    await navigator.clipboard.writeText(text)
-    return 'copied'
-  } catch {
-    return 'failed'
-  }
 }

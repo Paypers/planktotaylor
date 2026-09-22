@@ -4,7 +4,7 @@ import { DAILY_EPOCH, dailyNumber, dailySong } from './daily'
 import { addDays, daysBetween } from './dates'
 import { applyPlank, emptyData, ladderView, mergeCompletions, newerCursor, type Completion } from './progress'
 import { normalizeTitle, parseIsoDuration, pickVideo, videoSongName, type VideoCandidate } from './match'
-import { plankBar, plankSummary } from './share'
+import { pauseLabel, plankBar, plankHeadline, plankSegments, plankSummary } from './share'
 import { runLengths, streakInfo } from './streaks'
 
 describe('catalog', () => {
@@ -118,6 +118,25 @@ describe('pauses', () => {
     ]
     expect(plankBar(pauses, 174)).toBe('🟩🟩🟩🟩🟧🟩🟩🟩🟩🟩🟩🟧')
     expect(plankSummary(pauses, 174)).toBe('2:54 plank · 2 pauses, 0:14 · 3:08 total')
+  })
+
+  it('draws the bar in order, with breaks between the stretches held', () => {
+    const segments = plankSegments([{ at: 60, ms: 10_000 }], 174)
+    expect(segments).toEqual([
+      { kind: 'hold', ms: 60_000 },
+      { kind: 'pause', ms: 10_000 },
+      { kind: 'hold', ms: 114_000 },
+    ])
+    expect(plankSegments([], 174)).toEqual([{ kind: 'hold', ms: 174_000 }])
+    expect(pauseLabel(9_400)).toBe('9s')
+    expect(pauseLabel(65_000)).toBe('1:05')
+  })
+
+  it('heads the card with what the plank counted for', () => {
+    expect(plankHeadline(true, 12)).toBe('Two for one.')
+    expect(plankHeadline(false, 12)).toBe('Level 12 done.')
+    expect(plankHeadline(true)).toBe("Today's song, done.")
+    expect(plankHeadline(false)).toBe('Extra credit.')
   })
 })
 

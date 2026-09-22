@@ -79,7 +79,9 @@ Rules worth knowing:
 - A streak stays alive until the end of the day after your last plank. The 🔥 in the header is grey until you've planked today.
 - One ladder level per day. If today's song happens to be your ladder level, one plank counts for both.
 - Stopping early doesn't count, but you can retry as often as you like. Pausing is fine; the pauses just show up in what you share.
-- **Sharing** works like Wordle: ten 🟩 squares for the song, with a 🟧 dropped in wherever you paused, plus the plank time, the pauses and the total, and your streak. It ends with "Plank along:" and the link, which most apps turn into a preview card. The finished screen draws the same thing to scale.
+- **Sharing** opens a share box with two versions:
+  - **An image card** (1080×1350, drawn on a canvas in [src/lib/shareCard.ts](src/lib/shareCard.ts)): the streak, the song, and the green and orange bar to scale with each pause labelled. Phones get Share image (the share sheet, with the link attached) and Copy image; computers get Copy image and Save image.
+  - **Text**, like Wordle: ten 🟩 squares for the song, with a 🟧 dropped in wherever you paused, plus the times and your streak. It ends with "Plank along:" and the link, which most apps turn into a preview card.
 - **Without an account**, progress is kept in the browser. When accounts are switched on, a quiet line under the streak and on the finished screen says so, with a Sign in link. Signing in brings that progress along.
 - Already doing the challenge elsewhere? Open **The setlist** and tap your song to move your ladder there.
 
