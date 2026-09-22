@@ -1,0 +1,27 @@
+{
+  "name": "plank-to-taylor",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Plank to Taylor Swift songs, shortest to longest. A daily song for everyone, plus your own ladder and streak.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "sync:youtube": "node --env-file-if-exists=.env scripts/sync-youtube.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.1"
+  }
+}
