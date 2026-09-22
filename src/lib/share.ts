@@ -52,7 +52,8 @@ export function shareText({ dailyNumber, streak, song, daily, level, pauses }: S
     `${what} · ${song.title}`,
     plankBar(pauses, song.seconds),
     plankSummary(pauses, song.seconds),
-    window.location.origin + import.meta.env.BASE_URL,
+    // The invite: most apps turn this into a preview card (see the og: tags in index.html).
+    `Plank along: ${window.location.origin + import.meta.env.BASE_URL}`,
   ].join('\n')
 }
 

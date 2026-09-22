@@ -94,6 +94,8 @@ export function App() {
   }
 
   const start = (song: Song, label: string) => setSession({ song, label })
+  // Without an account, progress lives in this browser: say so quietly where there's something to keep.
+  const offerSignIn = accountsEnabled && !user ? () => setDialog('account') : undefined
   const dateline = fromDayKey(today).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
 
   return (
@@ -214,7 +216,7 @@ export function App() {
             </div>
           </section>
 
-          <StreakPanel completions={data.completions} days={days} streak={streak} today={today} />
+          <StreakPanel completions={data.completions} days={days} streak={streak} today={today} onSignIn={offerSignIn} />
           <Setlist level={ladder.level} onJump={setJumpTo} />
         </main>
 
@@ -244,6 +246,7 @@ export function App() {
           onFinish={finish}
           onShare={(plank) => void sharePlank(plank)}
           onClose={() => setSession(null)}
+          onSignIn={offerSignIn}
         />
       )}
       <MusicDialog open={dialog === 'music'} prefs={data.prefs} onClose={() => setDialog(null)} />

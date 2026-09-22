@@ -4,12 +4,15 @@ import { addDays, fromDayKey, type DayKey } from '../lib/dates'
 import { songFor, totalSeconds, type Completion } from '../lib/progress'
 import { runLengths, type StreakInfo } from '../lib/streaks'
 import { Flame, Icon } from './Icon'
+import { SaveNote } from './SaveNote'
 
 interface Props {
   completions: Completion[]
   days: ReadonlySet<DayKey>
   streak: StreakInfo
   today: DayKey
+  /** Set when accounts are on and nobody's signed in. */
+  onSignIn?: () => void
 }
 
 function formatTotal(seconds: number): string {
@@ -22,7 +25,7 @@ function formatTotal(seconds: number): string {
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
-export function StreakPanel({ completions, days, streak, today }: Props) {
+export function StreakPanel({ completions, days, streak, today, onSignIn }: Props) {
   const message = streak.doneToday
     ? 'Safe for today. See you tomorrow.'
     : streak.atRisk
@@ -44,6 +47,7 @@ export function StreakPanel({ completions, days, streak, today }: Props) {
           </span>
         </div>
         <p className="streak-msg">{message}</p>
+        {onSignIn && completions.length > 0 && <SaveNote onSignIn={onSignIn} className="streak-save" />}
         <dl className="facts">
           <dt>Best streak</dt>
           <dd>{plural(streak.best, 'day')}</dd>

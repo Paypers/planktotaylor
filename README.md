@@ -21,6 +21,8 @@ npm run build      # static site in dist/
 
 Deploy `dist/` to any static host (Vercel, Netlify, Cloudflare Pages, GitHub Pages). Copy `.env.example` to `.env` for local settings, and set the same `VITE_*` variables in your host's build settings.
 
+The live site is <https://planktotaylor.pages.dev> (Cloudflare Pages, redeploys on every push to `main`). Moving to another address? Update the `og:url` and `og:image` addresses in [index.html](index.html): they make the preview card when someone pastes a shared result. The card image is [public/og.png](public/og.png).
+
 ## The YouTube player + exact song lengths
 
 Each song plays its **album track** from YouTube: the auto-generated "Taylor Swift - Topic" upload, which is the album recording itself with the cover art on screen. It's never a music video or lyric video, since those add intros and title cards. Re-recorded albums always use *Taylor's Version*. Her debut and *reputation* were never re-recorded, so those use the original album tracks. The track ids and exact lengths live in `src/data/youtube-videos.json`, which is already filled in for all 243 songs. The exact lengths make each plank end when the song does.
@@ -77,7 +79,8 @@ Rules worth knowing:
 - A streak stays alive until the end of the day after your last plank. The 🔥 in the header is grey until you've planked today.
 - One ladder level per day. If today's song happens to be your ladder level, one plank counts for both.
 - Stopping early doesn't count, but you can retry as often as you like. Pausing is fine; the pauses just show up in what you share.
-- **Sharing** works like Wordle: ten 🟩 squares for the song, with a 🟧 dropped in wherever you paused, plus the plank time, the pauses and the total, and your streak. The finished screen draws the same thing to scale.
+- **Sharing** works like Wordle: ten 🟩 squares for the song, with a 🟧 dropped in wherever you paused, plus the plank time, the pauses and the total, and your streak. It ends with "Plank along:" and the link, which most apps turn into a preview card. The finished screen draws the same thing to scale.
+- **Without an account**, progress is kept in the browser. When accounts are switched on, a quiet line under the streak and on the finished screen says so, with a Sign in link. Signing in brings that progress along.
 - Already doing the challenge elsewhere? Open **The setlist** and tap your song to move your ladder there.
 
 ## Adding a new album

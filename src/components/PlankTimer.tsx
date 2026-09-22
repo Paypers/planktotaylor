@@ -8,6 +8,7 @@ import { youtubeUrl } from '../lib/youtube'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Flame, Icon } from './Icon'
 import { PlankReceipt } from './Receipt'
+import { SaveNote } from './SaveNote'
 import { Sleeve } from './Sleeve'
 import { SongLine } from './SongRow'
 import { useMusic, type PlayerEvents } from './useMusic'
@@ -39,6 +40,8 @@ interface Props {
   onFinish: (song: Song, pauses: Pause[]) => FinishSummary
   onShare: (plank: PlankShare) => void
   onClose: () => void
+  /** Set when accounts are on and nobody's signed in. */
+  onSignIn?: () => void
 }
 
 /**
@@ -70,7 +73,7 @@ function coachLine(elapsed: number, total: number): string {
   return 'Elbows under shoulders. Squeeze everything.'
 }
 
-export function PlankTimer({ session, prefs, onFinish, onShare, onClose }: Props) {
+export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignIn }: Props) {
   const { song } = session
   const album = ALBUMS[song.album]
   const total = song.seconds * 1000
@@ -327,8 +330,6 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose }: Props
 
   const closeRef = useRef(close)
   closeRef.current = close
-  const confirmingRef = useRef(confirming)
-  confirmingRef.current = confirming
   const spaceRef = useRef<() => void>(() => {})
   spaceRef.current = () => {
     if (phase === 'ready' || phase === 'quit') start()
@@ -337,8 +338,8 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose }: Props
   }
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      // The stop dialog handles its own keys: Escape there means keep going.
-      if (confirmingRef.current) return
+      // A dialog on top (stop, sign in) handles its own keys: Escape closes it, Space types or presses.
+      if (document.querySelector('dialog[open]')) return
       if (event.key === 'Escape') {
         // Claim the key, or the browser treats it as "close the top dialog" and shuts the one it just opened.
         event.preventDefault()
@@ -391,7 +392,7 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose }: Props
         </div>
 
         {phase === 'done' && summary ? (
-          <DoneView song={song} summary={summary} pauses={pauses} />
+          <DoneView song={song} summary={summary} pauses={pauses} onSignIn={onSignIn} />
         ) : (
           <div className="plank-body">
             <div className="plank-song">
@@ -515,7 +516,17 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose }: Props
   )
 }
 
-function DoneView({ song, summary, pauses }: { song: Song; summary: FinishSummary; pauses: Pause[] }) {
+function DoneView({
+  song,
+  summary,
+  pauses,
+  onSignIn,
+}: {
+  song: Song
+  summary: FinishSummary
+  pauses: Pause[]
+  onSignIn?: () => void
+}) {
   const ladder = summary.counted.find((c) => c.mode === 'ladder')
   const daily = summary.counted.some((c) => c.mode === 'daily')
   const length = formatDuration(song.seconds)
@@ -542,6 +553,7 @@ function DoneView({ song, summary, pauses }: { song: Song; summary: FinishSummar
       <p className="done-text">{text}</p>
 
       <PlankReceipt seconds={song.seconds} pauses={pauses} />
+      {onSignIn && <SaveNote onSignIn={onSignIn} className="done-save" />}
 
       {next && (
         <section className="done-next" aria-labelledby="done-next-heading">

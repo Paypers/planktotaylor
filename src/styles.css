@@ -702,6 +702,34 @@ a {
   line-height: 24px;
 }
 
+/* A quiet by-the-way: without an account, progress lives in this browser only */
+
+.save-note {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-2);
+}
+
+.text-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.streak-save {
+  margin-top: 4px;
+}
+
+.done-save {
+  margin-top: 20px;
+}
+
 .facts {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

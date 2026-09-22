@@ -12,7 +12,11 @@ import {
 } from './progress'
 import { getData, onPlankRecorded, replaceProgress } from './store'
 
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
+// Just the project address. The dashboard's Data API page shows it with /rest/v1/ on the end, which breaks sign-in.
+const url = (import.meta.env.VITE_SUPABASE_URL as string | undefined)
+  ?.trim()
+  .replace(/\/(rest|auth)\/v1\/?$/, '')
+  .replace(/\/+$/, '')
 const key = import.meta.env.VITE_SUPABASE_KEY as string | undefined
 
 /** False when the site runs without accounts: everything still works, stored in the browser. */
