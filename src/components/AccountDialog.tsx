@@ -1,41 +1,145 @@
-import { useState, type FormEvent } from 'react'
-import { retrySync, sendSignInEmail, signOut, useAccount, verifySignInCode } from '../lib/account'
+import { useRef, useState, type FormEvent } from 'react'
+import {
+  displayName,
+  removeAvatar,
+  retrySync,
+  saveDisplayName,
+  sendSignInEmail,
+  signOut,
+  uploadAvatar,
+  useAccount,
+  verifySignInCode,
+} from '../lib/account'
+import { squarePhoto } from '../lib/avatar'
+import type { RankInfo } from '../lib/xp'
+import { Avatar } from './Avatar'
 import { Dialog } from './Dialog'
+import { RankBar } from './Rank'
 
 const SYNC_TEXT = {
   idle: '',
   syncing: 'Syncing…',
-  synced: 'Your streak and ladder are synced to this account.',
+  synced: 'Your streak, ladder and XP are synced to this account.',
   error: "Couldn't sync just now. Your progress is safe in this browser.",
 }
 
-export function AccountDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { user, sync } = useAccount()
+export function AccountDialog({ open, onClose, rank }: { open: boolean; onClose: () => void; rank: RankInfo | null }) {
+  const { user } = useAccount()
+  return (
+    <Dialog open={open} title={user ? 'Your profile' : 'Sign in'} onClose={onClose}>
+      {user ? <ProfileForm rank={rank} /> : <SignInForm />}
+    </Dialog>
+  )
+}
+
+function ProfileForm({ rank }: { rank: RankInfo | null }) {
+  const { user, sync, profile } = useAccount()
+  const [name, setName] = useState(profile.name ?? '')
+  const [busy, setBusy] = useState<'name' | 'photo' | null>(null)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
+  if (!user) return null
+  const shown = displayName(user, profile)
+
+  const run = async (what: 'name' | 'photo', action: () => Promise<void>) => {
+    setBusy(what)
+    setError(null)
+    setSaved(false)
+    try {
+      await action()
+      if (what === 'name') setSaved(true)
+    } catch (err) {
+      const message = (err as Error).message
+      const reason = /fetch|network/i.test(message) ? 'Check your connection and try again.' : message
+      setError(`Couldn't save the ${what}. ${reason}`)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const choosePhoto = (file: File | undefined) => {
+    if (fileInput.current) fileInput.current.value = ''
+    if (file) void run('photo', async () => uploadAvatar(await squarePhoto(file)))
+  }
 
   return (
-    <Dialog open={open} title={user ? 'Your account' : 'Sign in'} onClose={onClose}>
-      {user ? (
-        <>
-          <p>
-            Signed in as <strong>{user.email}</strong>.
-          </p>
-          <p className="muted">{SYNC_TEXT[sync]}</p>
-          <div className="button-row">
-            {sync === 'error' && (
-              <button className="btn btn-secondary" onClick={retrySync}>
-                Try again
-              </button>
-            )}
-            <button className="btn btn-secondary" onClick={() => void signOut()}>
-              Sign out
-            </button>
-          </div>
-          <p className="fine">Signing out keeps this browser's copy of your progress.</p>
-        </>
-      ) : (
-        <SignInForm />
+    <>
+      <div className="profile-head">
+        <Avatar name={shown} url={profile.avatarUrl} size={72} />
+        <div className="profile-who">
+          <p className="profile-shown">{shown}</p>
+          <p className="fine">{user.email}</p>
+        </div>
+      </div>
+      <div className="button-row">
+        <button type="button" className="btn btn-secondary" onClick={() => fileInput.current?.click()} disabled={busy !== null}>
+          {busy === 'photo' ? 'Uploading…' : profile.avatarUrl ? 'Change photo' : 'Add a photo'}
+        </button>
+        {profile.avatarUrl && (
+          <button type="button" className="btn btn-link" onClick={() => void run('photo', removeAvatar)} disabled={busy !== null}>
+            Remove photo
+          </button>
+        )}
+        <input ref={fileInput} type="file" accept="image/*" hidden onChange={(e) => choosePhoto(e.target.files?.[0])} />
+      </div>
+
+      <form
+        className="dialog-section"
+        onSubmit={(e: FormEvent) => {
+          e.preventDefault()
+          void run('name', () => saveDisplayName(name))
+        }}
+      >
+        <label className="field">
+          <span>Name</span>
+          <input
+            className="input"
+            value={name}
+            maxLength={40}
+            autoComplete="nickname"
+            placeholder={user.email?.split('@')[0]}
+            onChange={(e) => {
+              setName(e.target.value)
+              setSaved(false)
+            }}
+          />
+        </label>
+        <div className="button-row">
+          <button className="btn btn-primary" disabled={busy !== null || name.trim() === (profile.name ?? '')}>
+            {busy === 'name' ? 'Saving…' : 'Save name'}
+          </button>
+          {saved && <span className="fine profile-saved">Saved.</span>}
+        </div>
+      </form>
+
+      {rank && (
+        <section className="dialog-section">
+          <h3>Your rank</h3>
+          <RankBar rank={rank} />
+        </section>
       )}
-    </Dialog>
+
+      <section className="dialog-section">
+        <p className="muted">{SYNC_TEXT[sync]}</p>
+        <div className="button-row">
+          {sync === 'error' && (
+            <button type="button" className="btn btn-secondary" onClick={retrySync}>
+              Try again
+            </button>
+          )}
+          <button type="button" className="btn btn-secondary" onClick={() => void signOut()}>
+            Sign out
+          </button>
+        </div>
+        <p className="fine">Signing out keeps this browser's copy of your progress.</p>
+      </section>
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+    </>
   )
 }
 
@@ -70,8 +174,8 @@ function SignInForm() {
         }
       >
         <p>
-          Optional. Sign in to keep your streak on your phone and laptop. Without an account, your progress stays in this
-          browser.
+          Optional. Sign in to keep your streak on your phone and laptop, and to earn XP. Without an account, your
+          progress stays in this browser.
         </p>
         <label className="field">
           <span>Email</span>

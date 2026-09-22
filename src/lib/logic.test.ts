@@ -189,6 +189,12 @@ describe('sync merge', () => {
     expect(merged[0].at).toBe('2026-09-01T08:00:00.000Z')
   })
 
+  it("keeps XP the account has that this browser's copy doesn't", () => {
+    const local = c('2026-09-22', 'daily', '2026-09-22T12:00:00.000Z')
+    const [merged] = mergeCompletions([local], [{ ...local, xp: 212 }])
+    expect(merged.xp).toBe(212)
+  })
+
   it('takes the most recently changed ladder level', () => {
     const older = { level: 9, updatedAt: '2026-09-01T00:00:00.000Z' }
     const newer = { level: 4, updatedAt: '2026-09-02T00:00:00.000Z' }

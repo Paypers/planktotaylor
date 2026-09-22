@@ -135,12 +135,20 @@ export function applyPlank(
   return { data: { ...data, completions: [...data.completions, ...added], ladder: cursor }, added }
 }
 
-/** Union of two histories; when both have the same plank, the earlier one wins. */
+/**
+ * Union of two histories. When both have the same plank, the earlier one wins, keeping any XP
+ * the other copy has (XP can be granted on the account after the browser recorded the plank).
+ */
 export function mergeCompletions(a: readonly Completion[], b: readonly Completion[]): Completion[] {
   const byKey = new Map<string, Completion>()
   for (const c of [...a, ...b]) {
     const existing = byKey.get(completionKey(c))
-    if (!existing || c.at < existing.at) byKey.set(completionKey(c), c)
+    if (!existing) byKey.set(completionKey(c), c)
+    else {
+      const winner = c.at < existing.at ? c : existing
+      const xp = Math.max(existing.xp ?? 0, c.xp ?? 0)
+      byKey.set(completionKey(c), xp > 0 ? { ...winner, xp } : winner)
+    }
   }
   return [...byKey.values()].sort((x, y) => x.day.localeCompare(y.day) || x.at.localeCompare(y.at) || x.mode.localeCompare(y.mode))
 }

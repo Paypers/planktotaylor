@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AccountDialog } from './components/AccountDialog'
+import { Avatar } from './components/Avatar'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { Flame, Icon, StarMark } from './components/Icon'
 import { MusicDialog } from './components/MusicDialog'
@@ -9,7 +10,7 @@ import { ShareDialog } from './components/ShareDialog'
 import { LadderProgress, SongLine, SongRow } from './components/SongRow'
 import { StreakPanel } from './components/StreakPanel'
 import { LADDER, type Song } from './data/songs'
-import { accountsEnabled, bumpDailyCount, fetchDailyCount, saveLadderCursor, useAccount } from './lib/account'
+import { accountsEnabled, bumpDailyCount, displayName, fetchDailyCount, saveLadderCursor, useAccount } from './lib/account'
 import { fromDayKey } from './lib/dates'
 import { useToday } from './lib/hooks'
 import { dailyView, ladderView, songFor, streakDays, type Completion, type Pause } from './lib/progress'
@@ -22,7 +23,7 @@ import { plankXp, rankFor, totalXp } from './lib/xp'
 export function App() {
   const data = useAppData()
   const today = useToday()
-  const { user } = useAccount()
+  const { user, profile } = useAccount()
   const [session, setSession] = useState<PlankSession | null>(null)
   const [dialog, setDialog] = useState<'music' | 'account' | null>(null)
   const [dailyCount, setDailyCount] = useState<number | null>(null)
@@ -36,6 +37,8 @@ export function App() {
   const twofer = !ladder.finished && ladder.song?.id === daily.song.id
   // XP is for signed-in players only.
   const earningXp = accountsEnabled && user !== null
+  const rank = earningXp ? rankFor(totalXp(data.completions)) : null
+  const shownName = user ? displayName(user, profile) : ''
   const climbed = ladder.climbedToday.length
   const lastClimb = ladder.climbedToday.at(-1)
   const climbedXp = totalXp(data.completions.filter((c) => c.day === today && ladder.climbedToday.some((l) => l.at === c.at)))
@@ -119,17 +122,35 @@ export function App() {
             <button type="button" className="icon-btn" onClick={() => setDialog('music')} aria-label="Music and sound">
               <Icon name="music" />
             </button>
-            {accountsEnabled && (
-              <button
-                type="button"
-                className="btn btn-secondary header-account"
-                onClick={() => setDialog('account')}
-                aria-label={user ? 'Account' : 'Sign in'}
-              >
-                <Icon name="user" className="narrow-only" />
-                <span className="wide-only">{user ? 'Account' : 'Sign in'}</span>
-              </button>
-            )}
+            {accountsEnabled &&
+              (user && rank ? (
+                // Signed in: your photo, name and rank. The rank sits on the photo on phones.
+                <button
+                  type="button"
+                  className="profile-btn"
+                  onClick={() => setDialog('account')}
+                  aria-label={`Your profile: ${shownName}, rank ${rank.rank}`}
+                >
+                  <span className="profile-photo">
+                    <Avatar name={shownName} url={profile.avatarUrl} size={36} />
+                    <span className="profile-badge narrow-only">{rank.rank}</span>
+                  </span>
+                  <span className="profile-text wide-only">
+                    <span className="profile-name">{shownName}</span>
+                    <span className="profile-rank">Rank {rank.rank}</span>
+                  </span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-secondary header-account"
+                  onClick={() => setDialog('account')}
+                  aria-label="Sign in"
+                >
+                  <Icon name="user" className="narrow-only" />
+                  <span className="wide-only">Sign in</span>
+                </button>
+              ))}
           </nav>
         </header>
 
@@ -219,7 +240,7 @@ export function App() {
             streak={streak}
             today={today}
             onSignIn={offerSignIn}
-            rank={earningXp ? rankFor(totalXp(data.completions)) : null}
+            rank={rank}
           />
           <Setlist level={ladder.level} onJump={setJumpTo} />
         </main>
@@ -255,7 +276,7 @@ export function App() {
         />
       )}
       <MusicDialog open={dialog === 'music'} prefs={data.prefs} onClose={() => setDialog(null)} />
-      {accountsEnabled && <AccountDialog open={dialog === 'account'} onClose={() => setDialog(null)} />}
+      {accountsEnabled && <AccountDialog open={dialog === 'account'} onClose={() => setDialog(null)} rank={rank} />}
       <ConfirmDialog
         open={jumpTo !== null}
         title={jumpTo === 1 && ladder.finished ? 'Start the ladder again?' : `Move to level ${jumpTo}?`}

@@ -41,12 +41,21 @@ function client(): Promise<SupabaseClient> {
 
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error'
 
+/** What a player chose to show: a name and a photo. Both optional. */
+export interface Profile {
+  name: string | null
+  avatarUrl: string | null
+}
+
+const NO_PROFILE: Profile = { name: null, avatarUrl: null }
+
 interface AccountState {
   user: User | null
   sync: SyncStatus
+  profile: Profile
 }
 
-let state: AccountState = { user: null, sync: 'idle' }
+let state: AccountState = { user: null, sync: 'idle', profile: NO_PROFILE }
 const listeners = new Set<() => void>()
 
 function setState(patch: Partial<AccountState>) {
@@ -136,9 +145,10 @@ async function syncNow(user: User) {
     const supabase = await client()
     const [remote, profile] = await Promise.all([
       fetchAllCompletions(supabase),
-      supabase.from('plank_profiles').select('ladder_level, updated_at').maybeSingle(),
+      supabase.from('plank_profiles').select('ladder_level, updated_at, display_name, avatar_url').maybeSingle(),
     ])
     if (profile.error) throw profile.error
+    setState({ profile: { name: profile.data?.display_name ?? null, avatarUrl: profile.data?.avatar_url ?? null } })
 
     const local = getData()
     const merged = mergeCompletions(local.completions, remote)
@@ -163,7 +173,7 @@ function listen(supabase: SupabaseClient) {
   supabase.auth.onAuthStateChange((event, session) => {
     const user = session?.user ?? null
     const changedUser = user?.id !== state.user?.id
-    setState({ user, sync: user ? state.sync : 'idle' })
+    setState({ user, sync: user ? state.sync : 'idle', profile: changedUser ? NO_PROFILE : state.profile })
     // Supabase warns against awaiting other Supabase calls inside this callback.
     if (user && (changedUser || event === 'SIGNED_IN')) setTimeout(() => void syncNow(user), 0)
   })
@@ -218,6 +228,60 @@ export async function verifySignInCode(email: string, token: string) {
 
 export async function signOut() {
   if (accountsEnabled) await (await client()).auth.signOut()
+}
+
+/** The name to show: the one they chose, or the start of their email. */
+export function displayName(user: User, profile: Profile): string {
+  return profile.name || user.email?.split('@')[0] || 'You'
+}
+
+/**
+ * Changes the name or photo without touching the ladder. A player who has never had a profile
+ * row gets one seeded with this browser's ladder, so a fresh row can't look like a newer ladder.
+ */
+async function saveProfile(fields: { display_name?: string | null; avatar_url?: string | null }) {
+  const user = state.user
+  if (!user) throw new Error('Sign in first.')
+  const supabase = await client()
+  const updated = await supabase.from('plank_profiles').update(fields).eq('user_id', user.id).select('user_id')
+  if (updated.error) throw updated.error
+  if (updated.data.length === 0) {
+    const { ladder } = getData()
+    const inserted = await supabase
+      .from('plank_profiles')
+      .insert({ user_id: user.id, ladder_level: ladder.level, updated_at: ladder.updatedAt, ...fields })
+    if (inserted.error) throw inserted.error
+  }
+  setState({
+    profile: {
+      name: fields.display_name !== undefined ? fields.display_name : state.profile.name,
+      avatarUrl: fields.avatar_url !== undefined ? fields.avatar_url : state.profile.avatarUrl,
+    },
+  })
+}
+
+export async function saveDisplayName(name: string) {
+  await saveProfile({ display_name: name.trim().slice(0, 40) || null })
+}
+
+const avatarPath = (userId: string) => `${userId}/avatar.jpg`
+
+/** Uploads an already-resized photo (see lib/avatar.ts) to the public avatars bucket. */
+export async function uploadAvatar(photo: Blob) {
+  const user = state.user
+  if (!user) throw new Error('Sign in first.')
+  const storage = (await client()).storage.from('avatars')
+  const { error } = await storage.upload(avatarPath(user.id), photo, { upsert: true, contentType: 'image/jpeg', cacheControl: '3600' })
+  if (error) throw error
+  // Same path every time, so the address changes with each upload to get past caches.
+  await saveProfile({ avatar_url: `${storage.getPublicUrl(avatarPath(user.id)).data.publicUrl}?v=${Date.now()}` })
+}
+
+export async function removeAvatar() {
+  const user = state.user
+  if (!user) return
+  await (await client()).storage.from('avatars').remove([avatarPath(user.id)])
+  await saveProfile({ avatar_url: null })
 }
 
 /** How many people finished today's global song. Null when accounts aren't configured. */

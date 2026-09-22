@@ -23,12 +23,37 @@ alter table public.plank_completions add column if not exists xp int check (xp i
 alter table public.plank_completions drop constraint if exists plank_completions_pkey;
 alter table public.plank_completions add primary key (user_id, day, mode, song_id);
 
--- Where each user is on the shortest-to-longest ladder.
+-- Where each user is on the shortest-to-longest ladder, and the name and photo they chose.
 create table if not exists public.plank_profiles (
   user_id uuid primary key default auth.uid() references auth.users (id) on delete cascade,
   ladder_level int not null default 1 check (ladder_level >= 1),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  display_name text check (char_length(display_name) <= 40),
+  avatar_url text
 );
+-- For databases created before names and photos.
+alter table public.plank_profiles add column if not exists display_name text check (char_length(display_name) <= 40);
+alter table public.plank_profiles add column if not exists avatar_url text;
+
+-- Profile photos: a public bucket (anyone with the link can see a photo), where each player can only
+-- add, replace or remove the one file in their own folder. The site shrinks photos to about 20 KB first.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('avatars', 'avatars', true, 1048576, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do update
+  set public = excluded.public, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "read avatars" on storage.objects;
+drop policy if exists "add own avatar" on storage.objects;
+drop policy if exists "replace own avatar" on storage.objects;
+drop policy if exists "remove own avatar" on storage.objects;
+create policy "read avatars" on storage.objects for select using (bucket_id = 'avatars');
+create policy "add own avatar" on storage.objects for insert to authenticated
+  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "replace own avatar" on storage.objects for update to authenticated
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text)
+  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "remove own avatar" on storage.objects for delete to authenticated
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
 
 -- "N people planked today's song". Anonymous visitors count too.
 create table if not exists public.daily_counts (
