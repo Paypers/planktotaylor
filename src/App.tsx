@@ -8,15 +8,16 @@ import { Setlist } from './components/Setlist'
 import { ShareDialog } from './components/ShareDialog'
 import { LadderProgress, SongLine, SongRow } from './components/SongRow'
 import { StreakPanel } from './components/StreakPanel'
-import { LADDER, formatDuration, type Song } from './data/songs'
+import { LADDER, type Song } from './data/songs'
 import { accountsEnabled, bumpDailyCount, fetchDailyCount, saveLadderCursor, useAccount } from './lib/account'
 import { fromDayKey } from './lib/dates'
 import { useToday } from './lib/hooks'
-import { dailyView, ladderView, plankedDays, songFor, type Completion, type Pause } from './lib/progress'
+import { dailyView, ladderView, songFor, streakDays, type Completion, type Pause } from './lib/progress'
 import { dailyNumber } from './lib/daily'
 import { plankSummary, type ShareInput } from './lib/share'
 import { getData, recordPlank, setLadderLevel, useAppData } from './lib/store'
 import { streakInfo } from './lib/streaks'
+import { plankXp, rankFor, totalXp } from './lib/xp'
 
 export function App() {
   const data = useAppData()
@@ -30,10 +31,14 @@ export function App() {
 
   const daily = dailyView(data, today)
   const ladder = ladderView(data, today)
-  const days = useMemo(() => plankedDays(data.completions), [data.completions])
+  const days = useMemo(() => streakDays(data.completions), [data.completions])
   const streak = streakInfo(days, today)
   const twofer = !ladder.finished && ladder.song?.id === daily.song.id
-  const toGo = (daily.done ? 0 : 1) + (ladder.finished || ladder.doneToday ? 0 : 1)
+  // XP is for signed-in players only.
+  const earningXp = accountsEnabled && user !== null
+  const climbed = ladder.climbedToday.length
+  const lastClimb = ladder.climbedToday.at(-1)
+  const climbedXp = totalXp(data.completions.filter((c) => c.day === today && ladder.climbedToday.some((l) => l.at === c.at)))
 
   useEffect(() => {
     let live = true
@@ -48,7 +53,8 @@ export function App() {
     setSharing({
       dailyNumber: dailyNumber(day),
       day,
-      streak: streakInfo(plankedDays(getData().completions), today).current,
+      streak: streakInfo(streakDays(getData().completions), today).current,
+      xp: totalXp(counted) || undefined,
       song,
       daily: counted.some((c) => c.mode === 'daily'),
       level: counted.find((c) => c.mode === 'ladder')?.level,
@@ -68,16 +74,22 @@ export function App() {
 
   const finish = useCallback(
     (song: Song, pauses: Pause[]): FinishSummary => {
-      const counted = recordPlank(song, pauses)
+      const before = totalXp(getData().completions)
+      const counted = recordPlank(song, pauses, earningXp)
       if (counted.some((c) => c.mode === 'daily')) {
         void bumpDailyCount(today).then((n) => n !== null && setDailyCount(n))
       }
       const now = getData()
       const after = ladderView(now, today)
       const next = counted.some((c) => c.mode === 'ladder') && after.song ? { level: after.level, song: after.song } : null
-      return { counted, streak: streakInfo(plankedDays(now.completions), today).current, next }
+      // Signed out, the finished screen shows what the plank would have earned.
+      const xp =
+        accountsEnabled && counted.length > 0
+          ? { award: plankXp(song.seconds, pauses), earned: earningXp, before, after: totalXp(now.completions) }
+          : null
+      return { counted, streak: streakInfo(streakDays(now.completions), today).current, next, xp }
     },
-    [today],
+    [today, earningXp],
   )
 
   const confirmJump = () => {
@@ -99,7 +111,7 @@ export function App() {
             <span>Plank to Taylor</span>
           </a>
           <nav className="header-actions" aria-label="Settings">
-            <span className="streak-pill" title={streak.doneToday ? 'Streak safe today' : 'Plank today to keep your streak'}>
+            <span className="streak-pill" title={streak.doneToday ? 'Streak safe today' : "Plank today's song to keep your streak"}>
               <Flame size={20} lit={streak.doneToday} />
               <span className="streak-pill-num">{streak.current}</span>
               <span className="sr-only">-day streak</span>
@@ -130,8 +142,8 @@ export function App() {
             <div className="masthead-body">
               <h1 className="headline">Hold a plank for the length of a Taylor Swift song.</h1>
               <p className="lede">
-                Everyone gets the same song each day. Your ladder climbs her whole catalog, shortest song to longest, one
-                level a day.
+                Everyone gets the same song each day: plank it to keep your streak. Your ladder climbs her whole catalog,
+                shortest song to longest, as fast as you like.
               </p>
             </div>
           </section>
@@ -140,7 +152,7 @@ export function App() {
             <div className="section-rule" />
             <div className="section-label">
               <h2 id="today-heading">Today</h2>
-              <p className="label-meta">{toGo === 0 ? 'All done' : `${toGo} ${toGo === 1 ? 'plank' : 'planks'} to go`}</p>
+              <p className="label-meta">{daily.done ? 'Streak safe' : "Today's song to go"}</p>
             </div>
             <div className="section-body today-list">
               <SongRow
@@ -176,21 +188,6 @@ export function App() {
                     </button>
                   </div>
                 </article>
-              ) : ladder.doneToday ? (
-                <SongRow
-                  eyebrow={`Your ladder · level ${ladder.doneToday.level} of ${ladder.total}`}
-                  song={songFor(ladder.doneToday) ?? ladder.song!}
-                  done
-                  startLabel=""
-                  onStart={() => {}}
-                  onShare={() => shareCompletion(ladder.doneToday!)}
-                >
-                  <p className="row-note">{plankSummary(ladder.doneToday.pauses ?? [], ladder.doneToday.seconds)}</p>
-                  <LadderProgress done={ladder.level - 1} total={ladder.total} />
-                  <p className="row-note">
-                    Tomorrow, level {ladder.level}: {ladder.song!.title} ({formatDuration(ladder.song!.seconds)})
-                  </p>
-                </SongRow>
               ) : (
                 <SongRow
                   eyebrow={`Your ladder · level ${ladder.level} of ${ladder.total}`}
@@ -198,17 +195,32 @@ export function App() {
                   done={false}
                   startLabel={`Start level ${ladder.level}`}
                   onStart={() => start(ladder.song!, `Level ${ladder.level} of ${ladder.total}`)}
+                  onShare={lastClimb && (() => shareCompletion(lastClimb))}
                 >
                   <LadderProgress done={ladder.level - 1} total={ladder.total} />
-                  {ladder.level === 1 && data.completions.length === 0 && (
+                  {climbed > 0 ? (
+                    <p className="row-note">
+                      {climbed} {climbed === 1 ? 'level' : 'levels'} climbed today
+                      {climbedXp > 0 && ` · +${climbedXp.toLocaleString()} XP`}. Keep going as long as you like.
+                    </p>
+                  ) : ladder.level === 1 && data.completions.length === 0 ? (
                     <p className="row-note">Level 1 is her shortest song. They get longer from here.</p>
+                  ) : (
+                    <p className="row-note">Climb as many levels a day as you like. Only today's song keeps your streak.</p>
                   )}
                 </SongRow>
               )}
             </div>
           </section>
 
-          <StreakPanel completions={data.completions} days={days} streak={streak} today={today} onSignIn={offerSignIn} />
+          <StreakPanel
+            completions={data.completions}
+            days={days}
+            streak={streak}
+            today={today}
+            onSignIn={offerSignIn}
+            rank={earningXp ? rankFor(totalXp(data.completions)) : null}
+          />
           <Setlist level={ladder.level} onJump={setJumpTo} />
         </main>
 
@@ -239,6 +251,7 @@ export function App() {
           onShare={(plank) => sharePlank(plank)}
           onClose={() => setSession(null)}
           onSignIn={offerSignIn}
+          onNext={start}
         />
       )}
       <MusicDialog open={dialog === 'music'} prefs={data.prefs} onClose={() => setDialog(null)} />

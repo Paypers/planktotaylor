@@ -3,16 +3,21 @@ import { ALBUMS, formatDuration } from '../data/songs'
 import { addDays, fromDayKey, type DayKey } from '../lib/dates'
 import { songFor, totalSeconds, type Completion } from '../lib/progress'
 import { runLengths, type StreakInfo } from '../lib/streaks'
+import type { RankInfo } from '../lib/xp'
 import { Flame, Icon } from './Icon'
+import { RankBar } from './Rank'
 import { SaveNote } from './SaveNote'
 
 interface Props {
   completions: Completion[]
+  /** Days today's song was planked: the streak. */
   days: ReadonlySet<DayKey>
   streak: StreakInfo
   today: DayKey
   /** Set when accounts are on and nobody's signed in. */
   onSignIn?: () => void
+  /** Signed-in players' rank. */
+  rank?: RankInfo | null
 }
 
 function formatTotal(seconds: number): string {
@@ -25,12 +30,12 @@ function formatTotal(seconds: number): string {
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
-export function StreakPanel({ completions, days, streak, today, onSignIn }: Props) {
+export function StreakPanel({ completions, days, streak, today, onSignIn, rank }: Props) {
   const message = streak.doneToday
     ? 'Safe for today. See you tomorrow.'
     : streak.atRisk
-      ? 'Plank today to keep it going.'
-      : 'Finish any plank to start one.'
+      ? "Plank today's song to keep it going."
+      : "Plank today's song to start one."
 
   return (
     <section className="section grid" aria-labelledby="streak-heading">
@@ -48,6 +53,7 @@ export function StreakPanel({ completions, days, streak, today, onSignIn }: Prop
         </div>
         <p className="streak-msg">{message}</p>
         {onSignIn && completions.length > 0 && <SaveNote onSignIn={onSignIn} className="streak-save" />}
+        {rank && <RankBar rank={rank} />}
         <dl className="facts">
           <dt>Best streak</dt>
           <dd>{plural(streak.best, 'day')}</dd>
@@ -73,8 +79,8 @@ function Calendar({ completions, days, today }: { completions: Completion[]; day
   const byDay = useMemo(() => {
     const map = new Map<DayKey, Completion[]>()
     for (const c of completions) map.set(c.day, [...(map.get(c.day) ?? []), c])
-    // Ladder first: that's the song whose colour paints the day.
-    map.forEach((list) => list.sort((a, b) => (a.mode === 'ladder' ? -1 : b.mode === 'ladder' ? 1 : 0)))
+    // Today's song first: it paints the day. Days with only ladder levels are just outlined.
+    map.forEach((list) => list.sort((a, b) => (a.mode === 'daily' ? -1 : b.mode === 'daily' ? 1 : a.at.localeCompare(b.at))))
     return map
   }, [completions])
 
@@ -116,12 +122,13 @@ function Calendar({ completions, days, today }: { completions: Completion[]; day
         {cells.map((day, i) => {
           if (!day) return <span key={`blank-${i}`} />
           const planks = byDay.get(day)
-          const song = planks && songFor(planks[0])
+          const streakDay = days.has(day)
+          const song = streakDay && planks ? songFor(planks[0]) : undefined
           const album = song && ALBUMS[song.album]
           // The flame and count sit on the last day of each run of two or more days.
           const run = runs.get(day) ?? 0
           const runEnd = run >= 2 && !days.has(addDays(day, 1))
-          const classes = ['day', planks && 'planked', day === today && 'today', day === selected && 'selected']
+          const classes = ['day', streakDay && 'planked', planks && !streakDay && 'climbed', day === today && 'today', day === selected && 'selected']
           const date = fromDayKey(day).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })
           return (
             <button
@@ -132,7 +139,7 @@ function Calendar({ completions, days, today }: { completions: Completion[]; day
               onClick={() => setSelected(day)}
               disabled={day > today}
               aria-pressed={day === selected}
-              aria-label={`${date}${planks ? ', planked' : ''}${runEnd ? `, end of a ${run}-day streak` : ''}${day === today ? ', today' : ''}`}
+              aria-label={`${date}${streakDay ? ", planked today's song" : planks ? ', ladder levels only' : ''}${runEnd ? `, end of a ${run}-day streak` : ''}${day === today ? ', today' : ''}`}
             >
               <span>{Number(day.slice(8))}</span>
               {runEnd && (
@@ -154,8 +161,9 @@ function Calendar({ completions, days, today }: { completions: Completion[]; day
             const planked = songFor(c)
             if (!planked) return null
             return (
-              <p key={c.mode}>
-                {c.mode === 'daily' ? 'Daily song' : `Level ${c.level}`} · {planked.title} · {formatDuration(c.seconds)}
+              <p key={`${c.mode}-${c.songId}`}>
+                {c.mode === 'daily' ? "Today's song" : `Level ${c.level}`} · {planked.title} · {formatDuration(c.seconds)}
+                {c.xp ? ` · +${c.xp} XP` : ''}
               </p>
             )
           })

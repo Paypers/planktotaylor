@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ALBUMS, formatDuration, type Song } from '../data/songs'
+import { ALBUMS, LADDER, formatDuration, type Song } from '../data/songs'
 import { useWakeLock } from '../lib/hooks'
 import type { Completion, Pause, Prefs } from '../lib/progress'
 import { pausedSeconds, plankHeadline } from '../lib/share'
 import { sounds, unlockAudio } from '../lib/sound'
+import { MARATHON_SECONDS, rankFor, type XpAward } from '../lib/xp'
 import { youtubeUrl } from '../lib/youtube'
 import { ConfirmDialog } from './ConfirmDialog'
-import { Flame, Icon } from './Icon'
+import { Confetti } from './Confetti'
+import { Flame, Icon, StarMark } from './Icon'
+import { RankBar } from './Rank'
 import { PlankReceipt } from './Receipt'
 import { SaveNote } from './SaveNote'
 import { Sleeve } from './Sleeve'
@@ -22,9 +25,21 @@ export interface PlankSession {
 
 export interface FinishSummary {
   counted: Completion[]
+  /** Days in a row you've planked today's song. */
   streak: number
-  /** Tomorrow's ladder level, when this plank finished today's. */
+  /** The next ladder level, when this plank climbed one. */
   next: { level: number; song: Song } | null
+  /** What the plank was worth. Null when accounts are off, or the plank didn't count for anything. */
+  xp: FinishXp | null
+}
+
+export interface FinishXp {
+  award: XpAward
+  /** False for a signed-out player: shown as what they would have earned. */
+  earned: boolean
+  /** Total XP before and after this plank. */
+  before: number
+  after: number
 }
 
 /** One finished plank, as it gets shared. */
@@ -42,6 +57,8 @@ interface Props {
   onClose: () => void
   /** Set when accounts are on and nobody's signed in. */
   onSignIn?: () => void
+  /** Go straight on to another plank (the next ladder level). */
+  onNext: (song: Song, label: string) => void
 }
 
 /**
@@ -73,7 +90,7 @@ function coachLine(elapsed: number, total: number): string {
   return 'Elbows under shoulders. Squeeze everything.'
 }
 
-export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignIn }: Props) {
+export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignIn, onNext }: Props) {
   const { song } = session
   const album = ALBUMS[song.album]
   const total = song.seconds * 1000
@@ -392,7 +409,7 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
         </div>
 
         {phase === 'done' && summary ? (
-          <DoneView song={song} summary={summary} pauses={pauses} onSignIn={onSignIn} />
+          <DoneView song={song} summary={summary} pauses={pauses} onSignIn={onSignIn} onNext={onNext} />
         ) : (
           <div className="plank-body">
             <div className="plank-song">
@@ -521,11 +538,13 @@ function DoneView({
   summary,
   pauses,
   onSignIn,
+  onNext,
 }: {
   song: Song
   summary: FinishSummary
   pauses: Pause[]
   onSignIn?: () => void
+  onNext: (song: Song, label: string) => void
 }) {
   const ladder = summary.counted.find((c) => c.mode === 'ladder')
   const daily = summary.counted.some((c) => c.mode === 'daily')
@@ -537,33 +556,96 @@ function DoneView({
       : ladder || daily
         ? `You held a plank for all of ${song.title}, ${length}.`
         : `Today was already in the bag. That's ${length} more.`
-  const next = summary.next
+  const { next, xp } = summary
+  const rankedUp = !!xp?.earned && rankFor(xp.after).rank > rankFor(xp.before).rank
+  const album = ALBUMS[song.album]
 
   return (
     <div className="plank-done">
       <div className="done-streak">
-        <span className="done-num">{summary.streak}</span>
-        <span className="done-unit">
-          <Flame size={32} lit />
-          day streak
-        </span>
+        {ladder && !daily ? (
+          // A ladder level doesn't touch the streak, so show the climb instead.
+          <>
+            <span className="done-num">{ladder.level}</span>
+            <span className="done-unit">
+              <span>of {LADDER.length}</span>
+              on your ladder
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="done-num">{summary.streak}</span>
+            <span className="done-unit">
+              <Flame size={32} lit />
+              day streak
+            </span>
+          </>
+        )}
+        {(daily || rankedUp) && <Confetti colors={['var(--signal)', 'var(--held)', 'var(--paused)', album.color, 'var(--ink)']} />}
       </div>
       <h2 className="done-title">{title}</h2>
       <p className="done-text">{text}</p>
 
       <PlankReceipt seconds={song.seconds} pauses={pauses} />
-      {onSignIn && <SaveNote onSignIn={onSignIn} className="done-save" />}
+
+      {xp?.earned ? (
+        <XpEarned xp={xp} seconds={song.seconds} rankedUp={rankedUp} />
+      ) : xp && onSignIn ? (
+        <p className="save-note done-save">
+          This plank would have earned {xp.award.total.toLocaleString()} XP.{' '}
+          <button type="button" className="text-btn" onClick={onSignIn}>
+            Sign in
+          </button>{' '}
+          to start earning XP.
+        </p>
+      ) : (
+        onSignIn && <SaveNote onSignIn={onSignIn} className="done-save" />
+      )}
 
       {next && (
         <section className="done-next" aria-labelledby="done-next-heading">
           <div className="done-next-head">
-            <h3 id="done-next-heading">Tomorrow</h3>
+            <h3 id="done-next-heading">Up next</h3>
             <p className="meta">Level {next.level}</p>
           </div>
           <SongLine song={next.song} />
+          <div>
+            <button type="button" className="btn btn-secondary" onClick={() => onNext(next.song, `Level ${next.level} of ${LADDER.length}`)}>
+              Keep climbing
+            </button>
+          </div>
         </section>
       )}
     </div>
+  )
+}
+
+/** "+318 XP", where it came from, and the rank it moves you along. */
+function XpEarned({ xp, seconds, rankedUp }: { xp: FinishXp; seconds: number; rankedUp: boolean }) {
+  const { award } = xp
+  const rank = rankFor(xp.after)
+  const detail =
+    award.kind === 'marathon'
+      ? `+${award.bonus.toLocaleString()} marathon bonus: no breaks on a song over 6 minutes`
+      : award.kind === 'clean'
+        ? `+${award.bonus.toLocaleString()} no-break bonus`
+        : seconds >= MARATHON_SECONDS
+          ? 'Hold it with no breaks for double XP.'
+          : 'Hold it with no breaks for +50% XP.'
+  return (
+    <section className="done-xp" aria-label="XP earned">
+      <p className="done-xp-total">+{award.total.toLocaleString()} XP</p>
+      <p className="done-xp-detail">
+        {award.base.toLocaleString()} for {formatDuration(seconds)} of song · {detail}
+      </p>
+      <RankBar rank={rank} />
+      {rankedUp && (
+        <p className="done-rankup">
+          <StarMark size={14} />
+          Rank up. You're rank {rank.rank}.
+        </p>
+      )}
+    </section>
   )
 }
 

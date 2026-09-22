@@ -66,8 +66,9 @@ export function onPlankRecorded(fn: (added: Completion[], ladder: LadderCursor) 
   return () => plankListeners.delete(fn)
 }
 
-export function recordPlank(song: Song, pauses: Pause[] = []): Completion[] {
-  const { data: next, added } = applyPlank(data, song, todayKey(), new Date().toISOString(), pauses)
+/** `earnXp`: the player is signed in, so the plank earns XP. */
+export function recordPlank(song: Song, pauses: Pause[] = [], earnXp = false): Completion[] {
+  const { data: next, added } = applyPlank(data, song, todayKey(), new Date().toISOString(), pauses, earnXp)
   if (added.length > 0) {
     commit(next)
     plankListeners.forEach((fn) => fn(added, next.ladder))

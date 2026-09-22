@@ -874,6 +874,16 @@ a {
   filter: brightness(1.06);
 }
 
+/* Ladder levels only: planked, but not today's song, so no streak. A small ring, bottom right. */
+.day.climbed::after {
+  content: '';
+  align-self: flex-end;
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid var(--ink-2);
+  border-radius: 50%;
+}
+
 .day.today {
   box-shadow: inset 0 0 0 1.5px var(--ink);
   color: var(--ink);
@@ -1712,9 +1722,131 @@ a {
   font-variant-numeric: tabular-nums;
 }
 
+/* Rank: the number, XP so far out of the next rank, and a thin bar */
+
+.rank {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.rank-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rank-name {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.rank .bar > span {
+  background: var(--held);
+}
+
+/* XP on the finished screen */
+
+.done-xp {
+  display: flex;
+  flex-direction: column;
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid var(--rule);
+}
+
+.done-xp-total {
+  font-family: var(--mono);
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 34px;
+  font-variant-numeric: tabular-nums;
+}
+
+.done-xp-detail {
+  margin-top: 4px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-2);
+}
+
+.done-xp .rank {
+  margin-top: 16px;
+}
+
+.done-rankup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+/* Confetti: a small one-off burst for today's song done (and rank ups) */
+
+.done-streak {
+  position: relative;
+}
+
+.confetti-anchor {
+  position: absolute;
+  left: 56px;
+  top: 55%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.confetti {
+  position: fixed;
+  z-index: 60;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.confetti > span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 1px;
+  opacity: 0;
+  animation-name: confetti-burst;
+  animation-fill-mode: forwards;
+}
+
+.confetti-star {
+  clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
+}
+
+@keyframes confetti-burst {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
+  }
+  35% {
+    opacity: 1;
+    transform: translate(calc(var(--x) * 0.7), var(--y)) rotate(calc(var(--spin) * 0.4));
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.6);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--x), calc(var(--y) + 420px)) rotate(var(--spin));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .plank,
   .plank-time.counting {
     animation: none;
+  }
+  .confetti {
+    display: none;
   }
 }

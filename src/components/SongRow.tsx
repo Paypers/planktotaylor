@@ -49,9 +49,17 @@ export function SongRow({ eyebrow, song, done, startLabel, onStart, onShare, onA
             )}
           </>
         ) : (
-          <button type="button" className="btn btn-primary" onClick={onStart}>
-            {startLabel}
-          </button>
+          <>
+            <button type="button" className="btn btn-primary" onClick={onStart}>
+              {startLabel}
+            </button>
+            {/* The ladder: the next level's up, and today's climb can still be shared. */}
+            {onShare && (
+              <button type="button" className="btn btn-secondary" onClick={onShare}>
+                Share
+              </button>
+            )}
+          </>
         )}
       </div>
     </article>

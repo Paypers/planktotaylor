@@ -1,4 +1,4 @@
-import { ALBUMS, formatDuration } from '../data/songs'
+import { ALBUMS, LADDER, formatDuration } from '../data/songs'
 import { formatShortDate } from './dates'
 import { pauseLabel, plankHeadline, plankSegments, plankSummary, type ShareInput } from './share'
 
@@ -55,13 +55,22 @@ export async function renderShareCard(share: ShareInput): Promise<Blob> {
   text(ctx, `No. ${share.dailyNumber} · ${formatShortDate(share.day)}`, right, 126, `500 30px ${MONO}`, COLOR.ink2, 'right')
   rule(ctx, left, right, 168, 3, COLOR.ink)
 
-  // The streak, big, as on the finished screen: the number, then the flame over "day streak".
+  // Big, as on the finished screen: the streak with its flame, or for a ladder level with no
+  // streak going yet, how far up the ladder you are.
+  const showLadder = share.streak === 0 && share.level !== undefined
+  const big = String(showLadder ? share.level : share.streak)
   const numberFont = `600 300px ${DISPLAY}`
   ctx.font = numberFont
-  const numberWidth = ctx.measureText(String(share.streak)).width
-  text(ctx, String(share.streak), left - 10, 494, numberFont, COLOR.ink)
-  icon(ctx, FLAME, left + numberWidth + 12, 372, 60, COLOR.signal, true)
-  text(ctx, 'day streak', left + numberWidth + 16, 486, `500 44px ${SANS}`, COLOR.ink2)
+  const numberWidth = ctx.measureText(big).width
+  text(ctx, big, left - 10, 494, numberFont, COLOR.ink)
+  const unitFont = `500 44px ${SANS}`
+  if (showLadder) {
+    text(ctx, `of ${LADDER.length}`, left + numberWidth + 16, 432, unitFont, COLOR.ink2)
+    text(ctx, 'on the ladder', left + numberWidth + 16, 486, unitFont, COLOR.ink2)
+  } else {
+    icon(ctx, FLAME, left + numberWidth + 12, 372, 60, COLOR.signal, true)
+    text(ctx, 'day streak', left + numberWidth + 16, 486, unitFont, COLOR.ink2)
+  }
 
   text(ctx, plankHeadline(share.daily, share.level), left, 628, `600 76px ${DISPLAY}`, COLOR.ink)
 
@@ -91,6 +100,7 @@ export async function renderShareCard(share: ShareInput): Promise<Blob> {
   const barTop = rowBottom + 132
   bar(ctx, share, left, right, barTop)
   text(ctx, plankSummary(share.pauses, song.seconds), left, barTop + 32 + 58, `500 30px ${MONO}`, COLOR.ink2)
+  if (share.xp) text(ctx, `+${share.xp.toLocaleString()} XP`, right, barTop + 32 + 58, `600 30px ${MONO}`, COLOR.ink, 'right')
 
   // Footer: the invite and where to find it.
   rule(ctx, left, right, CARD_HEIGHT - MARGIN - 108, 2, COLOR.rule)

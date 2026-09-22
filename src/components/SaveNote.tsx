@@ -9,7 +9,7 @@ export function SaveNote({ onSignIn, className = '' }: { onSignIn: () => void; c
       <button type="button" className="text-btn" onClick={onSignIn}>
         Sign in
       </button>{' '}
-      to keep your streak on any device.
+      to keep your streak on any device and earn XP.
     </p>
   )
 }

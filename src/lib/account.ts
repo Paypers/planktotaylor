@@ -73,6 +73,7 @@ interface CompletionRow {
   seconds: number
   completed_at: string
   pauses: Pause[] | null
+  xp: number | null
 }
 
 const toRow = (userId: string, c: Completion): CompletionRow => ({
@@ -84,6 +85,7 @@ const toRow = (userId: string, c: Completion): CompletionRow => ({
   seconds: c.seconds,
   completed_at: c.at,
   pauses: c.pauses ?? null,
+  xp: c.xp ?? null,
 })
 
 const fromRow = (row: CompletionRow): Completion => ({
@@ -95,6 +97,7 @@ const fromRow = (row: CompletionRow): Completion => ({
   // Postgres formats timestamps differently from JS; normalise so string comparisons hold.
   at: new Date(row.completed_at).toISOString(),
   ...(row.pauses?.length ? { pauses: row.pauses } : {}),
+  ...(row.xp != null ? { xp: row.xp } : {}),
 })
 
 async function fetchAllCompletions(supabase: SupabaseClient): Promise<Completion[]> {
@@ -103,7 +106,7 @@ async function fetchAllCompletions(supabase: SupabaseClient): Promise<Completion
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabase
       .from('plank_completions')
-      .select('user_id, day, mode, song_id, level, seconds, completed_at, pauses')
+      .select('user_id, day, mode, song_id, level, seconds, completed_at, pauses, xp')
       .order('day')
       .range(from, from + pageSize - 1)
     if (error) throw error
@@ -115,7 +118,7 @@ async function fetchAllCompletions(supabase: SupabaseClient): Promise<Completion
 async function upsertCompletions(supabase: SupabaseClient, userId: string, completions: Completion[]) {
   const { error } = await supabase
     .from('plank_completions')
-    .upsert(completions.map((c) => toRow(userId, c)), { onConflict: 'user_id,day,mode', ignoreDuplicates: true })
+    .upsert(completions.map((c) => toRow(userId, c)), { onConflict: 'user_id,day,mode,song_id', ignoreDuplicates: true })
   if (error) throw error
 }
 

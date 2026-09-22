@@ -1,7 +1,8 @@
 -- Plank to Taylor: accounts, sync and the global daily counter.
 -- Paste into Supabase → SQL Editor → Run. Safe to run more than once.
 
--- One row per finished plank. At most one daily and one ladder plank per user per day.
+-- One row per finished plank: today's song once a day, and any number of ladder levels a day
+-- (each song once a day).
 create table if not exists public.plank_completions (
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
   day date not null,
@@ -12,10 +13,15 @@ create table if not exists public.plank_completions (
   completed_at timestamptz not null default now(),
   -- Breaks taken during the plank: [{ "at": seconds into the song, "ms": length }]. Null = none.
   pauses jsonb,
-  primary key (user_id, day, mode)
+  -- XP the plank earned. A plank that counted twice carries it on one row only.
+  xp int check (xp is null or xp >= 0),
+  primary key (user_id, day, mode, song_id)
 );
--- For databases created before pauses were recorded.
+-- For databases created before pauses, XP, and more than one ladder level a day.
 alter table public.plank_completions add column if not exists pauses jsonb;
+alter table public.plank_completions add column if not exists xp int check (xp is null or xp >= 0);
+alter table public.plank_completions drop constraint if exists plank_completions_pkey;
+alter table public.plank_completions add primary key (user_id, day, mode, song_id);
 
 -- Where each user is on the shortest-to-longest ladder.
 create table if not exists public.plank_profiles (

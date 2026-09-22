@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { LADDER, SONGS, formatDuration, slugify } from '../data/songs'
 import { DAILY_EPOCH, dailyNumber, dailySong } from './daily'
 import { addDays, daysBetween } from './dates'
-import { applyPlank, emptyData, ladderView, mergeCompletions, newerCursor, type Completion } from './progress'
+import { applyPlank, emptyData, ladderView, mergeCompletions, newerCursor, streakDays, type Completion } from './progress'
 import { normalizeTitle, parseIsoDuration, pickVideo, videoSongName, type VideoCandidate } from './match'
 import { pauseLabel, plankBar, plankHeadline, plankSegments, plankSummary } from './share'
 import { runLengths, streakInfo } from './streaks'
+import { plankXp, rankFor, totalXp } from './xp'
 
 describe('catalog', () => {
   it('has unique ids and sane lengths', () => {
@@ -77,22 +78,58 @@ describe('recording planks', () => {
   const today = '2026-09-22'
   const at = '2026-09-22T12:00:00.000Z'
 
-  it('advances the ladder once per day', () => {
+  it('climbs as many ladder levels in a day as you like', () => {
     const first = applyPlank(emptyData(), LADDER[0], today, at)
-    expect(first.added).toHaveLength(first.added[0].mode === 'daily' ? 2 : 1)
     expect(first.data.ladder.level).toBe(2)
-    expect(ladderView(first.data, today).doneToday?.level).toBe(1)
-    // The next level isn't "today's ladder song" until tomorrow.
-    const again = applyPlank(first.data, LADDER[1], today, at)
-    expect(again.added.filter((c) => c.mode === 'ladder')).toHaveLength(0)
+    const second = applyPlank(first.data, LADDER[1], today, '2026-09-22T12:05:00.000Z')
+    expect(second.added.find((c) => c.mode === 'ladder')?.level).toBe(2)
+    expect(second.data.ladder.level).toBe(3)
+    expect(ladderView(second.data, today).climbedToday.map((c) => c.level)).toEqual([1, 2])
   })
 
-  it("counts twice when today's song is also the ladder level", () => {
+  it("keeps the streak for today's song only", () => {
+    const daily = dailySong(today)
+    const ladderOnly = LADDER.find((s) => s.id !== daily.id)!
+    const level = LADDER.indexOf(ladderOnly) + 1
+    const climbed = applyPlank({ ...emptyData(), ladder: { level, updatedAt: at } }, ladderOnly, today, at)
+    expect(climbed.added.map((c) => c.mode)).toEqual(['ladder'])
+    expect(streakDays(climbed.data.completions).has(today)).toBe(false)
+    const both = applyPlank(climbed.data, daily, today, at)
+    expect(streakDays(both.data.completions).has(today)).toBe(true)
+  })
+
+  it("counts twice when today's song is also the ladder level, but pays XP once", () => {
     const daily = dailySong(today)
     const level = LADDER.findIndex((s) => s.id === daily.id) + 1
     const data = { ...emptyData(), ladder: { level, updatedAt: at } }
-    const { added } = applyPlank(data, daily, today, at)
+    const { added } = applyPlank(data, daily, today, at, [], true)
     expect(added.map((c) => c.mode).sort()).toEqual(['daily', 'ladder'])
+    expect(totalXp(added)).toBe(plankXp(daily.seconds, []).total)
+  })
+
+  it('only earns XP when signed in', () => {
+    expect(totalXp(applyPlank(emptyData(), LADDER[0], today, at).added)).toBe(0)
+    expect(totalXp(applyPlank(emptyData(), LADDER[0], today, at, [], true).added)).toBeGreaterThan(0)
+  })
+})
+
+describe('xp', () => {
+  it('gives a point a second, and never takes any away for breaks', () => {
+    expect(plankXp(212, [{ at: 60, ms: 9_000 }])).toEqual({ base: 212, bonus: 0, total: 212, kind: 'held' })
+  })
+
+  it('adds half again for no breaks, and doubles it on songs over 6 minutes', () => {
+    expect(plankXp(212, [])).toEqual({ base: 212, bonus: 106, total: 318, kind: 'clean' })
+    // All Too Well (10 Minute Version) straight through.
+    expect(plankXp(613, [])).toEqual({ base: 613, bonus: 613, total: 1226, kind: 'marathon' })
+    expect(plankXp(613, [{ at: 300, ms: 5_000 }]).kind).toBe('held')
+  })
+
+  it('spaces ranks further apart as you go', () => {
+    expect(rankFor(0)).toMatchObject({ rank: 1, floor: 0, next: 500 })
+    expect(rankFor(499).rank).toBe(1)
+    expect(rankFor(500)).toMatchObject({ rank: 2, floor: 500, next: 1500 })
+    expect(rankFor(22_500).rank).toBe(10)
   })
 })
 

@@ -3,8 +3,8 @@
 Hold a plank for one Taylor Swift song a day.
 
 - **Today's song**: one random song per calendar day, the same for everyone (like Wordle). Songs are dealt from a shuffled deck, so all 243 come up before any repeat.
-- **Your ladder**: the whole catalog sorted shortest to longest. Level 1 is *I Look in People's Windows* (2:11). The last level is *All Too Well (10 Minute Version)* (10:13). One level a day.
-- **Streaks**: any finished plank counts for the day. You get a 🔥 streak, a calendar where each planked day is colored by that song's album, and your best streak, total planks and total time.
+- **Your ladder**: the whole catalog sorted shortest to longest. Level 1 is *I Look in People's Windows* (2:11). The last level is *All Too Well (10 Minute Version)* (10:13). Climb as many levels a day as you like.
+- **Streaks**: planking today's song keeps your streak. Ladder levels don't count towards it. You get a 🔥 streak, a calendar where each planked day is colored by that song's album, and your best streak, total planks and total time.
 - **Music**: the song's album track (Taylor's Version where there is one) plays from YouTube on the plank screen, starting when the countdown hits zero.
 - **No sign-up needed**: progress is saved in the browser. Signing in (optional) syncs it across devices.
 
@@ -53,7 +53,7 @@ How playback behaves:
 4. Put the project URL and the **publishable (anon)** key in `VITE_SUPABASE_URL` / `VITE_SUPABASE_KEY`.
 5. Recommended: Authentication → Email Templates → Magic Link: add `{{ .Token }}` to the template. People who open the email on a different device from the one they're signing in on can then type the 6-digit code.
 
-Already ran `schema.sql` before pauses were recorded? Run it again. It adds the `pauses` column and leaves your data alone.
+Already ran `schema.sql` before? Run it again **before deploying new code**: it adds the `pauses` and `xp` columns and lets a day hold more than one ladder level, and leaves your data alone.
 
 This adds:
 - A **Sign in** button (email magic link or code, no passwords).
@@ -76,8 +76,10 @@ This adds:
 
 Rules worth knowing:
 - Days are the visitor's **local** calendar day, for the daily song and for streaks.
-- A streak stays alive until the end of the day after your last plank. The 🔥 in the header is grey until you've planked today.
-- One ladder level per day. If today's song happens to be your ladder level, one plank counts for both.
+- A streak stays alive until the end of the day after you last planked today's song. The 🔥 in the header is grey until you've planked today's song.
+- Climb as many ladder levels a day as you like (each song once a day). Only today's song keeps the streak; the calendar fills in those days and marks ladder-only days with a small ring. If today's song happens to be your ladder level, one plank counts for both.
+- **XP** (signed-in players only, in [src/lib/xp.ts](src/lib/xp.ts)): a point for every second of song. No breaks: +50%. No breaks on a song over 6 minutes: double. Breaks never cost anything. XP adds up into ranks (rank 2 at 500 XP, rank 10 at 22,500). Signed out, the finished screen says what a plank would have earned.
+- Finishing today's song (or ranking up) sets off a small burst of confetti, skipped when the device asks for reduced motion.
 - Stopping early doesn't count, but you can retry as often as you like. Pausing is fine; the pauses just show up in what you share.
 - **Sharing** opens a share box with two versions:
   - **An image card** (1080×1350, drawn on a canvas in [src/lib/shareCard.ts](src/lib/shareCard.ts)): the streak, the song, and the green and orange bar to scale with each pause labelled. Phones get Share image (the share sheet, with the link attached) and Copy image; computers get Copy image and Save image.

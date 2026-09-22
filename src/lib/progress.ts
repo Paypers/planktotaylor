@@ -1,6 +1,7 @@
 import { LADDER, SONG_BY_ID, type Song } from '../data/songs'
 import { dailyNumber, dailySong } from './daily'
 import type { DayKey } from './dates'
+import { plankXp } from './xp'
 
 export type Mode = 'daily' | 'ladder'
 
@@ -22,6 +23,11 @@ export interface Completion {
   at: string
   /** Breaks taken along the way; absent for a plank held straight through. */
   pauses?: Pause[]
+  /**
+   * XP earned, only when signed in. A plank that counts twice (today's song and a ladder level)
+   * carries its XP on the first record only.
+   */
+  xp?: number
 }
 
 export interface LadderCursor {
@@ -51,10 +57,12 @@ export function emptyData(): AppData {
   }
 }
 
-export const completionKey = (c: Pick<Completion, 'day' | 'mode'>) => `${c.day}|${c.mode}`
+/** One daily plank a day, and one plank of each ladder song a day. */
+export const completionKey = (c: Pick<Completion, 'day' | 'mode' | 'songId'>) => `${c.day}|${c.mode}|${c.songId}`
 
-export function plankedDays(completions: readonly Completion[]): Set<DayKey> {
-  return new Set(completions.map((c) => c.day))
+/** Days you planked today's song: the streak. Ladder levels don't count towards it. */
+export function streakDays(completions: readonly Completion[]): Set<DayKey> {
+  return new Set(completions.filter((c) => c.mode === 'daily').map((c) => c.day))
 }
 
 export interface DailyView {
@@ -76,8 +84,8 @@ export interface LadderView {
   /** The level that is up next. */
   level: number
   song: Song | null
-  /** Today's ladder plank, if it's already done. */
-  doneToday: Completion | null
+  /** Ladder levels climbed today, in order. There's no limit: climb as many as you like. */
+  climbedToday: Completion[]
   /** Every level has been planked. */
   finished: boolean
 }
@@ -89,14 +97,15 @@ export function ladderView(data: AppData, today: DayKey): LadderView {
     total,
     level,
     song: LADDER[level - 1] ?? null,
-    doneToday: data.completions.find((c) => c.mode === 'ladder' && c.day === today) ?? null,
+    climbedToday: data.completions.filter((c) => c.mode === 'ladder' && c.day === today).sort((a, b) => a.at.localeCompare(b.at)),
     finished: level > total,
   }
 }
 
 /**
- * What finishing a plank of `song` today counts for. One plank can count twice when
- * today's global song happens to be your ladder level too.
+ * What finishing a plank of `song` today counts for: today's song (once a day), the next ladder
+ * level (as many a day as you like), or both at once when they're the same song.
+ * `earnXp` is for signed-in players; the XP goes on the first record so a two-for-one isn't paid twice.
  */
 export function applyPlank(
   data: AppData,
@@ -104,6 +113,7 @@ export function applyPlank(
   today: DayKey,
   at: string,
   pauses: Pause[] = [],
+  earnXp = false,
 ): { data: AppData; added: Completion[] } {
   const added: Completion[] = []
   const daily = dailyView(data, today)
@@ -114,22 +124,25 @@ export function applyPlank(
   if (daily.song.id === song.id && !daily.done) {
     added.push({ day: today, mode: 'daily', songId: song.id, seconds: song.seconds, at, ...extra })
   }
-  if (ladder.song?.id === song.id && !ladder.doneToday) {
+  // The same song twice in a day (after moving back down the ladder) only counts once.
+  const againToday = ladder.climbedToday.some((c) => c.songId === song.id)
+  if (ladder.song?.id === song.id && !againToday) {
     added.push({ day: today, mode: 'ladder', songId: song.id, level: ladder.level, seconds: song.seconds, at, ...extra })
     cursor = { level: ladder.level + 1, updatedAt: at }
   }
   if (added.length === 0) return { data, added }
+  if (earnXp) added[0] = { ...added[0], xp: plankXp(song.seconds, pauses).total }
   return { data: { ...data, completions: [...data.completions, ...added], ladder: cursor }, added }
 }
 
-/** Union of two histories; when both have the same day+mode, the earlier plank wins. */
+/** Union of two histories; when both have the same plank, the earlier one wins. */
 export function mergeCompletions(a: readonly Completion[], b: readonly Completion[]): Completion[] {
   const byKey = new Map<string, Completion>()
   for (const c of [...a, ...b]) {
     const existing = byKey.get(completionKey(c))
     if (!existing || c.at < existing.at) byKey.set(completionKey(c), c)
   }
-  return [...byKey.values()].sort((x, y) => x.day.localeCompare(y.day) || x.mode.localeCompare(y.mode))
+  return [...byKey.values()].sort((x, y) => x.day.localeCompare(y.day) || x.at.localeCompare(y.at) || x.mode.localeCompare(y.mode))
 }
 
 export function newerCursor(a: LadderCursor, b: LadderCursor): LadderCursor {
