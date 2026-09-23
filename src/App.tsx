@@ -3,6 +3,7 @@ import { AccountDialog } from './components/AccountDialog'
 import { Avatar } from './components/Avatar'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { HistoryDialog } from './components/HistoryDialog'
+import { HelpPage } from './components/HelpPage'
 import { Flame, Icon, StarMark } from './components/Icon'
 import { LevelDialog } from './components/LevelDialog'
 import { MusicDialog } from './components/MusicDialog'
@@ -20,7 +21,7 @@ import { fromDayKey } from './lib/dates'
 import { useToday } from './lib/hooks'
 import { dailyView, ladderView, songFor, streakDays, type Completion, type Pause } from './lib/progress'
 import { dailyNumber } from './lib/daily'
-import { followLink, hashFor, HOME, useRoute, type Route } from './lib/route'
+import { followLink, hashFor, HELP, HOME, useRoute, type Route } from './lib/route'
 import { playerRank, rankName } from './lib/ranks'
 import { plankSummary, type ShareInput } from './lib/share'
 import { getData, recordPlank, setLadderLevel, useAppData } from './lib/store'
@@ -169,6 +170,15 @@ export function App() {
               <span className="streak-pill-num">{streak.current}</span>
               <span className="sr-only">-day streak</span>
             </span>
+            <a
+              href={hashFor(HELP)}
+              className="icon-btn"
+              onClick={(e) => followLink(e, HELP)}
+              aria-label="How it works"
+              aria-current={route.page === 'help' ? 'page' : undefined}
+            >
+              <Icon name="info" />
+            </a>
             <button type="button" className="icon-btn" onClick={() => setDialog('music')} aria-label="Music and sound">
               <Icon name="music" />
             </button>
@@ -319,6 +329,11 @@ export function App() {
         {route.page === 'ranks' && (
           <main>
             <RanksPage rank={rank} onSignIn={offerSignIn} />
+          </main>
+        )}
+        {route.page === 'help' && (
+          <main>
+            <HelpPage />
           </main>
         )}
 

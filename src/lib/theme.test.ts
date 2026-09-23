@@ -164,6 +164,11 @@ describe('routes', () => {
     expect(parseRoute('#ranks/sonnet')).toEqual({ page: 'home' })
   })
 
+  it('reads the help page from the address', () => {
+    expect(parseRoute('#help')).toEqual({ page: 'help' })
+    expect(parseRoute('#Help/')).toEqual({ page: 'help' })
+  })
+
   it('leaves sign-in links alone', () => {
     expect(parseRoute('#access_token=abc&type=magiclink')).toEqual({ page: 'home' })
   })

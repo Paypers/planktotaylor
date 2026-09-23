@@ -54,6 +54,13 @@ const PATHS: Record<IconName, ReactNode> = {
       <path d="M12 5v14" />
     </>
   ),
+  info: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 16v-4" />
+      <path d="M12 8h.01" />
+    </>
+  ),
 }
 
 export type IconName =
@@ -68,6 +75,7 @@ export type IconName =
   | 'settings'
   | 'palette'
   | 'plus'
+  | 'info'
 
 interface Props {
   name: IconName

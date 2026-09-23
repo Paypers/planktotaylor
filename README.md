@@ -85,7 +85,7 @@ Security, in short:
 | Plank timer screen | [src/components/PlankTimer.tsx](src/components/PlankTimer.tsx) |
 | Settings page and its sections | [src/components/settings/](src/components/settings/) |
 | Theme colors, saving and applying themes | [src/lib/palette.ts](src/lib/palette.ts), [src/lib/theme.ts](src/lib/theme.ts) |
-| Page addresses (`#settings/…`, `#ranks`) | [src/lib/route.ts](src/lib/route.ts) |
+| Page addresses (`#settings/…`, `#ranks`, `#help`) | [src/lib/route.ts](src/lib/route.ts) |
 
 Rules worth knowing:
 - Days are the visitor's **local** calendar day, for the daily song and for streaks.
@@ -94,6 +94,7 @@ Rules worth knowing:
 - **XP** (signed-in players only, in [src/lib/xp.ts](src/lib/xp.ts)): a point for every second of song. No breaks: +50%. No breaks on a song over 6 minutes: double. Breaks never cost anything. XP is paid once per plank: today's song earns it every day, a ladder level the first time it's climbed. Doing either again earns nothing, except that the first go held with no breaks, after only goes with breaks, earns the no-break bonus. Signed out, the finished screen says what a plank would have earned.
 - **Ranks** (in [src/lib/ranks.ts](src/lib/ranks.ts)): each is a bigger piece of writing than the last: Scribble, Couplet, Verse, Sonnet, Ballad, Chapter and Anthology, each with four divisions (IV to I), then Manuscript, Masterpiece and Magnum Opus. XP moves you through the divisions (Scribble III at 500 XP, Sonnet IV at 39,000). Each new tier also needs a ladder level: Couplet level 10, Verse 25, Sonnet 50, Ballad 100, Chapter 150, Anthology 200. Until you reach it, you stay at I and see what it takes. Manuscript needs every level climbed; Masterpiece and Magnum Opus need every level held with no breaks at least once.
 - **Plaques and emblems** ([src/components/Rank.tsx](src/components/Rank.tsx), [src/components/RankEmblem.tsx](src/components/RankEmblem.tsx)): where the rank is a label (under your name, on your photo on phones, beside the XP bar) it's a plaque: the same flat plate for every rank in its tier's colour, always in the sans. Where the rank is the subject (your profile, a rank up) it's the emblem: a medallion holding that rank's piece of writing.
+- **How it works** (`#help`, [src/components/HelpPage.tsx](src/components/HelpPage.tsx)) opens from the ⓘ button in the header: planking, breaks, today's song and the streak, the ladder, XP and ranks, accounts and sharing, in plain words. Change a rule and change it there too. The XP and account parts only show when accounts are on.
 - **The Ranks page** (`#ranks`, [src/components/RanksPage.tsx](src/components/RanksPage.tsx)) opens from your plaque, under your name in the header, beside the XP bar in Streak, or in your profile. It shows your rank with your tier's four divisions, how XP and ranks work, every rank's emblem with the ladder level and XP it takes, and a full table of all 31 divisions. Its numbers come straight from [src/lib/ranks.ts](src/lib/ranks.ts) and [src/lib/xp.ts](src/lib/xp.ts), so retuning either updates the page.
 - Finishing today's song (or ranking up) sets off a small burst of confetti, skipped when the device asks for reduced motion.
 - Stopping early doesn't count, but you can retry as often as you like. Pausing is fine; the pauses just show up in what you share.

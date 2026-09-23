@@ -300,7 +300,13 @@ a {
   letter-spacing: -0.01em;
 }
 
-/* Narrower still, the name gives way before the buttons do. */
+/* The narrowest phones set the name a size down; narrower still, it gives way before the buttons do. */
+@media (max-width: 419px) {
+  .brand {
+    font-size: 16px;
+  }
+}
+
 .brand span {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -323,7 +329,7 @@ a {
 }
 
 .header-actions .icon-btn {
-  width: 40px;
+  width: 36px;
 }
 
 .header-actions .icon-btn[aria-current='page'] {
@@ -2920,13 +2926,13 @@ a {
   }
 }
 
-/* Ranks: your rank, how ranks work, and every rank with its emblem. Opened from your plaque. */
+/* Ranks and Help: pages of their own, set like the home page. Rules are a term beside its text. */
 
-.ranks {
+.info-page {
   padding-bottom: 32px;
 }
 
-.ranks .section-body {
+.info-page .section-body {
   padding-top: 16px;
 }
 
@@ -2985,14 +2991,14 @@ a {
   font-variant-numeric: tabular-nums;
 }
 
-.ranks-rules {
+.rules {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   max-width: 720px;
   margin: 0;
 }
 
-.ranks-rules dt {
+.rules dt {
   padding-top: 14px;
   border-top: 1px solid var(--rule);
   font-size: 15px;
@@ -3000,12 +3006,12 @@ a {
   line-height: 22px;
 }
 
-.ranks-rules dt:first-of-type {
+.rules dt:first-of-type {
   padding-top: 0;
   border-top: 0;
 }
 
-.ranks-rules dd {
+.rules dd {
   margin: 4px 0 14px;
   font-size: 15px;
   line-height: 23px;
@@ -3013,18 +3019,18 @@ a {
 }
 
 @media (min-width: 760px) {
-  .ranks-rules {
+  .rules {
     grid-template-columns: 140px minmax(0, 1fr);
     column-gap: 24px;
   }
-  .ranks-rules dt,
-  .ranks-rules dd {
+  .rules dt,
+  .rules dd {
     margin: 0;
     padding: 14px 0;
     border-top: 1px solid var(--rule);
   }
-  .ranks-rules dt:first-of-type,
-  .ranks-rules dd:first-of-type {
+  .rules dt:first-of-type,
+  .rules dd:first-of-type {
     padding-top: 0;
     border-top: 0;
   }

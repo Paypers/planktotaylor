@@ -1,7 +1,7 @@
-import { useEffect, useRef, type CSSProperties } from 'react'
+import type { CSSProperties } from 'react'
 import { RANK_STEPS, rankName, TIERS, tierStart, type PlayerRank, type Tier } from '../lib/ranks'
-import { HOME, navigate } from '../lib/route'
 import { CLEAN_BONUS, MARATHON_BONUS, MARATHON_SECONDS } from '../lib/xp'
+import { PageTop } from './PageTop'
 import { RankCard, RankPlaque } from './Rank'
 import { RankEmblem } from './RankEmblem'
 
@@ -23,29 +23,9 @@ interface Props {
 
 /** Every rank, what each one takes, and where you are: opened from your plaque. */
 export function RanksPage({ rank, onSignIn }: Props) {
-  const heading = useRef<HTMLHeadingElement>(null)
-
-  useEffect(() => {
-    document.title = 'Ranks · Plank to Taylor'
-    // Screen readers start from the heading, as on a new page.
-    heading.current?.focus({ preventScroll: true })
-    return () => {
-      document.title = 'Plank to Taylor'
-    }
-  }, [])
-
   return (
-    <div className="ranks">
-      <div className="grid">
-        <div className="page-top">
-          <h1 ref={heading} tabIndex={-1} className="page-title">
-            Ranks
-          </h1>
-          <button type="button" className="btn btn-secondary" onClick={() => navigate(HOME)}>
-            Done
-          </button>
-        </div>
-      </div>
+    <div className="info-page">
+      <PageTop title="Ranks" />
 
       {(rank || onSignIn) && (
         <section className="section grid" aria-labelledby="ranks-yours">
@@ -78,7 +58,7 @@ export function RanksPage({ rank, onSignIn }: Props) {
         <div className="section-label">
           <h2 id="ranks-how">How it works</h2>
         </div>
-        <dl className="section-body ranks-rules">
+        <dl className="section-body rules">
           <dt>XP</dt>
           <dd>
             A point for every second of song you hold. No breaks: +{percent(CLEAN_BONUS)}. No breaks on a song{' '}

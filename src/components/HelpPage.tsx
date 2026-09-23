@@ -1,0 +1,121 @@
+import type { ReactNode } from 'react'
+import { LADDER } from '../data/songs'
+import { accountsEnabled } from '../lib/account'
+import { followLink, hashFor, RANKS } from '../lib/route'
+import { PageTop } from './PageTop'
+
+/** One topic: its name in the left column on wide screens, the rules beside it. */
+function Topic({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+  return (
+    <section className="section grid" aria-labelledby={`help-${id}`}>
+      <div className="section-rule" />
+      <div className="section-label">
+        <h2 id={`help-${id}`}>{title}</h2>
+      </div>
+      <dl className="section-body rules">{children}</dl>
+    </section>
+  )
+}
+
+/** How the site works, from the info button in the header. */
+export function HelpPage() {
+  return (
+    <div className="info-page">
+      <PageTop title="How it works" />
+
+      <Topic id="plank" title="Planking">
+        <dt>Start</dt>
+        <dd>Get into position and press Start. After a 3-second countdown the song plays, and the timer runs with it.</dd>
+        <dt>Hold</dt>
+        <dd>A plank counts when you hold it to the end of the song. There's no skipping ahead.</dd>
+        <dt>Breaks</dt>
+        <dd>
+          Pausing is fine: use Pause, tap the video, or your phone's media controls, and the song and timer stop
+          together. Every break is noted, where in the song and for how long, and shows in what you share. A break
+          under a second doesn't count.
+        </dd>
+        <dt>Ending early</dt>
+        <dd>
+          Give up, close the plank, leave the page or lose your connection, and that attempt ends there. It's kept in
+          your plank history, and you can go again as often as you like.
+        </dd>
+        <dt>Music</dt>
+        <dd>
+          Each song plays as its album track from YouTube. Some phones only start it from a tap on the video. Turn
+          music off in Music & sound, or press Start without music, to plank to the timer alone.
+        </dd>
+      </Topic>
+
+      <Topic id="daily" title="Today's song">
+        <dt>The same for everyone</dt>
+        <dd>Everyone gets the same song each day, by their own calendar. New releases take the spot on their release day.</dd>
+        <dt>Your streak</dt>
+        <dd>
+          Plank today's song to keep your streak going. It lasts until the end of the day after you last planked it,
+          and the flame in the header lights up once today's is done. Ladder levels don't count towards it.
+        </dd>
+        <dt>Again</dt>
+        <dd>Plank today's song as many times as you like after that. The first go is the one that keeps your streak.</dd>
+      </Topic>
+
+      <Topic id="ladder" title="The ladder">
+        <dt>Climbing</dt>
+        <dd>
+          All {LADDER.length} songs, shortest to longest. Plank your next level to climb to the one after, as many a day
+          as you like. Levels are climbed in order, never skipped.
+        </dd>
+        <dt>Two for one</dt>
+        <dd>When today's song is also your ladder level, one plank counts for both.</dd>
+        <dt>The setlist</dt>
+        <dd>
+          Every level and how it went: a green tick for no breaks, an orange count for breaks. Tap a song for its
+          details, or to plank a level you've climbed again for practice. Practice never moves the ladder.
+        </dd>
+        <dt>The top</dt>
+        <dd>Once you've climbed every level, you can start again from level 1. Your streak and XP stay as they are.</dd>
+      </Topic>
+
+      {accountsEnabled && (
+        <>
+          <Topic id="xp" title="XP and ranks">
+            <dt>XP</dt>
+            <dd>
+              Signed in, every plank earns XP: a point for every second of song, with a bonus for holding it with no
+              breaks. Today's song pays every day, a ladder level the first time you climb it. Going again pays nothing,
+              unless it's your first go with no breaks after goes with breaks: that earns the bonus.
+            </dd>
+            <dt>Ranks</dt>
+            <dd>
+              XP and your ladder level move you from Scribble up to Magnum Opus. Your rank's plaque sits under your name.{' '}
+              <a href={hashFor(RANKS)} onClick={(e) => followLink(e, RANKS)}>
+                See every rank and what it takes
+              </a>
+              .
+            </dd>
+          </Topic>
+
+          <Topic id="account" title="Your account">
+            <dt>Without one</dt>
+            <dd>
+              Everything works without an account. Your progress stays in this browser; the only thing sent is an
+              anonymous +1 to today's count when you plank today's song.
+            </dd>
+            <dt>Signed in</dt>
+            <dd>
+              Your streak, ladder, XP, plank history, name, photo and settings follow you to every device you sign in on.
+              Progress from before you signed in comes along too.
+            </dd>
+          </Topic>
+        </>
+      )}
+
+      <Topic id="share" title="Sharing">
+        <dt>After a plank</dt>
+        <dd>
+          Share it as an image card or as text like Wordle: ten green squares for the song, with an orange one wherever
+          you paused.
+        </dd>
+      </Topic>
+    </div>
+  )
+}

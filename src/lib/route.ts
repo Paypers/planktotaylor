@@ -3,20 +3,22 @@ import { useSyncExternalStore, type MouseEvent } from 'react'
 // Pages live in the address's #hash, so any static host serves them and Back works.
 // Sign-in links use the hash too (#access_token=…): anything that isn't a page here is left alone.
 
-export type Route = { page: 'home' } | { page: 'settings'; section: string | null } | { page: 'ranks' }
+export type Route = { page: 'home' } | { page: 'settings'; section: string | null } | { page: 'ranks' } | { page: 'help' }
 
 export const HOME: Route = { page: 'home' }
 export const RANKS: Route = { page: 'ranks' }
+export const HELP: Route = { page: 'help' }
 
 export function parseRoute(hash: string): Route {
   if (/^#ranks\/?$/i.test(hash)) return RANKS
+  if (/^#help\/?$/i.test(hash)) return HELP
   const match = /^#settings(?:\/([a-z0-9-]+))?\/?$/i.exec(hash)
   return match ? { page: 'settings', section: match[1]?.toLowerCase() ?? null } : HOME
 }
 
 /** The route's #hash, '' for the home page. */
 export function hashFor(route: Route): string {
-  if (route.page === 'ranks') return '#ranks'
+  if (route.page === 'ranks' || route.page === 'help') return `#${route.page}`
   return route.page === 'settings' ? `#settings${route.section ? `/${route.section}` : ''}` : ''
 }
 
