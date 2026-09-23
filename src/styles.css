@@ -1152,8 +1152,10 @@ a {
   white-space: nowrap;
 }
 
-.track.done .track-title,
-.track.done .track-len {
+.track.clean .track-title,
+.track.clean .track-len,
+.track.breaks .track-title,
+.track.breaks .track-len {
   color: var(--ink-2);
 }
 
@@ -1207,6 +1209,120 @@ a {
 .track-status .up-next {
   font-size: 13px;
   line-height: 16px;
+}
+
+/* How each level went: a green tick (no breaks), an orange count (breaks), a dash (moved past).
+   The same colours as the plank bar and the shared squares. */
+.level-mark {
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.level-mark.clean {
+  background: var(--held);
+  color: var(--paper);
+}
+
+.level-mark.clean svg {
+  stroke-width: 3;
+}
+
+.level-mark.breaks {
+  background: var(--paused);
+  color: #2a1206;
+}
+
+.level-mark.passed {
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--faint);
+}
+
+/* Phones: three even tiles, the mark and count over the label. Wider: a row of pills. */
+.level-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.level-filter {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'mark count'
+    'label label';
+  align-items: center;
+  gap: 4px 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 18px;
+  text-align: left;
+}
+
+.level-filter .level-mark {
+  grid-area: mark;
+}
+
+.level-filter-label {
+  grid-area: label;
+}
+
+.level-filter .level-filter-count {
+  grid-area: count;
+}
+
+@media (min-width: 760px) {
+  .level-filters {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .level-filter {
+    display: inline-flex;
+    gap: 8px;
+    height: 40px;
+    padding: 0 14px 0 12px;
+    border-radius: 20px;
+  }
+  .level-filter .level-mark {
+    order: 0;
+  }
+  .level-filter-label {
+    order: 1;
+  }
+  .level-filter .level-filter-count {
+    order: 2;
+  }
+}
+
+.level-filter:hover {
+  background: var(--well);
+}
+
+.level-filter[aria-pressed='true'] {
+  border-color: var(--ink);
+  background: var(--well);
+  font-weight: 600;
+}
+
+.level-filter-count {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
 }
 
 .setlist-toggle {

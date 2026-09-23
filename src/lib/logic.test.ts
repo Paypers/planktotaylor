@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { LADDER, SONGS, formatDuration, slugify } from '../data/songs'
 import { DAILY_EPOCH, dailyNumber, dailySong } from './daily'
 import { addDays, daysBetween } from './dates'
-import { applyPlank, emptyData, ladderView, mergeCompletions, newerCursor, streakDays, type Completion } from './progress'
+import { applyPlank, emptyData, ladderRecords, ladderView, mergeCompletions, newerCursor, streakDays, type Completion } from './progress'
 import { normalizeTitle, parseIsoDuration, pickVideo, videoSongName, type VideoCandidate } from './match'
 import { pauseLabel, plankBar, plankHeadline, plankSegments, plankSummary } from './share'
 import { runLengths, streakInfo } from './streaks'
@@ -110,6 +110,101 @@ describe('recording planks', () => {
   it('only earns XP when signed in', () => {
     expect(totalXp(applyPlank(emptyData(), LADDER[0], today, at).added)).toBe(0)
     expect(totalXp(applyPlank(emptyData(), LADDER[0], today, at, [], true).added)).toBeGreaterThan(0)
+  })
+})
+
+describe('replays and XP', () => {
+  const today = '2026-09-22'
+  const tomorrow = '2026-09-23'
+  const t = (n: number) => `2026-09-22T12:0${n}:00.000Z`
+  const breaks = [{ at: 60, ms: 9_000 }]
+  const daily = dailySong(today)
+  const clean = plankXp(daily.seconds, [])
+  const held = plankXp(daily.seconds, breaks)
+
+  it("earns nothing for today's song again after a clean go", () => {
+    const first = applyPlank(emptyData(), daily, today, t(0), [], true)
+    const again = applyPlank(first.data, daily, today, t(1), [], true)
+    expect(again).toMatchObject({ kind: 'repeat', gained: 0, bonusLeft: false })
+    expect(totalXp(again.data.completions)).toBe(clean.total)
+  })
+
+  it('earns nothing for another go with breaks, but says the bonus is still there', () => {
+    const first = applyPlank(emptyData(), daily, today, t(0), breaks, true)
+    expect(first).toMatchObject({ gained: held.total, bonusLeft: true })
+    const again = applyPlank(first.data, daily, today, t(1), breaks, true)
+    expect(again).toMatchObject({ kind: 'repeat', gained: 0, bonusLeft: true })
+  })
+
+  it('pays the no-break bonus once, for the first go held straight through', () => {
+    const first = applyPlank(emptyData(), daily, today, t(0), breaks, true)
+    const straight = applyPlank(first.data, daily, today, t(1), [], true)
+    expect(straight).toMatchObject({ kind: 'upgrade', gained: clean.total - held.total })
+    expect(totalXp(straight.data.completions)).toBe(clean.total)
+    // Today's record is now the clean plank.
+    expect(straight.data.completions.find((c) => c.mode === 'daily')?.pauses).toBeUndefined()
+    const third = applyPlank(straight.data, daily, today, t(2), [], true)
+    expect(third).toMatchObject({ kind: 'repeat', gained: 0 })
+  })
+
+  it("pays a two-for-one's bonus once, not once per record", () => {
+    const level = LADDER.findIndex((s) => s.id === daily.id) + 1
+    const first = applyPlank({ ...emptyData(), ladder: { level, updatedAt: t(0) } }, daily, today, t(0), breaks, true)
+    const back = { ...first.data, ladder: { level, updatedAt: t(1) } }
+    const straight = applyPlank(back, daily, today, t(2), [], true)
+    expect(straight.gained).toBe(clean.total - held.total)
+    expect(totalXp(straight.data.completions)).toBe(clean.total)
+    expect(straight.updated.every((c) => c.pauses === undefined)).toBe(true)
+  })
+
+  it('pays a ladder level once, however many days you come back to it', () => {
+    const song = LADDER[0]
+    const first = applyPlank(emptyData(), song, today, t(0), [], true)
+    // Tomorrow: move back down to level 1 and plank it again.
+    const redo = applyPlank({ ...first.data, ladder: { level: 1, updatedAt: t(1) } }, song, tomorrow, '2026-09-23T12:00:00.000Z', [], true)
+    expect(redo).toMatchObject({ kind: 'new', gained: 0, bonusLeft: false })
+    expect(redo.data.ladder.level).toBe(2)
+  })
+
+  it('pays only the no-break bonus when a ladder level with breaks is redone straight through', () => {
+    const song = LADDER[0]
+    const first = applyPlank(emptyData(), song, today, t(0), breaks, true)
+    const back = { ...first.data, ladder: { level: 1, updatedAt: t(1) } }
+    const heldAgain = applyPlank(back, song, tomorrow, '2026-09-23T12:00:00.000Z', breaks, true)
+    expect(heldAgain).toMatchObject({ gained: 0, bonusLeft: true })
+    const straight = applyPlank(back, song, tomorrow, '2026-09-23T12:00:00.000Z', [], true)
+    expect(straight.gained).toBe(plankXp(song.seconds, []).bonus)
+  })
+
+  it('never pays a replay when signed out', () => {
+    const first = applyPlank(emptyData(), daily, today, t(0), breaks, false)
+    expect(applyPlank(first.data, daily, today, t(1), [], false).gained).toBe(0)
+  })
+
+  it('keeps the improved plank when syncing', () => {
+    const first = applyPlank(emptyData(), daily, today, t(0), breaks, true)
+    const straight = applyPlank(first.data, daily, today, t(1), [], true)
+    const [merged] = mergeCompletions(first.data.completions, straight.data.completions)
+    expect(merged).toMatchObject({ xp: clean.total })
+    expect(merged.pauses).toBeUndefined()
+  })
+})
+
+describe('setlist marks', () => {
+  it('shows each ladder song at its best: no breaks beats breaks, fewer breaks beat more', () => {
+    const c = (songId: string, pauses: number, mode: 'daily' | 'ladder' = 'ladder'): Completion => ({
+      day: '2026-09-22',
+      mode,
+      songId,
+      seconds: 100,
+      at: `2026-09-22T12:0${pauses}:00.000Z`,
+      ...(pauses ? { pauses: Array.from({ length: pauses }, (_, i) => ({ at: i * 10, ms: 2000 })) } : {}),
+    })
+    const records = ladderRecords([c('a', 3), c('a', 1), c('b', 2), c('b', 0), c('d', 0, 'daily')])
+    expect(records.get('a')).toEqual({ clean: false, breaks: 1 })
+    expect(records.get('b')).toEqual({ clean: true, breaks: 0 })
+    // Today's song doesn't mark the ladder.
+    expect(records.has('d')).toBe(false)
   })
 })
 

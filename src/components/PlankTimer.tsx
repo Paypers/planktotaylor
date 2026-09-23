@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ALBUMS, LADDER, formatDuration, type Song } from '../data/songs'
 import { useWakeLock } from '../lib/hooks'
-import type { Completion, Pause, Prefs } from '../lib/progress'
+import type { Completion, Pause, PlankResult, Prefs } from '../lib/progress'
 import { pausedSeconds, plankHeadline } from '../lib/share'
 import { sounds, unlockAudio } from '../lib/sound'
 import { MARATHON_SECONDS, rankFor, type XpAward } from '../lib/xp'
@@ -34,9 +34,15 @@ export interface FinishSummary {
 }
 
 export interface FinishXp {
+  /** What this go is worth on its own. */
   award: XpAward
   /** False for a signed-out player: shown as what they would have earned. */
   earned: boolean
+  /** XP actually added. Less than the award for a replay: only a first no-break go earns more. */
+  gained: number
+  kind: PlankResult['kind']
+  /** Holding this song with no breaks would still earn the no-break bonus. */
+  bonusLeft: boolean
   /** Total XP before and after this plank. */
   before: number
   after: number
@@ -549,14 +555,16 @@ function DoneView({
   const ladder = summary.counted.find((c) => c.mode === 'ladder')
   const daily = summary.counted.some((c) => c.mode === 'daily')
   const length = formatDuration(song.seconds)
-  const title = plankHeadline(daily, ladder?.level)
-  const text =
-    ladder && daily
+  const { next, xp } = summary
+  const upgraded = xp?.kind === 'upgrade'
+  const title = upgraded ? 'Straight through.' : plankHeadline(daily, ladder?.level)
+  const text = upgraded
+    ? 'No breaks this time, so the no-break bonus is yours.'
+    : ladder && daily
       ? `${song.title} counted for today's song and level ${ladder.level}.`
       : ladder || daily
         ? `You held a plank for all of ${song.title}, ${length}.`
         : `Today was already in the bag. That's ${length} more.`
-  const { next, xp } = summary
   const rankedUp = !!xp?.earned && rankFor(xp.after).rank > rankFor(xp.before).rank
   const album = ALBUMS[song.album]
 
@@ -590,7 +598,7 @@ function DoneView({
 
       {xp?.earned ? (
         <XpEarned xp={xp} seconds={song.seconds} rankedUp={rankedUp} />
-      ) : xp && onSignIn ? (
+      ) : xp?.kind === 'new' && onSignIn ? (
         <p className="save-note done-save">
           This plank would have earned {xp.award.total.toLocaleString()} XP.{' '}
           <button type="button" className="text-btn" onClick={onSignIn}>
@@ -620,24 +628,34 @@ function DoneView({
   )
 }
 
-/** "+318 XP", where it came from, and the rank it moves you along. */
+/** "+318 XP", where it came from, and the rank it moves you along. Replays say what's left to earn. */
 function XpEarned({ xp, seconds, rankedUp }: { xp: FinishXp; seconds: number; rankedUp: boolean }) {
-  const { award } = xp
+  const { award, gained } = xp
   const rank = rankFor(xp.after)
-  const detail =
-    award.kind === 'marathon'
-      ? `+${award.bonus.toLocaleString()} marathon bonus: no breaks on a song over 6 minutes`
-      : award.kind === 'clean'
-        ? `+${award.bonus.toLocaleString()} no-break bonus`
-        : seconds >= MARATHON_SECONDS
-          ? 'Hold it with no breaks for double XP.'
-          : 'Hold it with no breaks for +50% XP.'
+  const bonusName = seconds >= MARATHON_SECONDS ? 'marathon bonus (double XP)' : 'no-break bonus (+50%)'
+  let total = `+${gained.toLocaleString()} XP`
+  let detail: string
+  if (gained === 0) {
+    total = 'No new XP'
+    detail = xp.bonusLeft
+      ? `You've had this song's XP. Hold it with no breaks for the ${bonusName}.`
+      : "You've already earned all the XP this song gives."
+  } else if (gained < award.total) {
+    // A replay held straight through after a go with breaks.
+    detail = `${seconds >= MARATHON_SECONDS ? 'Marathon' : 'No-break'} bonus: straight through this time.`
+  } else {
+    const how =
+      award.kind === 'marathon'
+        ? `+${award.bonus.toLocaleString()} marathon bonus: no breaks on a song over 6 minutes`
+        : award.kind === 'clean'
+          ? `+${award.bonus.toLocaleString()} no-break bonus`
+          : `Go again with no breaks for the ${bonusName}.`
+    detail = `${award.base.toLocaleString()} for ${formatDuration(seconds)} of song · ${how}`
+  }
   return (
     <section className="done-xp" aria-label="XP earned">
-      <p className="done-xp-total">+{award.total.toLocaleString()} XP</p>
-      <p className="done-xp-detail">
-        {award.base.toLocaleString()} for {formatDuration(seconds)} of song · {detail}
-      </p>
+      <p className="done-xp-total">{total}</p>
+      <p className="done-xp-detail">{detail}</p>
       <RankBar rank={rank} />
       {rankedUp && (
         <p className="done-rankup">

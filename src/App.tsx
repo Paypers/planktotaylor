@@ -78,18 +78,28 @@ export function App() {
   const finish = useCallback(
     (song: Song, pauses: Pause[]): FinishSummary => {
       const before = totalXp(getData().completions)
-      const counted = recordPlank(song, pauses, earningXp)
+      // Any plank of your ladder level moves you up, a redone one included.
+      const climbing = ladderView(getData(), today).song?.id === song.id
+      const result = recordPlank(song, pauses, earningXp)
+      const counted = result.added
       if (counted.some((c) => c.mode === 'daily')) {
         void bumpDailyCount(today).then((n) => n !== null && setDailyCount(n))
       }
       const now = getData()
       const after = ladderView(now, today)
-      const next = counted.some((c) => c.mode === 'ladder') && after.song ? { level: after.level, song: after.song } : null
+      const next = climbing && after.song ? { level: after.level, song: after.song } : null
       // Signed out, the finished screen shows what the plank would have earned.
-      const xp =
-        accountsEnabled && counted.length > 0
-          ? { award: plankXp(song.seconds, pauses), earned: earningXp, before, after: totalXp(now.completions) }
-          : null
+      const xp = accountsEnabled
+        ? {
+            award: plankXp(song.seconds, pauses),
+            earned: earningXp,
+            gained: result.gained,
+            kind: result.kind,
+            bonusLeft: result.bonusLeft,
+            before,
+            after: totalXp(now.completions),
+          }
+        : null
       return { counted, streak: streakInfo(streakDays(now.completions), today).current, next, xp }
     },
     [today, earningXp],
@@ -242,7 +252,7 @@ export function App() {
             onSignIn={offerSignIn}
             rank={rank}
           />
-          <Setlist level={ladder.level} onJump={setJumpTo} />
+          <Setlist level={ladder.level} completions={data.completions} onJump={setJumpTo} />
         </main>
 
         <footer className="site-footer grid">

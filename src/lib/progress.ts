@@ -1,7 +1,7 @@
 import { LADDER, SONG_BY_ID, type Song } from '../data/songs'
 import { dailyNumber, dailySong } from './daily'
 import type { DayKey } from './dates'
-import { plankXp } from './xp'
+import { plankXp, totalXp, type XpAward } from './xp'
 
 export type Mode = 'daily' | 'ladder'
 
@@ -102,10 +102,32 @@ export function ladderView(data: AppData, today: DayKey): LadderView {
   }
 }
 
+export interface PlankResult {
+  data: AppData
+  /** New records: today's song and/or a ladder level. */
+  added: Completion[]
+  /** Records a replay improved: breaks cleared and the no-break bonus added. */
+  updated: Completion[]
+  /** XP this plank actually earned: 0 signed out, and 0 for a replay with nothing left to earn. */
+  gained: number
+  /**
+   * new      counted for something (today's song, or a ladder level)
+   * upgrade  a replay held straight through after a go with breaks: earns the no-break bonus
+   * repeat   a replay that earns nothing
+   */
+  kind: 'new' | 'upgrade' | 'repeat'
+  /** A plank of this song held with no breaks would still earn the no-break bonus. */
+  bonusLeft: boolean
+}
+
 /**
  * What finishing a plank of `song` today counts for: today's song (once a day), the next ladder
  * level (as many a day as you like), or both at once when they're the same song.
- * `earnXp` is for signed-in players; the XP goes on the first record so a two-for-one isn't paid twice.
+ *
+ * XP (`earnXp`: signed in) is paid once per plank: today's song earns it every day; a ladder level
+ * earns it the first time it's climbed. Doing either again earns nothing, with one exception: if
+ * every earlier go had breaks, holding it straight through earns the no-break bonus, once.
+ * A two-for-one carries its XP on the first record only.
  */
 export function applyPlank(
   data: AppData,
@@ -114,47 +136,119 @@ export function applyPlank(
   at: string,
   pauses: Pause[] = [],
   earnXp = false,
-): { data: AppData; added: Completion[] } {
-  const added: Completion[] = []
+): PlankResult {
+  const award = plankXp(song.seconds, pauses)
   const daily = dailyView(data, today)
   const ladder = ladderView(data, today)
   const extra = pauses.length > 0 ? { pauses } : {}
-  let cursor = data.ladder
+  const added: Completion[] = []
 
   if (daily.song.id === song.id && !daily.done) {
     added.push({ day: today, mode: 'daily', songId: song.id, seconds: song.seconds, at, ...extra })
   }
-  // The same song twice in a day (after moving back down the ladder) only counts once.
-  const againToday = ladder.climbedToday.some((c) => c.songId === song.id)
-  if (ladder.song?.id === song.id && !againToday) {
+  const onLadder = ladder.song?.id === song.id
+  if (onLadder && !ladder.climbedToday.some((c) => c.songId === song.id)) {
     added.push({ day: today, mode: 'ladder', songId: song.id, level: ladder.level, seconds: song.seconds, at, ...extra })
-    cursor = { level: ladder.level + 1, updatedAt: at }
   }
-  if (added.length === 0) return { data, added }
-  if (earnXp) added[0] = { ...added[0], xp: plankXp(song.seconds, pauses).total }
-  return { data: { ...data, completions: [...data.completions, ...added], ladder: cursor }, added }
+  // Planking your ladder level always moves you up, even a level you went back down to redo.
+  const next = onLadder ? { ...data, ladder: { level: ladder.level + 1, updatedAt: at } } : data
+
+  if (added.length > 0) {
+    const left = added.some((c) => c.mode === 'daily')
+      ? { xp: award.total, bonusLeft: award.kind === 'held' }
+      : ladderXpLeft(data.completions, song.id, award)
+    const gained = earnXp ? left.xp : 0
+    if (gained > 0) added[0] = { ...added[0], xp: gained }
+    return {
+      data: { ...next, completions: [...data.completions, ...added] },
+      added,
+      updated: [],
+      gained,
+      kind: 'new',
+      bonusLeft: left.bonusLeft,
+    }
+  }
+
+  // A replay of a song already planked today.
+  const todays = data.completions.filter((c) => c.day === today && c.songId === song.id)
+  const hadBreaks = todays.length > 0 && todays.every((c) => c.pauses?.length)
+  const gain = earnXp && hadBreaks && award.kind !== 'held' ? award.total - totalXp(todays) : 0
+  if (gain <= 0) return { data: next, added: [], updated: [], gained: 0, kind: 'repeat', bonusLeft: hadBreaks }
+
+  // Held straight through this time: today's records become the clean plank, with the bonus added
+  // to whichever one carries the XP.
+  const carrier = Math.max(0, todays.findIndex((c) => c.xp))
+  const updated = todays.map((c, i) => {
+    const clean: Completion = { ...c }
+    delete clean.pauses
+    return i === carrier ? { ...clean, xp: (c.xp ?? 0) + gain } : clean
+  })
+  const byKey = new Map(updated.map((c) => [completionKey(c), c]))
+  return {
+    data: { ...next, completions: data.completions.map((c) => byKey.get(completionKey(c)) ?? c) },
+    added: [],
+    updated,
+    gained: gain,
+    kind: 'upgrade',
+    bonusLeft: false,
+  }
 }
 
 /**
- * Union of two histories. When both have the same plank, the earlier one wins, keeping any XP
- * the other copy has (XP can be granted on the account after the browser recorded the plank).
+ * What a ladder level still has to give: all its XP the first time it's climbed; after that only
+ * the no-break bonus, once, and only if every earlier climb had breaks.
+ */
+function ladderXpLeft(completions: readonly Completion[], songId: string, award: XpAward): { xp: number; bonusLeft: boolean } {
+  const earlier = completions.filter((c) => c.mode === 'ladder' && c.songId === songId)
+  if (earlier.length === 0) return { xp: award.total, bonusLeft: award.kind === 'held' }
+  if (earlier.some((c) => !c.pauses?.length)) return { xp: 0, bonusLeft: false }
+  if (award.kind === 'held') return { xp: 0, bonusLeft: true }
+  // A two-for-one keeps its XP on the daily record, so count each earlier plank whole.
+  const best = Math.max(...earlier.map((l) => totalXp(completions.filter((c) => c.at === l.at))))
+  return { xp: Math.max(0, award.total - best), bonusLeft: false }
+}
+
+/** Which copy of the same plank to keep: more XP, then fewer breaks (the better go), then the earlier one. */
+export function betterPlank(a: Completion, b: Completion): boolean {
+  if ((a.xp ?? 0) !== (b.xp ?? 0)) return (a.xp ?? 0) > (b.xp ?? 0)
+  const breaks = (c: Completion) => c.pauses?.length ?? 0
+  if (breaks(a) !== breaks(b)) return breaks(a) < breaks(b)
+  return a.at < b.at
+}
+
+/**
+ * Union of two histories, keeping the better copy when both have the same plank. XP can be added
+ * on the account after the browser recorded a plank, and a replay can improve today's record.
  */
 export function mergeCompletions(a: readonly Completion[], b: readonly Completion[]): Completion[] {
   const byKey = new Map<string, Completion>()
   for (const c of [...a, ...b]) {
     const existing = byKey.get(completionKey(c))
-    if (!existing) byKey.set(completionKey(c), c)
-    else {
-      const winner = c.at < existing.at ? c : existing
-      const xp = Math.max(existing.xp ?? 0, c.xp ?? 0)
-      byKey.set(completionKey(c), xp > 0 ? { ...winner, xp } : winner)
-    }
+    if (!existing || betterPlank(c, existing)) byKey.set(completionKey(c), c)
   }
   return [...byKey.values()].sort((x, y) => x.day.localeCompare(y.day) || x.at.localeCompare(y.at) || x.mode.localeCompare(y.mode))
 }
 
 export function newerCursor(a: LadderCursor, b: LadderCursor): LadderCursor {
   return b.updatedAt > a.updatedAt ? b : a
+}
+
+/** How a ladder level went: held with no breaks, or done with breaks (the fewest, over every go). */
+export interface LevelRecord {
+  clean: boolean
+  breaks: number
+}
+
+/** Every ladder song you've planked, and how it went at best. */
+export function ladderRecords(completions: readonly Completion[]): Map<string, LevelRecord> {
+  const records = new Map<string, LevelRecord>()
+  for (const c of completions) {
+    if (c.mode !== 'ladder') continue
+    const breaks = c.pauses?.length ?? 0
+    const best = records.get(c.songId)
+    if (!best || breaks < best.breaks) records.set(c.songId, { clean: breaks === 0, breaks })
+  }
+  return records
 }
 
 export function songFor(c: Completion): Song | undefined {

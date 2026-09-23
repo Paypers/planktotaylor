@@ -78,7 +78,7 @@ Rules worth knowing:
 - Days are the visitor's **local** calendar day, for the daily song and for streaks.
 - A streak stays alive until the end of the day after you last planked today's song. The 🔥 in the header is grey until you've planked today's song.
 - Climb as many ladder levels a day as you like (each song once a day). Only today's song keeps the streak; the calendar fills in those days and marks ladder-only days with a small ring. If today's song happens to be your ladder level, one plank counts for both.
-- **XP** (signed-in players only, in [src/lib/xp.ts](src/lib/xp.ts)): a point for every second of song. No breaks: +50%. No breaks on a song over 6 minutes: double. Breaks never cost anything. XP adds up into ranks (rank 2 at 500 XP, rank 10 at 22,500). Signed out, the finished screen says what a plank would have earned.
+- **XP** (signed-in players only, in [src/lib/xp.ts](src/lib/xp.ts)): a point for every second of song. No breaks: +50%. No breaks on a song over 6 minutes: double. Breaks never cost anything. XP is paid once per plank: today's song earns it every day, a ladder level the first time it's climbed. Doing either again earns nothing, except that the first go held with no breaks, after only goes with breaks, earns the no-break bonus. XP adds up into ranks (rank 2 at 500 XP, rank 10 at 22,500). Signed out, the finished screen says what a plank would have earned.
 - Finishing today's song (or ranking up) sets off a small burst of confetti, skipped when the device asks for reduced motion.
 - Stopping early doesn't count, but you can retry as often as you like. Pausing is fine; the pauses just show up in what you share.
 - **Sharing** opens a share box with two versions:
@@ -86,6 +86,7 @@ Rules worth knowing:
   - **Text**, like Wordle: ten 🟩 squares for the song, with a 🟧 dropped in wherever you paused, plus the times and your streak. It ends with "Plank along:" and the link, which most apps turn into a preview card.
 - **Without an account**, progress is kept in the browser. When accounts are switched on, a quiet line under the streak and on the finished screen says so, with a Sign in link. Signing in brings that progress along.
 - Already doing the challenge elsewhere? Open **The setlist** and tap your song to move your ladder there.
+- **The setlist marks every level** by how it went: a green tick for no breaks, an orange count of breaks (the fewest over every go), a faint dash for a level moved past without planking it. The **No breaks · With breaks · Not yet** buttons above it show their counts and filter the list, so the levels worth redoing for the no-break bonus are one tap away.
 
 ## Adding a new album
 

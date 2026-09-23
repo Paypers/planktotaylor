@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import type { Song } from '../data/songs'
 import { todayKey } from './dates'
-import { applyPlank, emptyData, type AppData, type Completion, type LadderCursor, type Pause, type Prefs } from './progress'
+import { applyPlank, emptyData, type AppData, type Completion, type LadderCursor, type Pause, type PlankResult, type Prefs } from './progress'
 
 // Progress lives in this browser until the visitor signs in; then it's merged with their account.
 const STORAGE_KEY = 'plank-to-taylor:v1'
@@ -25,7 +25,7 @@ function load(): AppData {
 
 let data: AppData = load()
 const listeners = new Set<() => void>()
-const plankListeners = new Set<(added: Completion[], ladder: LadderCursor) => void>()
+const plankListeners = new Set<(added: Completion[], updated: Completion[], ladder: LadderCursor) => void>()
 
 function commit(next: AppData) {
   data = next
@@ -61,19 +61,19 @@ export function useAppData(): AppData {
 }
 
 /** Fires after a plank is recorded, so the account sync can push it. */
-export function onPlankRecorded(fn: (added: Completion[], ladder: LadderCursor) => void): () => void {
+export function onPlankRecorded(fn: (added: Completion[], updated: Completion[], ladder: LadderCursor) => void): () => void {
   plankListeners.add(fn)
   return () => plankListeners.delete(fn)
 }
 
 /** `earnXp`: the player is signed in, so the plank earns XP. */
-export function recordPlank(song: Song, pauses: Pause[] = [], earnXp = false): Completion[] {
-  const { data: next, added } = applyPlank(data, song, todayKey(), new Date().toISOString(), pauses, earnXp)
-  if (added.length > 0) {
+export function recordPlank(song: Song, pauses: Pause[] = [], earnXp = false): Omit<PlankResult, 'data'> {
+  const { data: next, ...result } = applyPlank(data, song, todayKey(), new Date().toISOString(), pauses, earnXp)
+  if (next !== data) {
     commit(next)
-    plankListeners.forEach((fn) => fn(added, next.ladder))
+    plankListeners.forEach((fn) => fn(result.added, result.updated, next.ladder))
   }
-  return added
+  return result
 }
 
 export function setLadderLevel(level: number): LadderCursor {

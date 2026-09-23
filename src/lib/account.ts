@@ -2,6 +2,7 @@ import type { SupabaseClient, User } from '@supabase/supabase-js'
 import { useSyncExternalStore } from 'react'
 import type { DayKey } from './dates'
 import {
+  betterPlank,
   completionKey,
   mergeCompletions,
   newerCursor,
@@ -124,10 +125,19 @@ async function fetchAllCompletions(supabase: SupabaseClient): Promise<Completion
   }
 }
 
+/** New planks only: a plank the account already has is left as it is. */
 async function upsertCompletions(supabase: SupabaseClient, userId: string, completions: Completion[]) {
   const { error } = await supabase
     .from('plank_completions')
     .upsert(completions.map((c) => toRow(userId, c)), { onConflict: 'user_id,day,mode,song_id', ignoreDuplicates: true })
+  if (error) throw error
+}
+
+/** Planks a replay improved (breaks cleared, no-break bonus added): these overwrite the account's copy. */
+async function replaceCompletions(supabase: SupabaseClient, userId: string, completions: Completion[]) {
+  const { error } = await supabase
+    .from('plank_completions')
+    .upsert(completions.map((c) => toRow(userId, c)), { onConflict: 'user_id,day,mode,song_id' })
   if (error) throw error
 }
 
@@ -158,9 +168,15 @@ async function syncNow(user: User) {
     const ladder = remoteCursor ? newerCursor(local.ladder, remoteCursor) : local.ladder
     replaceProgress(merged, ladder)
 
-    const remoteKeys = new Set(remote.map(completionKey))
-    const missing = merged.filter((c) => !remoteKeys.has(completionKey(c)))
+    const remoteByKey = new Map(remote.map((c) => [completionKey(c), c]))
+    const missing = merged.filter((c) => !remoteByKey.has(completionKey(c)))
+    // A replay improved a plank here but that didn't reach the account (offline, say).
+    const improved = merged.filter((c) => {
+      const theirs = remoteByKey.get(completionKey(c))
+      return theirs !== undefined && betterPlank(c, theirs)
+    })
     if (missing.length > 0) await upsertCompletions(supabase, user.id, missing)
+    if (improved.length > 0) await replaceCompletions(supabase, user.id, improved)
     if (ladder !== remoteCursor) await pushLadderCursor(supabase, user.id, ladder)
     setState({ sync: 'synced' })
   } catch (error) {
@@ -178,13 +194,14 @@ function listen(supabase: SupabaseClient) {
     if (user && (changedUser || event === 'SIGNED_IN')) setTimeout(() => void syncNow(user), 0)
   })
 
-  onPlankRecorded((added, ladder) => {
+  onPlankRecorded((added, updated, ladder) => {
     const user = state.user
     if (!user) return
     void (async () => {
       try {
-        await upsertCompletions(supabase, user.id, added)
-        if (added.some((c) => c.mode === 'ladder')) await pushLadderCursor(supabase, user.id, ladder)
+        if (added.length > 0) await upsertCompletions(supabase, user.id, added)
+        if (updated.length > 0) await replaceCompletions(supabase, user.id, updated)
+        await pushLadderCursor(supabase, user.id, ladder)
         setState({ sync: 'synced' })
       } catch (error) {
         console.error('Could not save plank to account', error)
