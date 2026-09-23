@@ -3,17 +3,20 @@ import { useSyncExternalStore, type MouseEvent } from 'react'
 // Pages live in the address's #hash, so any static host serves them and Back works.
 // Sign-in links use the hash too (#access_token=…): anything that isn't a page here is left alone.
 
-export type Route = { page: 'home' } | { page: 'settings'; section: string | null }
+export type Route = { page: 'home' } | { page: 'settings'; section: string | null } | { page: 'ranks' }
 
 export const HOME: Route = { page: 'home' }
+export const RANKS: Route = { page: 'ranks' }
 
 export function parseRoute(hash: string): Route {
+  if (/^#ranks\/?$/i.test(hash)) return RANKS
   const match = /^#settings(?:\/([a-z0-9-]+))?\/?$/i.exec(hash)
   return match ? { page: 'settings', section: match[1]?.toLowerCase() ?? null } : HOME
 }
 
 /** The route's #hash, '' for the home page. */
 export function hashFor(route: Route): string {
+  if (route.page === 'ranks') return '#ranks'
   return route.page === 'settings' ? `#settings${route.section ? `/${route.section}` : ''}` : ''
 }
 
@@ -64,14 +67,14 @@ export function setLeaveGuard(next: LeaveGuard): () => void {
 
 export function navigate(next: Route) {
   const go = () => {
-    if (next.page === 'settings') {
+    if (next.page !== 'home') {
       history.pushState({ depth: depth() + 1 }, '', hashFor(next))
       update(next)
     } else if (depth() > 0) {
-      // Back to where settings was opened from, so Back then doesn't reopen it.
+      // Back to where the first page was opened from, so Back then doesn't reopen it.
       history.go(-depth())
     } else {
-      // Arrived straight at a settings address: there's nothing to go back to.
+      // Arrived straight at a page's address: there's nothing to go back to.
       history.replaceState(null, '', location.pathname + location.search)
       update(HOME)
     }

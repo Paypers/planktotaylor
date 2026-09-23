@@ -1,4 +1,5 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import { useAccount } from '../../lib/account'
 import { DARK, LIGHT, TOKENS, type Palette } from '../../lib/palette'
 import { setLeaveGuard } from '../../lib/route'
 import {
@@ -19,6 +20,7 @@ type Pending = { kind: 'leave'; proceed: () => void } | { kind: 'delete'; id: st
 
 export function AppearanceSettings() {
   const theme = useTheme()
+  const { user } = useAccount()
   const custom = activeCustom(theme)
   const unsaved = hasUnsavedChanges(theme)
   const [pending, setPending] = useState<Pending | null>(null)
@@ -86,7 +88,8 @@ export function AppearanceSettings() {
           </button>
         </div>
         <p className="fine">
-          A new theme starts from the colors showing now. Your themes are saved in this browser.
+          A new theme starts from the colors showing now.{' '}
+          {user ? 'Your themes are saved to your account, on every device you sign in on.' : 'Your themes are saved in this browser.'}
         </p>
       </section>
 

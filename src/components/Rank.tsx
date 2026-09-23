@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import { rankName, type Division, type PlayerRank, type Tier } from '../lib/ranks'
+import { followLink, hashFor, RANKS } from '../lib/route'
 import { StarMark } from './Icon'
 import { RankEmblem } from './RankEmblem'
 
@@ -18,6 +19,27 @@ export function RankPlaque({ tier, division = null, size = 'sm' }: { tier: Tier;
   )
 }
 
+/**
+ * Your plaque as a way to the ranks page, for working out what a rank means. `onOpen` runs when
+ * it opens the page in place (to close the dialog it's in, say).
+ */
+export function RankLink({ rank, size = 'sm', onOpen }: { rank: PlayerRank; size?: 'sm' | 'md' | 'lg'; onOpen?: () => void }) {
+  return (
+    <a
+      href={hashFor(RANKS)}
+      className="plaque-link"
+      title="See every rank"
+      aria-label={`${rankName(rank.tier, rank.division)}. See every rank`}
+      onClick={(e) => {
+        followLink(e, RANKS)
+        if (e.defaultPrevented) onOpen?.()
+      }}
+    >
+      <RankPlaque tier={rank.tier} division={rank.division} size={size} />
+    </a>
+  )
+}
+
 /** On phones the rank rides on your photo: its division on the same plate (a star for the top three). */
 export function RankBadge({ rank }: { rank: PlayerRank }) {
   return (
@@ -27,13 +49,24 @@ export function RankBadge({ rank }: { rank: PlayerRank }) {
   )
 }
 
+interface BarProps {
+  rank: PlayerRank
+  /** The plaque opens the ranks page. `onOpen` as for RankLink. */
+  linked?: boolean
+  onOpen?: () => void
+}
+
 /** Your rank, XP so far out of the next rank, and what the next rank takes. */
-export function RankBar({ rank }: { rank: PlayerRank }) {
+export function RankBar({ rank, linked = false, onOpen }: BarProps) {
   const into = rank.next === null ? 1 : Math.min(1, (rank.xp - rank.floor) / (rank.next - rank.floor))
   return (
     <div className="rank">
       <div className="rank-head">
-        <RankPlaque tier={rank.tier} division={rank.division} size="md" />
+        {linked ? (
+          <RankLink rank={rank} size="md" onOpen={onOpen} />
+        ) : (
+          <RankPlaque tier={rank.tier} division={rank.division} size="md" />
+        )}
         <span className="rank-xp">
           {rank.xp.toLocaleString()}
           {rank.next !== null && ` / ${rank.next.toLocaleString()}`} XP
@@ -55,11 +88,11 @@ export function RankBar({ rank }: { rank: PlayerRank }) {
 }
 
 /** Where the rank is the subject: its emblem beside the bar. */
-export function RankCard({ rank }: { rank: PlayerRank }) {
+export function RankCard({ size = 88, ...bar }: BarProps & { size?: number }) {
   return (
     <div className="rank-card">
-      <RankEmblem tier={rank.tier} size={88} />
-      <RankBar rank={rank} />
+      <RankEmblem tier={bar.rank.tier} size={size} />
+      <RankBar {...bar} />
     </div>
   )
 }

@@ -7,7 +7,8 @@ import { Flame, Icon, StarMark } from './components/Icon'
 import { LevelDialog } from './components/LevelDialog'
 import { MusicDialog } from './components/MusicDialog'
 import { PlankTimer, type FinishSummary, type PlankSession, type PlankShare } from './components/PlankTimer'
-import { RankBadge, RankPlaque } from './components/Rank'
+import { RankBadge, RankLink } from './components/Rank'
+import { RanksPage } from './components/RanksPage'
 import { SettingsPage } from './components/settings/SettingsPage'
 import { Setlist } from './components/Setlist'
 import { ShareDialog } from './components/ShareDialog'
@@ -42,22 +43,23 @@ export function App() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const route = useRoute()
   const inSettings = route.page === 'settings'
+  const onHome = route.page === 'home'
   const homeScroll = useRef(0)
-  const wasInSettings = useRef(inSettings)
+  const lastPage = useRef(route.page)
 
-  // Settings opens at the top; coming back finds the home page where it was left.
+  // Settings and Ranks open at the top; coming back finds the home page where it was left.
   useEffect(() => {
     const remember = () => {
-      if (!wasInSettings.current) homeScroll.current = window.scrollY
+      if (lastPage.current === 'home') homeScroll.current = window.scrollY
     }
     window.addEventListener('scroll', remember, { passive: true })
     return () => window.removeEventListener('scroll', remember)
   }, [])
   useLayoutEffect(() => {
-    if (wasInSettings.current === inSettings) return
-    wasInSettings.current = inSettings
-    window.scrollTo(0, inSettings ? 0 : homeScroll.current)
-  }, [inSettings])
+    if (lastPage.current === route.page) return
+    lastPage.current = route.page
+    window.scrollTo(0, route.page === 'home' ? homeScroll.current : 0)
+  }, [route.page])
 
   const daily = dailyView(data, today)
   const ladder = ladderView(data, today)
@@ -156,7 +158,7 @@ export function App() {
           <a
             className="brand"
             href={import.meta.env.BASE_URL}
-            onClick={inSettings ? (e) => followLink(e, HOME) : undefined}
+            onClick={onHome ? undefined : (e) => followLink(e, HOME)}
           >
             <StarMark size={18} />
             <span>Plank to Taylor</span>
@@ -181,22 +183,28 @@ export function App() {
             </a>
             {accountsEnabled &&
               (user && rank ? (
-                // Signed in: your photo, name and rank. The rank sits on the photo on phones.
-                <button
-                  type="button"
-                  className="profile-btn"
-                  onClick={() => setDialog('account')}
-                  aria-label={`Your profile: ${shownName}, ${rankName(rank.tier, rank.division)}`}
-                >
-                  <span className="profile-photo">
-                    <Avatar name={shownName} url={profile.avatarUrl} size={36} />
-                    <RankBadge rank={rank} />
-                  </span>
+                // Signed in: your photo and name open your profile; your rank's plaque, what the ranks
+                // mean. On phones the rank sits on the photo.
+                <span className="profile">
+                  <button
+                    type="button"
+                    className="profile-btn"
+                    onClick={() => setDialog('account')}
+                    aria-label={`Your profile: ${shownName}, ${rankName(rank.tier, rank.division)}`}
+                  >
+                    <span className="profile-photo">
+                      <Avatar name={shownName} url={profile.avatarUrl} size={36} />
+                      <RankBadge rank={rank} />
+                    </span>
+                  </button>
                   <span className="profile-text wide-only">
-                    <span className="profile-name">{shownName}</span>
-                    <RankPlaque tier={rank.tier} division={rank.division} />
+                    {/* The same as the photo, for the mouse: keyboards and screen readers have the photo. */}
+                    <button type="button" className="profile-name" onClick={() => setDialog('account')} tabIndex={-1} aria-hidden="true">
+                      {shownName}
+                    </button>
+                    <RankLink rank={rank} />
                   </span>
-                </button>
+                </span>
               ) : (
                 <button
                   type="button"
@@ -212,7 +220,7 @@ export function App() {
         </header>
 
         {/* Home stays mounted behind settings, so the setlist comes back as it was left. */}
-        <main hidden={inSettings}>
+        <main hidden={!onHome}>
           <section className="masthead grid">
             <div className="masthead-meta">
               <p>{dateline}</p>
@@ -306,6 +314,11 @@ export function App() {
         {route.page === 'settings' && (
           <main>
             <SettingsPage section={route.section} />
+          </main>
+        )}
+        {route.page === 'ranks' && (
+          <main>
+            <RanksPage rank={rank} onSignIn={offerSignIn} />
           </main>
         )}
 

@@ -1,8 +1,9 @@
 import { useSyncExternalStore } from 'react'
 import { BUILT_IN, completePalette, LIGHT, schemeFor, TOKENS, type Palette, type Scheme } from './palette'
 
-// The theme lives in this browser, apart from progress. index.html reads the same key before
-// the first paint (so the page never flashes the wrong colours): keep its format in step.
+// The theme lives in this browser, apart from progress, and for signed-in players in their account
+// too (see account.ts). index.html reads the same key before the first paint (so the page never
+// flashes the wrong colours): keep its format in step.
 const STORAGE_KEY = 'plank-to-taylor:theme:v1'
 
 export type BuiltInTheme = 'system' | 'light' | 'dark'
@@ -15,12 +16,16 @@ export interface CustomTheme {
   scheme: Scheme
 }
 
-interface Saved {
+export interface SavedTheme {
   v: 1
   /** A built-in theme, or a custom theme's id. */
   selected: string
   themes: CustomTheme[]
+  /** When the player last changed their themes, on any device. Absent until they do. */
+  updatedAt?: string
 }
+
+type Saved = SavedTheme
 
 export interface ThemeState extends Saved {
   /** Unsaved edits to the selected custom theme. Shown live, never stored. */
@@ -37,10 +42,19 @@ const isBuiltIn = (id: string): id is BuiltInTheme => id === 'system' || id === 
 
 /** Reads saved themes, dropping anything malformed and filling in colours added since they were saved. */
 export function parseSaved(raw: string | null): Saved {
-  const empty: Saved = { v: 1, selected: 'system', themes: [] }
-  if (!raw) return empty
   try {
-    const parsed = JSON.parse(raw) as Partial<Saved>
+    return readSaved(raw ? JSON.parse(raw) : null)
+  } catch {
+    return readSaved(null)
+  }
+}
+
+/** The same, for themes already parsed (the account's copy). */
+export function readSaved(value: unknown): Saved {
+  const empty: Saved = { v: 1, selected: 'system', themes: [] }
+  if (!value || typeof value !== 'object') return empty
+  try {
+    const parsed = value as Partial<Saved>
     const themes: CustomTheme[] = []
     for (const t of Array.isArray(parsed.themes) ? parsed.themes : []) {
       if (!t || typeof t.id !== 'string' || typeof t.name !== 'string' || typeof t.colors !== 'object' || !t.colors) continue
@@ -49,7 +63,12 @@ export function parseSaved(raw: string | null): Saved {
       themes.push({ id: t.id, name: t.name.slice(0, 40) || 'Untitled', colors, scheme: schemeFor(colors) })
     }
     const selected = typeof parsed.selected === 'string' ? parsed.selected : 'system'
-    return { v: 1, selected: isBuiltIn(selected) || themes.some((t) => t.id === selected) ? selected : 'system', themes }
+    return {
+      v: 1,
+      selected: isBuiltIn(selected) || themes.some((t) => t.id === selected) ? selected : 'system',
+      themes,
+      ...(typeof parsed.updatedAt === 'string' ? { updatedAt: parsed.updatedAt } : {}),
+    }
   } catch {
     return empty
   }
@@ -65,19 +84,32 @@ function load(): Saved {
 
 let state: ThemeState = { ...load(), draft: null }
 const listeners = new Set<() => void>()
+const savedListeners = new Set<(saved: Saved) => void>()
 
-function set(next: ThemeState, persist = true) {
-  state = next
-  if (persist) {
+const savedPart = ({ v, selected, themes, updatedAt }: Saved): Saved => ({ v, selected, themes, ...(updatedAt ? { updatedAt } : {}) })
+
+/**
+ * `save`: 'change' for the player's own change (stored with the time, and sent to the account),
+ * 'account' for the account's copy (stored as it came), false for what's only shown.
+ */
+function set(next: ThemeState, save: 'change' | 'account' | false = 'change') {
+  state = save === 'change' ? { ...next, updatedAt: new Date().toISOString() } : next
+  if (save) {
     try {
-      const { v, selected, themes } = next
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ v, selected, themes } satisfies Saved))
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(savedPart(state)))
     } catch {
       // Private mode or full storage: the theme holds until the page closes.
     }
   }
   apply()
   listeners.forEach((fn) => fn())
+  if (save === 'change') savedListeners.forEach((fn) => fn(savedPart(state)))
+}
+
+/** Saved themes from elsewhere. Unsaved edits here stay, unless their theme went away or isn't showing. */
+function withDraft(saved: Saved): ThemeState {
+  const draft = state.draft && saved.selected === state.draft.id && saved.themes.some((t) => t.id === state.draft!.id) ? state.draft : null
+  return { ...saved, draft }
 }
 
 const systemDark = typeof window !== 'undefined' ? window.matchMedia('(prefers-color-scheme: dark)') : null
@@ -116,12 +148,9 @@ if (typeof window !== 'undefined') {
   systemDark?.addEventListener('change', () => {
     if (state.selected === 'system') set(state, false)
   })
-  // Keep several open tabs in step. Unsaved edits stay, unless their theme went away.
+  // Keep several open tabs in step.
   window.addEventListener('storage', (event) => {
-    if (event.key !== STORAGE_KEY) return
-    const saved = load()
-    const draft = state.draft && saved.themes.some((t) => t.id === state.draft!.id) ? state.draft : null
-    set({ ...saved, draft: draft && saved.selected === draft.id ? draft : null }, false)
+    if (event.key === STORAGE_KEY) set(withDraft(load()), false)
   })
   window.addEventListener('beforeunload', (event) => {
     if (!hasUnsavedChanges()) return
@@ -142,6 +171,22 @@ export function useTheme(): ThemeState {
     },
     getTheme,
   )
+}
+
+/** The saved themes and choice, as the account keeps them. */
+export function savedTheme(): SavedTheme {
+  return savedPart(state)
+}
+
+/** Fires when the player saves a change to their themes here, so the account can keep a copy. */
+export function onThemeSaved(fn: (saved: SavedTheme) => void): () => void {
+  savedListeners.add(fn)
+  return () => savedListeners.delete(fn)
+}
+
+/** Themes from the account (changed on another device). */
+export function applySavedTheme(value: unknown) {
+  set(withDraft(readSaved(value)), 'account')
 }
 
 export function hasUnsavedChanges(s: ThemeState = state): boolean {

@@ -23,17 +23,24 @@ alter table public.plank_completions add column if not exists xp int check (xp i
 alter table public.plank_completions drop constraint if exists plank_completions_pkey;
 alter table public.plank_completions add primary key (user_id, day, mode, song_id);
 
--- Where each user is on the shortest-to-longest ladder, and the name and photo they chose.
+-- Where each user is on the shortest-to-longest ladder, the name and photo they chose, and their
+-- settings, so every device they sign in on looks and sounds the same.
 create table if not exists public.plank_profiles (
   user_id uuid primary key default auth.uid() references auth.users (id) on delete cascade,
   ladder_level int not null default 1 check (ladder_level >= 1),
   updated_at timestamptz not null default now(),
   display_name text check (char_length(display_name) <= 40),
-  avatar_url text
+  avatar_url text,
+  -- Music and sound: { "music": bool, "sounds": bool, "updatedAt": when last changed }.
+  prefs jsonb check (octet_length(prefs::text) <= 1024),
+  -- Themes: { "selected": ..., "themes": [...], "updatedAt": ... }, as the site saves them in the browser.
+  theme jsonb check (octet_length(theme::text) <= 65536)
 );
--- For databases created before names and photos.
+-- For databases created before names and photos, and before settings.
 alter table public.plank_profiles add column if not exists display_name text check (char_length(display_name) <= 40);
 alter table public.plank_profiles add column if not exists avatar_url text;
+alter table public.plank_profiles add column if not exists prefs jsonb check (octet_length(prefs::text) <= 1024);
+alter table public.plank_profiles add column if not exists theme jsonb check (octet_length(theme::text) <= 65536);
 
 -- Profile photos: a public bucket (anyone with the link can see a photo), where each player can only
 -- add, replace or remove the one file in their own folder. The site shrinks photos to about 20 KB first.

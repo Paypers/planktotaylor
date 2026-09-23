@@ -39,6 +39,8 @@ export interface LadderCursor {
 export interface Prefs {
   music: boolean
   sounds: boolean
+  /** When they were last changed, on any device. Absent until they are: the account's copy wins. */
+  updatedAt?: string
 }
 
 export interface AppData {
@@ -245,6 +247,17 @@ export function mergeCompletions(a: readonly Completion[], b: readonly Completio
 
 export function newerCursor(a: LadderCursor, b: LadderCursor): LadderCursor {
   return b.updatedAt > a.updatedAt ? b : a
+}
+
+/**
+ * Settings kept in both places (sound, themes): whichever copy was changed last wins. A copy never
+ * changed has no time, so a new device takes the account's, and an account with none takes this one's.
+ */
+export function newerSettings(local: { updatedAt?: string }, remote: { updatedAt?: string } | null): 'local' | 'remote' | 'same' {
+  const here = local.updatedAt ?? ''
+  const there = remote?.updatedAt ?? ''
+  if (here === there) return 'same'
+  return here > there ? 'local' : 'remote'
 }
 
 /** How a ladder level went: held with no breaks, or done with breaks (the fewest, over every go). */

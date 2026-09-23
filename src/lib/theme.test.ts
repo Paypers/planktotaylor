@@ -158,6 +158,12 @@ describe('routes', () => {
     expect(parseRoute('#settings/Appearance/')).toEqual({ page: 'settings', section: 'appearance' })
   })
 
+  it('reads the ranks page from the address', () => {
+    expect(parseRoute('#ranks')).toEqual({ page: 'ranks' })
+    expect(parseRoute('#Ranks/')).toEqual({ page: 'ranks' })
+    expect(parseRoute('#ranks/sonnet')).toEqual({ page: 'home' })
+  })
+
   it('leaves sign-in links alone', () => {
     expect(parseRoute('#access_token=abc&type=magiclink')).toEqual({ page: 'home' })
   })

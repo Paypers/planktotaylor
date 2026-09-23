@@ -149,4 +149,9 @@ export function mergeAttempts(fromAccount: readonly Attempt[], savedIds: readonl
   commit([...byId.values()])
 }
 
+/** Someone else signed in on this browser: the log here was the last account's, so it goes. */
+export function forgetAttempts() {
+  commit([])
+}
+
 const round = (seconds: number) => Math.round(seconds * 10) / 10

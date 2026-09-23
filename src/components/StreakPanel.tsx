@@ -54,7 +54,7 @@ export function StreakPanel({ completions, days, streak, today, onSignIn, rank, 
         </div>
         <p className="streak-msg">{message}</p>
         {onSignIn && completions.length > 0 && <SaveNote onSignIn={onSignIn} className="streak-save" />}
-        {rank && <RankBar rank={rank} />}
+        {rank && <RankBar rank={rank} linked />}
         <dl className="facts">
           <dt>Best streak</dt>
           <dd>{plural(streak.best, 'day')}</dd>

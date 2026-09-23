@@ -56,6 +56,25 @@ export function rankName(tier: Tier, division: Division | null): string {
   return division ? `${tier.name} ${division}` : tier.name
 }
 
+export interface RankStep {
+  step: number
+  tier: Tier
+  division: Division | null
+  /** Total XP where it begins. */
+  xp: number
+}
+
+/** Every rank in order, Scribble IV to Magnum Opus, with the XP each begins at. */
+export const RANK_STEPS: readonly RankStep[] = Array.from({ length: TOP_STEP }, (_, i) => ({
+  step: i + 1,
+  tier: tierAt(i + 1),
+  division: divisionAt(i + 1),
+  xp: rankFloor(i + 1),
+}))
+
+/** Where a tier begins: its first division (or the rank itself, for the top three). */
+export const tierStart = (tier: Tier): RankStep => RANK_STEPS.find((r) => r.tier.id === tier.id)!
+
 export interface LadderProgress {
   /** The highest ladder level ever climbed (restarting the ladder doesn't lower it). */
   highest: number

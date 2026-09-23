@@ -4,15 +4,19 @@ import type { DayKey } from './dates'
 import {
   betterPlank,
   completionKey,
+  emptyData,
   mergeCompletions,
   newerCursor,
+  newerSettings,
   type Completion,
   type LadderCursor,
   type Mode,
   type Pause,
+  type Prefs,
 } from './progress'
-import { getAttempts, mergeAttempts, onAttemptEnded, type AttemptKind, type AttemptOutcome } from './attempts'
-import { getData, onPlankRecorded, replaceProgress } from './store'
+import { forgetAttempts, getAttempts, mergeAttempts, onAttemptEnded, type AttemptKind, type AttemptOutcome } from './attempts'
+import { applyPrefs, getData, onPlankRecorded, onPrefsChanged, replaceProgress } from './store'
+import { applySavedTheme, onThemeSaved, readSaved, savedTheme, type SavedTheme } from './theme'
 
 // Just the project address. The dashboard's Data API page shows it with /rest/v1/ on the end, which breaks sign-in.
 const url = (import.meta.env.VITE_SUPABASE_URL as string | undefined)
@@ -149,6 +153,105 @@ async function pushLadderCursor(supabase: SupabaseClient, userId: string, ladder
   if (error) throw error
 }
 
+/** The account's row: ladder, name, photo and settings. */
+interface ProfileRow {
+  ladder_level: number
+  updated_at: string
+  display_name: string | null
+  avatar_url: string | null
+  prefs?: unknown
+  theme?: unknown
+}
+
+/** Settings the account keeps a copy of. */
+interface SettingsFields {
+  prefs?: Prefs
+  theme?: SavedTheme
+}
+
+/** The account's sound settings, or null if it has none. */
+function readPrefs(value: unknown, fallback: Prefs): Prefs | null {
+  if (!value || typeof value !== 'object') return null
+  const v = value as Partial<Prefs>
+  return {
+    music: typeof v.music === 'boolean' ? v.music : fallback.music,
+    sounds: typeof v.sounds === 'boolean' ? v.sounds : fallback.sounds,
+    ...(typeof v.updatedAt === 'string' ? { updatedAt: v.updatedAt } : {}),
+  }
+}
+
+/** Sound and themes: whichever copy was changed last, here or in the account, wins. */
+async function syncSettings(supabase: SupabaseClient, userId: string, row: ProfileRow | null) {
+  const push: SettingsFields = {}
+  const prefs = getData().prefs
+  const theirPrefs = readPrefs(row?.prefs, prefs)
+  const prefsWinner = newerSettings(prefs, theirPrefs)
+  if (prefsWinner === 'remote') applyPrefs(theirPrefs!)
+  if (prefsWinner === 'local') push.prefs = prefs
+
+  const theme = savedTheme()
+  const theirTheme = row?.theme ? readSaved(row.theme) : null
+  const themeWinner = newerSettings(theme, theirTheme)
+  if (themeWinner === 'remote') applySavedTheme(theirTheme)
+  if (themeWinner === 'local') push.theme = theme
+
+  if (push.prefs || push.theme) await saveProfileRow(supabase, userId, push)
+}
+
+// Whose progress this browser holds: the last account signed in here. Signing out keeps it, so
+// signing in as someone else must never merge one person's planks into another's account.
+const OWNER_KEY = 'plank-to-taylor:account'
+
+function claimBrowser(userId: string) {
+  let owner: string | null = null
+  try {
+    owner = localStorage.getItem(OWNER_KEY)
+  } catch {
+    // Storage is off: this browser only ever holds what this visit did.
+  }
+  if (owner && owner !== userId) {
+    replaceProgress([], emptyData().ladder)
+    forgetAttempts()
+    // Settings stay on screen until this account's arrive, but never count as newer than them.
+    const { updatedAt: _prefsAt, ...prefs } = getData().prefs
+    applyPrefs(prefs)
+    const { updatedAt: _themeAt, ...theme } = savedTheme()
+    applySavedTheme(theme)
+  }
+  try {
+    localStorage.setItem(OWNER_KEY, userId)
+  } catch {
+    // As above.
+  }
+}
+
+let running: Promise<void> | null = null
+let again = false
+let lastSync = 0
+/** Coming back to the site within this long of a sync doesn't sync again. */
+const FRESH_MS = 30_000
+
+/** One sync at a time: asked for during one, it runs once more straight after. */
+function sync(user: User) {
+  if (running) {
+    again = true
+    return
+  }
+  again = false
+  lastSync = Date.now()
+  running = syncNow(user).finally(() => {
+    running = null
+    if (again && state.user) sync(state.user)
+  })
+}
+
+// Phones keep a tab open for days. Whenever the site comes back into view, or back online, it
+// catches up with what changed on other devices meanwhile: a new photo, planks, settings.
+function catchUp() {
+  if (!state.user || document.visibilityState !== 'visible') return
+  if (state.sync === 'error' || Date.now() - lastSync > FRESH_MS) sync(state.user)
+}
+
 /** Two-way merge: pull the account's history, union it with this browser's, push back what's missing. */
 async function syncNow(user: User) {
   setState({ sync: 'syncing' })
@@ -156,15 +259,17 @@ async function syncNow(user: User) {
     const supabase = await client()
     const [remote, profile] = await Promise.all([
       fetchAllCompletions(supabase),
-      supabase.from('plank_profiles').select('ladder_level, updated_at, display_name, avatar_url').maybeSingle(),
+      // The whole row, so a database that hasn't had the settings columns added yet still syncs the rest.
+      supabase.from('plank_profiles').select('*').maybeSingle<ProfileRow>(),
     ])
     if (profile.error) throw profile.error
-    setState({ profile: { name: profile.data?.display_name ?? null, avatarUrl: profile.data?.avatar_url ?? null } })
+    const row = profile.data
+    setState({ profile: { name: row?.display_name ?? null, avatarUrl: row?.avatar_url ?? null } })
 
     const local = getData()
     const merged = mergeCompletions(local.completions, remote)
-    const remoteCursor: LadderCursor | null = profile.data
-      ? { level: profile.data.ladder_level, updatedAt: new Date(profile.data.updated_at).toISOString() }
+    const remoteCursor: LadderCursor | null = row
+      ? { level: row.ladder_level, updatedAt: new Date(row.updated_at).toISOString() }
       : null
     const ladder = remoteCursor ? newerCursor(local.ladder, remoteCursor) : local.ladder
     replaceProgress(merged, ladder)
@@ -179,6 +284,8 @@ async function syncNow(user: User) {
     if (missing.length > 0) await upsertCompletions(supabase, user.id, missing)
     if (improved.length > 0) await replaceCompletions(supabase, user.id, improved)
     if (ladder !== remoteCursor) await pushLadderCursor(supabase, user.id, ladder)
+    // Settings aren't progress either: a failure is retried next time, since the copy here stays newer.
+    await syncSettings(supabase, user.id, row).catch((error) => console.error('Could not sync settings with account', error))
     // Attempts made while signed out, or while offline, go up now. They're a record, not progress,
     // so a failure here doesn't fail the sync; they're retried next time.
     await pushAttempts(supabase, user.id).catch((error) => console.error('Could not save attempts to account', error))
@@ -193,10 +300,19 @@ function listen(supabase: SupabaseClient) {
   supabase.auth.onAuthStateChange((event, session) => {
     const user = session?.user ?? null
     const changedUser = user?.id !== state.user?.id
+    if (user && changedUser) claimBrowser(user.id)
     setState({ user, sync: user ? state.sync : 'idle', profile: changedUser ? NO_PROFILE : state.profile })
     // Supabase warns against awaiting other Supabase calls inside this callback.
-    if (user && (changedUser || event === 'SIGNED_IN')) setTimeout(() => void syncNow(user), 0)
+    if (user && (changedUser || event === 'SIGNED_IN')) setTimeout(() => sync(user), 0)
   })
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', catchUp)
+    window.addEventListener('online', catchUp)
+    window.addEventListener('pageshow', (event) => {
+      if (event.persisted) catchUp()
+    })
+  }
 
   onPlankRecorded((added, updated, ladder) => {
     const user = state.user
@@ -287,8 +403,23 @@ onAttemptEnded(() => {
 // Start right away so a returning magic link (#access_token=…) is picked up on page load.
 if (accountsEnabled) void client()
 
+// A setting changed here while signed in goes to the account straight away. Signed out, nothing
+// leaves the browser.
+async function pushSettings(fields: SettingsFields) {
+  const user = state.user
+  if (!accountsEnabled || !user) return
+  try {
+    await saveProfileRow(await client(), user.id, fields)
+  } catch (error) {
+    // The copy here stays newer, so the next sync sends it.
+    console.error('Could not save settings to account', error)
+  }
+}
+onPrefsChanged((prefs) => void pushSettings({ prefs }))
+onThemeSaved((theme) => void pushSettings({ theme }))
+
 export function retrySync() {
-  if (state.user) void syncNow(state.user)
+  if (state.user) sync(state.user)
 }
 
 export async function saveLadderCursor(ladder: LadderCursor) {
@@ -326,22 +457,29 @@ export function displayName(user: User, profile: Profile): string {
 }
 
 /**
- * Changes the name or photo without touching the ladder. A player who has never had a profile
+ * Changes the name, photo or settings without touching the ladder. A player who has never had a profile
  * row gets one seeded with this browser's ladder, so a fresh row can't look like a newer ladder.
  */
-async function saveProfile(fields: { display_name?: string | null; avatar_url?: string | null }) {
-  const user = state.user
-  if (!user) throw new Error('Sign in first.')
-  const supabase = await client()
-  const updated = await supabase.from('plank_profiles').update(fields).eq('user_id', user.id).select('user_id')
+async function saveProfileRow(
+  supabase: SupabaseClient,
+  userId: string,
+  fields: SettingsFields & { display_name?: string | null; avatar_url?: string | null },
+) {
+  const updated = await supabase.from('plank_profiles').update(fields).eq('user_id', userId).select('user_id')
   if (updated.error) throw updated.error
   if (updated.data.length === 0) {
     const { ladder } = getData()
     const inserted = await supabase
       .from('plank_profiles')
-      .insert({ user_id: user.id, ladder_level: ladder.level, updated_at: ladder.updatedAt, ...fields })
+      .insert({ user_id: userId, ladder_level: ladder.level, updated_at: ladder.updatedAt, ...fields })
     if (inserted.error) throw inserted.error
   }
+}
+
+async function saveProfile(fields: { display_name?: string | null; avatar_url?: string | null }) {
+  const user = state.user
+  if (!user) throw new Error('Sign in first.')
+  await saveProfileRow(await client(), user.id, fields)
   setState({
     profile: {
       name: fields.display_name !== undefined ? fields.display_name : state.profile.name,

@@ -172,6 +172,7 @@ a {
 .done-num,
 .done-title,
 .settings-title,
+.page-title,
 .settings-section-title {
   color: var(--heading);
 }
@@ -409,7 +410,14 @@ a {
   text-align: left;
 }
 
-.profile-btn:hover .avatar {
+.profile {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.profile-btn:hover .avatar,
+.profile:has(.profile-name:hover) .avatar {
   box-shadow: inset 0 0 0 1px var(--rule), 0 0 0 2px var(--rule);
 }
 
@@ -451,6 +459,13 @@ a {
 }
 
 .profile-name {
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: inherit;
+  text-align: left;
   overflow: hidden;
   font-size: 14px;
   font-weight: 600;
@@ -1828,7 +1843,8 @@ a {
   padding-bottom: 48px;
 }
 
-.settings-top {
+.settings-top,
+.page-top {
   grid-column: 1 / -1;
   display: flex;
   align-items: flex-end;
@@ -1837,7 +1853,8 @@ a {
   padding: 24px 0 16px;
 }
 
-.settings-title {
+.settings-title,
+.page-title {
   font-family: var(--display);
   font-size: 40px;
   font-weight: 600;
@@ -1847,6 +1864,7 @@ a {
 
 /* Headings take focus when a page opens, for screen readers; no ring for that. */
 .settings-title:focus,
+.page-title:focus,
 .settings-section-title:focus {
   outline: none;
 }
@@ -1939,10 +1957,12 @@ a {
   .settings {
     padding-bottom: 80px;
   }
-  .settings-top {
+  .settings-top,
+  .page-top {
     padding: 40px 0 24px;
   }
-  .settings-title {
+  .settings-title,
+  .page-title {
     font-size: 56px;
     line-height: 60px;
   }
@@ -2724,6 +2744,17 @@ a {
   font-size: 15px;
 }
 
+/* A plaque that opens the ranks page. */
+.plaque-link {
+  display: inline-flex;
+  border-radius: 5px;
+  text-decoration: none;
+}
+
+.plaque-link:hover .plaque {
+  box-shadow: inset 0 0 0 1px var(--plaque-edge), 0 0 0 2px var(--rule);
+}
+
 /* Scribble: a clear plate. */
 .plaque-clear {
   --plaque: transparent;
@@ -2887,4 +2918,223 @@ a {
   .confetti {
     display: none;
   }
+}
+
+/* Ranks: your rank, how ranks work, and every rank with its emblem. Opened from your plaque. */
+
+.ranks {
+  padding-bottom: 32px;
+}
+
+.ranks .section-body {
+  padding-top: 16px;
+}
+
+.ranks-yours .rank-card {
+  gap: 24px;
+}
+
+.ranks-yours > p {
+  max-width: 560px;
+  margin-bottom: 16px;
+  font-size: 16px;
+  line-height: 24px;
+}
+
+/* Your tier's four divisions: the one you're at on its plate. */
+.divisions {
+  --plaque-edge: color-mix(in srgb, var(--ink) 10%, transparent);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  max-width: 480px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.divisions li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px var(--rule);
+  color: var(--ink-2);
+}
+
+.divisions li.is-past {
+  color: var(--ink);
+}
+
+.divisions li.is-here {
+  background: var(--plaque);
+  box-shadow: inset 0 0 0 1px var(--plaque-edge);
+  color: var(--plaque-ink);
+}
+
+.divisions-name {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.divisions-xp {
+  font-size: 12.5px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ranks-rules {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 720px;
+  margin: 0;
+}
+
+.ranks-rules dt {
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.ranks-rules dt:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.ranks-rules dd {
+  margin: 4px 0 14px;
+  font-size: 15px;
+  line-height: 23px;
+  color: var(--ink-2);
+}
+
+@media (min-width: 760px) {
+  .ranks-rules {
+    grid-template-columns: 140px minmax(0, 1fr);
+    column-gap: 24px;
+  }
+  .ranks-rules dt,
+  .ranks-rules dd {
+    margin: 0;
+    padding: 14px 0;
+    border-top: 1px solid var(--rule);
+  }
+  .ranks-rules dt:first-of-type,
+  .ranks-rules dd:first-of-type {
+    padding-top: 0;
+    border-top: 0;
+  }
+}
+
+/* Every rank: its emblem, its plaque and what it takes. */
+.tier-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 760px) {
+  .tier-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1100px) {
+  .tier-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+.tier {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 8px 18px;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.tier.is-here {
+  background: var(--well);
+}
+
+.tier-needs {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.tier-here {
+  margin-top: -4px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+/* The full list, one row a division, tucked away until asked for. */
+.rank-table {
+  margin-top: 24px;
+  border-top: 1px solid var(--rule);
+}
+
+.rank-table summary {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rank-table table {
+  width: 100%;
+  max-width: 640px;
+  margin-bottom: 8px;
+  border-collapse: collapse;
+}
+
+.rank-table th,
+.rank-table td {
+  padding: 8px 12px 8px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 14px;
+  line-height: 20px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.rank-table th {
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+.rank-table td {
+  color: var(--ink-2);
+}
+
+.rank-table .num {
+  padding-right: 0;
+  text-align: right;
+}
+
+.rank-table td.num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.rank-table tr.is-here td {
+  background: var(--well);
 }

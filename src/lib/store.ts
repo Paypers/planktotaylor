@@ -26,6 +26,7 @@ function load(): AppData {
 let data: AppData = load()
 const listeners = new Set<() => void>()
 const plankListeners = new Set<(added: Completion[], updated: Completion[], ladder: LadderCursor) => void>()
+const prefsListeners = new Set<(prefs: Prefs) => void>()
 
 function commit(next: AppData) {
   data = next
@@ -82,8 +83,21 @@ export function setLadderLevel(level: number): LadderCursor {
   return ladder
 }
 
+/** Fires when the player changes a setting here, so the account can keep a copy. */
+export function onPrefsChanged(fn: (prefs: Prefs) => void): () => void {
+  prefsListeners.add(fn)
+  return () => prefsListeners.delete(fn)
+}
+
 export function setPrefs(prefs: Partial<Prefs>) {
-  commit({ ...data, prefs: { ...data.prefs, ...prefs } })
+  const next = { ...data.prefs, ...prefs, updatedAt: new Date().toISOString() }
+  commit({ ...data, prefs: next })
+  prefsListeners.forEach((fn) => fn(next))
+}
+
+/** Settings from the account (changed on another device). */
+export function applyPrefs(prefs: Prefs) {
+  commit({ ...data, prefs })
 }
 
 export function replaceProgress(completions: Completion[], ladder: LadderCursor) {

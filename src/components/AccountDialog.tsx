@@ -19,7 +19,7 @@ import { RankCard } from './Rank'
 const SYNC_TEXT = {
   idle: '',
   syncing: 'Syncing…',
-  synced: 'Your streak, ladder and XP are synced to this account.',
+  synced: 'Your streak, ladder, XP, photo and settings are synced to this account, on every device you sign in on.',
   error: "Couldn't sync just now. Your progress is safe in this browser.",
 }
 
@@ -27,12 +27,12 @@ export function AccountDialog({ open, onClose, rank }: { open: boolean; onClose:
   const { user } = useAccount()
   return (
     <Dialog open={open} title={user ? 'Your profile' : 'Sign in'} onClose={onClose}>
-      {user ? <ProfileForm rank={rank} /> : <SignInForm />}
+      {user ? <ProfileForm rank={rank} onClose={onClose} /> : <SignInForm />}
     </Dialog>
   )
 }
 
-function ProfileForm({ rank }: { rank: PlayerRank | null }) {
+function ProfileForm({ rank, onClose }: { rank: PlayerRank | null; onClose: () => void }) {
   const { user, sync, profile } = useAccount()
   const [name, setName] = useState(profile.name ?? '')
   const [busy, setBusy] = useState<'name' | 'photo' | null>(null)
@@ -116,7 +116,7 @@ function ProfileForm({ rank }: { rank: PlayerRank | null }) {
       {rank && (
         <section className="dialog-section">
           <h3>Your rank</h3>
-          <RankCard rank={rank} />
+          <RankCard rank={rank} linked onOpen={onClose} />
         </section>
       )}
 

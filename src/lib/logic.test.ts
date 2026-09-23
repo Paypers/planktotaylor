@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { ALBUMS, LADDER, LAUNCH_SONGS, SONG_BY_ID, SONGS, UPCOMING, formatDuration, slugify } from '../data/songs'
 import { DAILY_EPOCH, PREMIERES, dailyNumber, dailySong, songOfTheDay } from './daily'
 import { addDays, daysBetween } from './dates'
-import { applyPlank, emptyData, ladderRecords, ladderView, mergeCompletions, newerCursor, streakDays, type Completion } from './progress'
+import { applyPlank, emptyData, ladderRecords, ladderView, mergeCompletions, newerCursor, newerSettings, streakDays, type Completion } from './progress'
 import { normalizeTitle, parseIsoDuration, pickVideo, videoSongName, type VideoCandidate } from './match'
 import { pauseLabel, plankBar, plankHeadline, plankSegments, plankSummary } from './share'
 import { runLengths, streakInfo } from './streaks'
@@ -336,6 +336,18 @@ describe('sync merge', () => {
     const older = { level: 9, updatedAt: '2026-09-01T00:00:00.000Z' }
     const newer = { level: 4, updatedAt: '2026-09-02T00:00:00.000Z' }
     expect(newerCursor(older, newer)).toBe(newer)
+  })
+
+  it('takes the most recently changed settings, and the only copy ever changed', () => {
+    const monday = { updatedAt: '2026-09-21T09:00:00.000Z' }
+    const tuesday = { updatedAt: '2026-09-22T09:00:00.000Z' }
+    expect(newerSettings(tuesday, monday)).toBe('local')
+    expect(newerSettings(monday, tuesday)).toBe('remote')
+    expect(newerSettings(monday, { ...monday })).toBe('same')
+    // A new device (never changed) takes the account's; an account with none takes this device's.
+    expect(newerSettings({}, monday)).toBe('remote')
+    expect(newerSettings(monday, null)).toBe('local')
+    expect(newerSettings({}, null)).toBe('same')
   })
 })
 

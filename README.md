@@ -54,11 +54,15 @@ How playback behaves:
 4. Put the project URL and the **publishable (anon)** key in `VITE_SUPABASE_URL` / `VITE_SUPABASE_KEY`.
 5. Recommended: Authentication → Email Templates → Magic Link: add `{{ .Token }}` to the template. People who open the email on a different device from the one they're signing in on can then type the 6-digit code.
 
-Already ran `schema.sql` before? Run it again **before deploying new code**: it adds the `pauses` and `xp` columns and lets a day hold more than one ladder level, and leaves your data alone.
+Already ran `schema.sql` before? Run it again **before deploying new code**: it adds whatever columns are new (`pauses` and `xp` on planks, `prefs` and `theme` on profiles), lets a day hold more than one ladder level, and leaves your data alone. Until it's run, settings just don't reach the account; everything else still syncs.
 
 This adds:
 - A **Sign in** button (email magic link or code, no passwords).
 - Two-way sync: on sign-in, the browser's history and the account's history are merged, so nobody loses a streak by signing in late.
+- **Everything tied to the account lives in the account**, so every device a player signs in on shows the same: planks, ladder, XP and rank, attempts, name and photo, and settings (music and sound, themes). Planks, attempts, the photo and name are saved the moment they happen; a setting changed on two devices keeps whichever change was made last.
+- **Catching up:** phones keep a tab open for days, so whenever the site comes back into view (or back online) it syncs again, at most every 30 seconds, and picks up whatever changed on another device meanwhile.
+- **One browser, one account's progress.** Signing out keeps this browser's copy. If someone else then signs in here, that copy is cleared first instead of merged, so one person's planks never land in another's account. Progress made before ever signing in still comes along.
+- Signed out, nothing personal leaves the browser. The only thing sent is the +1 on today's anonymous counter.
 - "**N people have planked this today**" on the daily card. Anonymous visitors count too.
 
 ## How it works
@@ -76,7 +80,7 @@ This adds:
 | Plank timer screen | [src/components/PlankTimer.tsx](src/components/PlankTimer.tsx) |
 | Settings page and its sections | [src/components/settings/](src/components/settings/) |
 | Theme colors, saving and applying themes | [src/lib/palette.ts](src/lib/palette.ts), [src/lib/theme.ts](src/lib/theme.ts) |
-| Page addresses (`#settings/…`) | [src/lib/route.ts](src/lib/route.ts) |
+| Page addresses (`#settings/…`, `#ranks`) | [src/lib/route.ts](src/lib/route.ts) |
 
 Rules worth knowing:
 - Days are the visitor's **local** calendar day, for the daily song and for streaks.
@@ -85,6 +89,7 @@ Rules worth knowing:
 - **XP** (signed-in players only, in [src/lib/xp.ts](src/lib/xp.ts)): a point for every second of song. No breaks: +50%. No breaks on a song over 6 minutes: double. Breaks never cost anything. XP is paid once per plank: today's song earns it every day, a ladder level the first time it's climbed. Doing either again earns nothing, except that the first go held with no breaks, after only goes with breaks, earns the no-break bonus. Signed out, the finished screen says what a plank would have earned.
 - **Ranks** (in [src/lib/ranks.ts](src/lib/ranks.ts)): each is a bigger piece of writing than the last: Scribble, Couplet, Verse, Sonnet, Ballad, Chapter and Anthology, each with four divisions (IV to I), then Manuscript, Masterpiece and Magnum Opus. XP moves you through the divisions (Scribble III at 500 XP, Sonnet IV at 39,000). Each new tier also needs a ladder level: Couplet level 10, Verse 25, Sonnet 50, Ballad 100, Chapter 150, Anthology 200. Until you reach it, you stay at I and see what it takes. Manuscript needs every level climbed; Masterpiece and Magnum Opus need every level held with no breaks at least once.
 - **Plaques and emblems** ([src/components/Rank.tsx](src/components/Rank.tsx), [src/components/RankEmblem.tsx](src/components/RankEmblem.tsx)): where the rank is a label (under your name, on your photo on phones, beside the XP bar) it's a plaque: the same flat plate for every rank in its tier's colour, always in the sans. Where the rank is the subject (your profile, a rank up) it's the emblem: a medallion holding that rank's piece of writing.
+- **The Ranks page** (`#ranks`, [src/components/RanksPage.tsx](src/components/RanksPage.tsx)) opens from your plaque, under your name in the header, beside the XP bar in Streak, or in your profile. It shows your rank with your tier's four divisions, how XP and ranks work, every rank's emblem with the ladder level and XP it takes, and a full table of all 31 divisions. Its numbers come straight from [src/lib/ranks.ts](src/lib/ranks.ts) and [src/lib/xp.ts](src/lib/xp.ts), so retuning either updates the page.
 - Finishing today's song (or ranking up) sets off a small burst of confetti, skipped when the device asks for reduced motion.
 - Stopping early doesn't count, but you can retry as often as you like. Pausing is fine; the pauses just show up in what you share.
 - **Sharing** opens a share box with two versions:
@@ -100,7 +105,7 @@ Rules worth knowing:
 Settings has its own address (`#settings/appearance`), so Back, bookmarks and links work. On a computer the sections are listed down the left; on a phone the list comes first and each section opens on its own.
 
 - **Adding a section** (or moving one): add an entry to `SECTIONS` in [src/components/settings/sections.ts](src/components/settings/sections.ts) with a component for its content. It gets a menu entry and its own address.
-- **Themes** are saved in the browser, separate from progress, and aren't synced to accounts. Picking System, Light, Dark or a saved theme applies it straight away. Editing a custom theme shows each change live across the site; **Save theme** keeps it, and leaving with unsaved edits asks first. A color that gets hard to read against its background (below WCAG AA) shows a warning.
+- **Themes** are saved in the browser, separate from progress, and for signed-in players in their account too, so they follow them to every device. Picking System, Light, Dark or a saved theme applies it straight away. Editing a custom theme shows each change live across the site; **Save theme** keeps it, and leaving with unsaved edits asks first. A color that gets hard to read against its background (below WCAG AA) shows a warning.
 - **Colors** are CSS variables in [src/styles.css](src/styles.css). The ones a theme can change, with their labels in the editor, are listed in [src/lib/palette.ts](src/lib/palette.ts). The Light and Dark values are written in both files; a test fails if they drift apart. To make another part of the site customizable, give it its own variable in both places and add it to `COLOR_GROUPS`. Themes saved before then pick it up from Light or Dark.
 - A small script in [index.html](index.html) applies the saved theme before the page first draws, so it never flashes the wrong colors. It reads the same saved format as [src/lib/theme.ts](src/lib/theme.ts).
 
