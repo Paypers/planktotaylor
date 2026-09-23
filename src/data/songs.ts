@@ -13,7 +13,7 @@ export type AlbumId =
   | 'midnights'
   | 'ttpd'
   | 'showgirl'
-  | 'patientzero'
+  | 'encore'
 
 export interface Album {
   id: AlbumId
@@ -58,7 +58,7 @@ export const ALBUMS: Record<AlbumId, Album> = {
   midnights: { id: 'midnights', title: 'Midnights', short: 'Midnights', year: 2022, color: '#2f3d73', ink: '#eef0ff' },
   ttpd: { id: 'ttpd', title: 'The Tortured Poets Department', short: 'TTPD', year: 2024, color: '#d6cdbf', ink: '#2b2621' },
   showgirl: { id: 'showgirl', title: 'The Life of a Showgirl', short: 'Showgirl', year: 2025, color: '#e8742f', ink: '#2a1206' },
-  patientzero: { id: 'patientzero', title: 'Patient Zero', short: 'Patient Zero', year: 2026, color: '#c5d93b', ink: '#232b06', afterLaunch: true },
+  encore: { id: 'encore', title: 'The Life of a Showgirl: The Encore', short: 'The Encore', year: 2026, color: '#c5d93b', ink: '#232b06', afterLaunch: true },
 }
 
 /** Release order, used to break ties between songs of equal length. */
@@ -324,8 +324,12 @@ const CATALOG: Record<AlbumId, string> = {
     CANCELLED! | 3:31
     Honey | 3:01
     The Life of a Showgirl | 4:01`,
-  patientzero: `
-    Patient Zero | ?`,
+  // The Encore's new songs. The rest of its tracklist is Showgirl's, above.
+  encore: `
+    Patient Zero | ?
+    Cleveland! | ?
+    Pink Clouding | ?
+    Babylon | ?`,
 }
 
 export function slugify(title: string): string {

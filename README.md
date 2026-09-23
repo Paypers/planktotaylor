@@ -117,12 +117,14 @@ Settings has its own address (`#settings/appearance`), so Back, bookmarks and li
 
 ## New releases
 
-A new album or single goes in `ALBUMS` and `CATALOG` in [src/data/songs.ts](src/data/songs.ts) with `afterLaunch: true`. That keeps its songs out of the daily rotation and off the ladder, because adding them there would reshuffle every day's song and shift everyone's ladder level. Instead, a song premieres as the song of the day: list it in `PREMIERES` in [src/lib/daily.ts](src/lib/daily.ts). The premiere takes that one day, and the rotation picks up where it left off the next day. Nothing earlier moves.
+A new album or single goes in `ALBUMS` and `CATALOG` in [src/data/songs.ts](src/data/songs.ts) with `afterLaunch: true`. That keeps its songs out of the daily rotation and off the ladder, because adding them there would reshuffle every day's song and shift everyone's ladder level. Instead, a song premieres as the song of the day: list it in `PREMIERES` in [src/lib/daily.ts](src/lib/daily.ts). Several new songs play back to back with `backToBack(firstDay, [ids in track order])`, one day each. Premiere days are slotted in: the rotation picks up where it left off after them, and nothing earlier moves. A song that isn't out by its day leaves that day to a rotation song and moves nothing else.
+
+Right now: *The Life of a Showgirl: The Encore* (Friday 25 September) premieres its four new songs back to back: Patient Zero on the 25th, Cleveland! on the 26th, Pink Clouding on the 27th and Babylon on the 28th.
 
 To have it on the site the moment it's out:
 
 1. Before release day, add the song with `?` for its length (`Patient Zero | ?`), add its premiere, and push. It stays off the site until its track is found.
-2. Before the release (her new music comes out at midnight Eastern), run `npm run watch:release` and leave it running. It checks the Topic channel every 15 seconds. When the track appears, it commits the track and its exact length on top of `origin/main`, pushes, and waits for the redeploy to go live. It builds that commit without touching your working copy, so unfinished work stays local. It keeps Windows awake while it runs, but closing a laptop lid still puts it to sleep.
+2. Before the release (her new music comes out at midnight Eastern), run `npm run watch:release` and leave it running. It checks the Topic channel every 15 seconds. When the tracks appear, it commits them and their exact lengths (all the songs found in one check go in one commit) on top of `origin/main`, pushes, and waits for the redeploy to go live. It builds that commit without touching your working copy, so unfinished work stays local. It keeps Windows awake while it runs, but closing a laptop lid still puts it to sleep.
    - `npm run watch:release -- --try "Some Song"` is a rehearsal on a song that's already out. It finds the track and shows the commit it would push, without pushing.
    - `--dry-run` watches for the real song the same way, without pushing.
 3. Visitors whose day has already started when the release lands (Europe, Asia, Australia) get the premiere when they next load the page. If they planked the usual song first, that still counts for their streak.

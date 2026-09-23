@@ -57,6 +57,27 @@ describe('daily song', () => {
     for (let i = 4; i < 600; i++) expect(withPremiere(i)).toBe(usual(i - 1))
   })
 
+  it("gives a late premiere's day to a rotation song, and moves nothing else", () => {
+    const day = (i: number) => addDays(DAILY_EPOCH, i)
+    const out = new Map([[day(3), { ...LAUNCH_SONGS[0], id: 'new-single', title: 'New Single' }]])
+    const late = new Map([[day(3), null]])
+    for (let i = 0; i < 600; i++) if (i !== 3) expect(songOfTheDay(day(i), late).id).toBe(songOfTheDay(day(i), out).id)
+    expect(LAUNCH_SONGS.some((s) => s.id === songOfTheDay(day(3), late).id)).toBe(true)
+  })
+
+  it("plays the Encore's four new songs back to back from release day, then picks the rotation back up", () => {
+    expect(Object.entries(PREMIERES)).toEqual([
+      ['2026-09-25', 'patient-zero'],
+      ['2026-09-26', 'cleveland'],
+      ['2026-09-27', 'pink-clouding'],
+      ['2026-09-28', 'babylon'],
+    ])
+    const released = new Map(Object.entries(PREMIERES).map(([day, id]) => [day, { ...LAUNCH_SONGS[0], id }]))
+    expect([0, 1, 2, 3].map((i) => songOfTheDay(addDays('2026-09-25', i), released).id)).toEqual(Object.values(PREMIERES))
+    // The 29th gets the song the 25th would have had.
+    expect(songOfTheDay('2026-09-29', released).id).toBe(songOfTheDay('2026-09-25', new Map()).id)
+  })
+
   it('premieres songs from the catalog, released after launch', () => {
     for (const id of Object.values(PREMIERES)) {
       const song = SONG_BY_ID.get(id) ?? UPCOMING.find((s) => s.id === id)

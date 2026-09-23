@@ -1,15 +1,20 @@
 import { LAUNCH_SONGS, SONG_BY_ID, type Song } from '../data/songs'
-import { daysBetween, type DayKey } from './dates'
+import { addDays, daysBetween, type DayKey } from './dates'
 
 /** Daily #1. Everyone on the same calendar date gets the same song, like Wordle. */
 export const DAILY_EPOCH: DayKey = '2026-09-22'
 
+/** One day each for `ids`, in order, starting on `from`. */
+const backToBack = (from: DayKey, ids: string[]) => Object.fromEntries(ids.map((id, i) => [addDays(from, i), id]))
+
 /**
- * New releases, the song of the day on their release day once they're out. A premiere is slotted
- * in rather than taking a day from the rotation, which carries on unchanged the day after.
+ * New releases as the song of the day, from their release day. Their days are slotted in rather
+ * than taken from the rotation, which carries on unchanged after them. A song that isn't out by its
+ * day (not found on YouTube yet) leaves its day to a rotation song, and moves nothing else.
  */
 export const PREMIERES: Readonly<Record<DayKey, string>> = {
-  '2026-09-25': 'patient-zero',
+  // The Life of a Showgirl: The Encore, out Friday 25 September: its four new songs, in track order.
+  ...backToBack('2026-09-25', ['patient-zero', 'cleveland', 'pink-clouding', 'babylon']),
 }
 
 export function dailyNumber(day: DayKey): number {
@@ -54,21 +59,20 @@ function deck(cycle: number): Song[] {
   return shuffled
 }
 
-const RELEASED_PREMIERES = new Map(
-  Object.entries(PREMIERES).flatMap(([day, id]) => {
-    const song = SONG_BY_ID.get(id)
-    return song ? [[day, song] as const] : []
-  }),
+/** Every premiere day, with its song once it's out (null until then). */
+const PREMIERE_SONGS: ReadonlyMap<DayKey, Song | null> = new Map(
+  Object.entries(PREMIERES).map(([day, id]) => [day, SONG_BY_ID.get(id) ?? null]),
 )
 
 /**
- * The song of the day given which premieres are out (a parameter for tests). Rotation songs are
- * dealt from a shuffled deck, so every one comes up once before any repeats.
+ * The song of the day, given the premiere days (a parameter for tests). Rotation songs are dealt
+ * from a shuffled deck, so every one comes up once before any repeats.
  */
-export function songOfTheDay(day: DayKey, premieres: ReadonlyMap<DayKey, Song>): Song {
+export function songOfTheDay(day: DayKey, premieres: ReadonlyMap<DayKey, Song | null>): Song {
   const premiere = premieres.get(day)
   if (premiere) return premiere
   const offset = daysBetween(DAILY_EPOCH, day)
+  // Premiere days before this one, whether or not their song came out: none of them used up a rotation song.
   const slotted = [...premieres.keys()].filter((p) => {
     const at = daysBetween(DAILY_EPOCH, p)
     return at >= 0 && at < offset
@@ -82,5 +86,5 @@ export function songOfTheDay(day: DayKey, premieres: ReadonlyMap<DayKey, Song>):
 
 /** The global song of the day. */
 export function dailySong(day: DayKey): Song {
-  return songOfTheDay(day, RELEASED_PREMIERES)
+  return songOfTheDay(day, PREMIERE_SONGS)
 }

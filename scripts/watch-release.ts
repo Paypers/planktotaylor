@@ -1,6 +1,7 @@
 // Watches the "Taylor Swift - Topic" channel for announced songs ("?" for their length in
-// src/data/songs.ts) and, the moment one is out, commits its track and length on top of
-// origin/main and pushes, so the site redeploys with it. See "New releases" in the README.
+// src/data/songs.ts) and, the moment they're out, commits their tracks and lengths on top of
+// origin/main and pushes, so the site redeploys with them. Songs found together (an album at
+// midnight) go out in one commit. See "New releases" in the README.
 //
 //   npm run watch:release                    watch, and publish each song the moment it's out
 //   npm run watch:release -- --dry-run       watch, and show the commit it would push instead
@@ -118,28 +119,36 @@ async function trackDetails(videoId: string): Promise<Track | null> {
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
+/** A song that's out, and its track. */
+interface Found {
+  song: Wanted
+  track: Track
+}
+
+const titles = (found: Found[]) => found.map(({ song, track }) => `${song.title} (${formatDuration(track.seconds)})`).join(', ')
+
 /**
- * A commit on top of origin/main that adds the track to youtube-videos.json and fills in the
- * song's length in songs.ts, built in a throwaway index so the working copy is never touched.
+ * One commit on top of origin/main that adds every found track to youtube-videos.json and fills in
+ * their lengths in songs.ts, built in a throwaway index so the working copy is never touched.
  */
-function prepareCommit(song: Wanted, track: Track): string {
+function prepareCommit(found: Found[]): string {
   git(['fetch', '--quiet', 'origin', 'main'])
   const base = git(['rev-parse', 'origin/main'])
-  const files: Record<string, string> = {}
 
   const videos = JSON.parse(gitRaw(['show', `${base}:${VIDEOS_FILE}`])) as Record<string, unknown>
-  videos[song.id] = { id: track.id, seconds: track.seconds }
-  const sorted = Object.fromEntries(Object.entries(videos).sort(([a], [b]) => a.localeCompare(b)))
-  files[VIDEOS_FILE] = `${JSON.stringify(sorted, null, 2)}\n`
-
-  const songs = gitRaw(['show', `${base}:${SONGS_FILE}`])
-  // The last song of an album closes its string: `    Title | ?\`,`
-  const line = new RegExp(`^(\\s*)${escapeRegExp(song.title)} \\| \\?(?=\`?,?\\r?$)`, 'm')
-  if (line.test(songs)) {
-    files[SONGS_FILE] = songs.replace(line, (_, indent: string) => `${indent}${song.title} | ${formatDuration(track.seconds)}`)
-  } else if (!tryTitle) {
-    throw new Error(`origin/main doesn't list "${song.title} | ?" in ${SONGS_FILE}. Push the release prep first.`)
+  let songs = gitRaw(['show', `${base}:${SONGS_FILE}`])
+  for (const { song, track } of found) {
+    videos[song.id] = { id: track.id, seconds: track.seconds }
+    // The last song of an album closes its string: `    Title | ?\`,`
+    const line = new RegExp(`^(\\s*)${escapeRegExp(song.title)} \\| \\?(?=\`?,?\\r?$)`, 'm')
+    if (line.test(songs)) {
+      songs = songs.replace(line, (_, indent: string) => `${indent}${song.title} | ${formatDuration(track.seconds)}`)
+    } else if (!tryTitle) {
+      throw new Error(`origin/main doesn't list "${song.title} | ?" in ${SONGS_FILE}. Push the release prep first.`)
+    }
   }
+  const sorted = Object.fromEntries(Object.entries(videos).sort(([a], [b]) => a.localeCompare(b)))
+  const files = { [VIDEOS_FILE]: `${JSON.stringify(sorted, null, 2)}\n`, [SONGS_FILE]: songs }
 
   const dir = mkdtempSync(join(tmpdir(), 'watch-release-'))
   const env = { GIT_INDEX_FILE: join(dir, 'index') }
@@ -150,15 +159,16 @@ function prepareCommit(song: Wanted, track: Track): string {
       git(['update-index', '--cacheinfo', `100644,${blob},${path}`], { env })
     }
     const tree = git(['write-tree'], { env })
-    return git(['commit-tree', tree, '-p', base, '-m', `${song.title} is out: its album track from YouTube (${formatDuration(track.seconds)})`])
+    const subject = `${titles(found)} ${found.length === 1 ? 'is' : 'are'} out: album tracks from YouTube`
+    return git(['commit-tree', tree, '-p', base, '-m', subject])
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
 }
 
-function push(song: Wanted, track: Track): string {
+function push(found: Found[]): string {
   for (let attempt = 1; ; attempt++) {
-    const commit = prepareCommit(song, track)
+    const commit = prepareCommit(found)
     try {
       git(['push', '--quiet', 'origin', `${commit}:refs/heads/main`])
       return commit
@@ -181,18 +191,18 @@ function updateLocal() {
   }
 }
 
-/** Waits for the redeployed site to serve the new track. */
-async function confirmLive(videoId: string) {
+/** Waits for the redeployed site to serve the new tracks. */
+async function confirmLive(videoIds: string[]) {
   console.log(`  Waiting for ${SITE} to redeploy…`)
   const deadline = Date.now() + 15 * 60_000
   while (Date.now() < deadline) {
     try {
       const html = await (await fetch(`${SITE}/?t=${Date.now()}`, { cache: 'no-store' })).text()
-      for (const [, path] of html.matchAll(/(?:src|href)="(\/assets\/[^"]+\.js)"/g)) {
-        if ((await (await fetch(SITE + path)).text()).includes(videoId)) {
-          console.log(`  ✓ Live at ${clockTime()}: ${SITE}`)
-          return
-        }
+      let code = ''
+      for (const [, path] of html.matchAll(/(?:src|href)="(\/assets\/[^"]+\.js)"/g)) code += await (await fetch(SITE + path)).text()
+      if (videoIds.every((id) => code.includes(id))) {
+        console.log(`  ✓ Live at ${clockTime()}: ${SITE}`)
+        return
       }
     } catch {
       // Keep waiting: a deploy can briefly serve errors.
@@ -202,29 +212,33 @@ async function confirmLive(videoId: string) {
   console.log('  Not live after 15 minutes: check the Cloudflare Pages dashboard.')
 }
 
-async function release(song: Wanted, track: Track) {
+/** Publishes every song found in one check together: one commit, one redeploy. */
+async function release(found: Found[]) {
   process.stdout.write('\x07')
-  console.log(`\n\n♪ ${song.title} is out: https://youtu.be/${track.id} (${formatDuration(track.seconds)}), found at ${clockTime()}`)
-  if (!track.embeddable) console.log("  ! Embedding is turned off for now: the site will show a \"Play on YouTube\" link until it's allowed.")
+  console.log('')
+  for (const { song, track } of found) {
+    console.log(`\n♪ ${song.title} is out: https://youtu.be/${track.id} (${formatDuration(track.seconds)}), found at ${clockTime()}`)
+    if (!track.embeddable) console.log("  ! Embedding is turned off for now: the site will show a \"Play on YouTube\" link until it's allowed.")
+  }
   if (dryRun) {
-    const commit = prepareCommit(song, track)
+    const commit = prepareCommit(found)
     console.log(`  Dry run: this is what would be pushed (commit ${commit.slice(0, 7)}, not pushed):\n`)
     console.log(git(['show', '--format=  %s', '--unified=1', commit]))
     return
   }
   let commit: string
   try {
-    commit = push(song, track)
+    commit = push(found)
   } catch (error) {
     console.log(`\n  ✗ Couldn't push: ${message(error)}`)
-    console.log(`  Add this to ${VIDEOS_FILE}, set the length in ${SONGS_FILE} to ${formatDuration(track.seconds)}, and push:`)
-    console.log(`    "${song.id}": { "id": "${track.id}", "seconds": ${track.seconds} }`)
+    console.log(`  Add these to ${VIDEOS_FILE}, set their lengths in ${SONGS_FILE} (${titles(found)}), and push:`)
+    for (const { song, track } of found) console.log(`    "${song.id}": { "id": "${track.id}", "seconds": ${track.seconds} }`)
     process.exitCode = 1
     return
   }
   console.log(`  Pushed ${commit.slice(0, 7)} to main at ${clockTime()}.`)
   updateLocal()
-  await confirmLive(track.id)
+  await confirmLive(found.map(({ track }) => track.id))
 }
 
 /** Keeps Windows from sleeping for as long as this process runs. */
@@ -241,7 +255,7 @@ function keepAwake() {
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
-const watching: Wanted[] = tryTitle ? [{ id: slugify(tryTitle), title: tryTitle }] : [...UPCOMING]
+let watching: Wanted[] = tryTitle ? [{ id: slugify(tryTitle), title: tryTitle }] : [...UPCOMING]
 if (!watching.length) {
   console.log(`Nothing announced: give a song "?" for its length in ${SONGS_FILE} to watch for it.`)
   process.exit(0)
@@ -289,7 +303,8 @@ for (let tick = 0; watching.length; tick++) {
   }
   checks++
 
-  for (const song of [...watching]) {
+  const found: Found[] = []
+  for (const song of watching) {
     const seen = new Set<string>()
     const matches = uploads
       .filter((upload) => isRightVideo({ title: upload.title, channel: ALBUM_AUDIO_CHANNEL }, { title: song.title, taylorsVersion: false }))
@@ -306,10 +321,13 @@ for (let tick = 0; watching.length; tick++) {
         problems.push(`found https://youtu.be/${upload.id} ("${upload.title}"), waiting for it to go public`)
         continue
       }
-      await release(song, track)
-      watching.splice(watching.indexOf(song), 1)
+      found.push({ song, track })
       break
     }
+  }
+  if (found.length) {
+    await release(found)
+    watching = watching.filter((song) => !found.some((f) => f.song === song))
   }
 
   const problem = problems.join('; ')
