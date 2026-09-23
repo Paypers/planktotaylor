@@ -85,7 +85,7 @@ Rules worth knowing:
   - **An image card** (1080×1350, drawn on a canvas in [src/lib/shareCard.ts](src/lib/shareCard.ts)): the streak, the song, and the green and orange bar to scale with each pause labelled. Phones get Share image (the share sheet, with the link attached) and Copy image; computers get Copy image and Save image.
   - **Text**, like Wordle: ten 🟩 squares for the song, with a 🟧 dropped in wherever you paused, plus the times and your streak. It ends with "Plank along:" and the link, which most apps turn into a preview card.
 - **Without an account**, progress is kept in the browser. When accounts are switched on, a quiet line under the streak and on the finished screen says so, with a Sign in link. Signing in brings that progress along.
-- Already doing the challenge elsewhere? Open **The setlist** and tap your song to move your ladder there.
+- **The ladder is climbed, never skipped.** The only thing that moves it is planking your next level (or, once every level is done, starting again from level 1). Tapping a song in **The setlist** opens its details: how and when you planked it, your planks of it, and a YouTube link. For your next level there's a Start button; for a level you've climbed there's **Plank it again**, which is practice: it doesn't move the ladder, but held with no breaks it earns the level's no-break bonus if it hasn't had it.
 - **The setlist marks every level** by how it went: a green tick for no breaks, an orange count of breaks (the fewest over every go), a faint dash for a level moved past without planking it. The **No breaks · With breaks · Not yet** buttons above it show their counts and filter the list, so the levels worth redoing for the no-break bonus are one tap away.
 
 ## Adding a new album

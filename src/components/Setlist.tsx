@@ -7,7 +7,8 @@ import { Icon } from './Icon'
 interface Props {
   level: number
   completions: readonly Completion[]
-  onJump: (level: number) => void
+  /** Opens a level's details. The ladder is climbed in order: nothing here moves it. */
+  onOpen: (level: number) => void
 }
 
 /**
@@ -31,7 +32,7 @@ function trackState(n: number, level: number, record: LevelRecord | undefined): 
 const inFilter = (state: TrackState, filter: Filter) =>
   filter === 'clean' ? state === 'clean' : filter === 'breaks' ? state === 'breaks' : state !== 'clean' && state !== 'breaks'
 
-export function Setlist({ level, completions, onJump }: Props) {
+export function Setlist({ level, completions, onOpen }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [filter, setFilter] = useState<Filter | null>(null)
   const [query, setQuery] = useState('')
@@ -77,7 +78,7 @@ export function Setlist({ level, completions, onJump }: Props) {
           <span className="narrow-only">Shortest to longest, </span>
           {TOTAL_HOURS} hours in all.
         </p>
-        <p className="label-note">Already doing the challenge? Pick your song to move your ladder there.</p>
+        <p className="label-note">Tap a song for its details. The ladder is climbed in order, one level at a time.</p>
       </div>
       <div className="section-body setlist-body">
         <label className="search">
@@ -110,7 +111,7 @@ export function Setlist({ level, completions, onJump }: Props) {
           </div>
           <ol>
             {rows.map(({ song, n, record, state }) => (
-              <Track key={song.id} song={song} n={n} state={state} breaks={record?.breaks ?? 0} onJump={onJump} />
+              <Track key={song.id} song={song} n={n} state={state} breaks={record?.breaks ?? 0} onOpen={onOpen} />
             ))}
           </ol>
           {rows.length === 0 && (
@@ -162,13 +163,13 @@ function Track({
   n,
   state,
   breaks,
-  onJump,
+  onOpen,
 }: {
   song: Song
   n: number
   state: TrackState
   breaks: number
-  onJump: (level: number) => void
+  onOpen: (level: number) => void
 }) {
   const album = ALBUMS[song.album]
   return (
@@ -176,7 +177,7 @@ function Track({
       <button
         type="button"
         className="track-btn"
-        onClick={() => state !== 'current' && onJump(n)}
+        onClick={() => onOpen(n)}
         aria-current={state === 'current' ? 'step' : undefined}
         aria-label={`Level ${n}: ${song.title}, ${formatDuration(song.seconds)}${STATE_LABEL[state](breaks)}`}
       >

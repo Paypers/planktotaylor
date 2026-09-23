@@ -29,8 +29,10 @@ export interface FinishSummary {
   streak: number
   /** The next ladder level, when this plank climbed one. */
   next: { level: number; song: Song } | null
-  /** What the plank was worth. Null when accounts are off, or the plank didn't count for anything. */
+  /** What the plank was worth. Null when accounts are off. */
   xp: FinishXp | null
+  /** Practice on a ladder level already climbed (from the setlist): it doesn't move the ladder. */
+  practiceLevel: number | null
 }
 
 export interface FinishXp {
@@ -557,10 +559,13 @@ function DoneView({
   const length = formatDuration(song.seconds)
   const { next, xp } = summary
   const upgraded = xp?.kind === 'upgrade'
-  const title = upgraded ? 'Straight through.' : plankHeadline(daily, ladder?.level)
+  const practice = summary.practiceLevel
+  const title = upgraded ? 'Straight through.' : practice ? `Level ${practice}, again.` : plankHeadline(daily, ladder?.level)
   const text = upgraded
     ? 'No breaks this time, so the no-break bonus is yours.'
-    : ladder && daily
+    : practice
+      ? `Another go at ${song.title}, ${length}. Practice doesn't move your ladder.`
+      : ladder && daily
       ? `${song.title} counted for today's song and level ${ladder.level}.`
       : ladder || daily
         ? `You held a plank for all of ${song.title}, ${length}.`

@@ -442,6 +442,42 @@ a {
   margin-top: 4px;
 }
 
+/* A setlist level's details */
+
+.level-status {
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+}
+
+.level-bonus {
+  margin-top: -6px;
+  color: var(--paused-ink);
+}
+
+.level-planks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.level-planks li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.level-planks li:last-child {
+  border-bottom: 0;
+}
+
 /* Buttons */
 
 .btn {
@@ -1117,10 +1153,6 @@ a {
 .track-btn:hover,
 .track.current .track-btn {
   background: var(--well);
-}
-
-.track.current .track-btn {
-  cursor: default;
 }
 
 .track-no {

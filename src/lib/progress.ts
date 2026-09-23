@@ -150,7 +150,7 @@ export function applyPlank(
   if (onLadder && !ladder.climbedToday.some((c) => c.songId === song.id)) {
     added.push({ day: today, mode: 'ladder', songId: song.id, level: ladder.level, seconds: song.seconds, at, ...extra })
   }
-  // Planking your ladder level always moves you up, even a level you went back down to redo.
+  // Planking your ladder level moves you up. Nothing else moves the ladder: it's climbed, not skipped.
   const next = onLadder ? { ...data, ladder: { level: ladder.level + 1, updatedAt: at } } : data
 
   if (added.length > 0) {
@@ -169,16 +169,15 @@ export function applyPlank(
     }
   }
 
-  // A replay of a song already planked today.
-  const todays = data.completions.filter((c) => c.day === today && c.songId === song.id)
-  const hadBreaks = todays.length > 0 && todays.every((c) => c.pauses?.length)
-  const gain = earnXp && hadBreaks && award.kind !== 'held' ? award.total - totalXp(todays) : 0
-  if (gain <= 0) return { data: next, added: [], updated: [], gained: 0, kind: 'repeat', bonusLeft: hadBreaks }
+  // A go that counts for nothing new: today's song again, or practice on a ladder level already climbed.
+  const target = upgradeTarget(data.completions, song.id, today)
+  const gain = target && earnXp && award.kind !== 'held' ? award.total - totalXp(target) : 0
+  if (gain <= 0) return { data: next, added: [], updated: [], gained: 0, kind: 'repeat', bonusLeft: target !== null }
 
-  // Held straight through this time: today's records become the clean plank, with the bonus added
-  // to whichever one carries the XP.
-  const carrier = Math.max(0, todays.findIndex((c) => c.xp))
-  const updated = todays.map((c, i) => {
+  // Held straight through this time: that earlier plank becomes the clean one, with the bonus added
+  // to whichever of its records carries the XP.
+  const carrier = Math.max(0, target!.findIndex((c) => c.xp))
+  const updated = target!.map((c, i) => {
     const clean: Completion = { ...c }
     delete clean.pauses
     return i === carrier ? { ...clean, xp: (c.xp ?? 0) + gain } : clean
@@ -192,6 +191,21 @@ export function applyPlank(
     kind: 'upgrade',
     bonusLeft: false,
   }
+}
+
+/**
+ * The earlier plank a no-break go at this song would upgrade, as its records (a two-for-one has two),
+ * or null when there's none. Candidates: today's plank of the song, and its ladder climbs from any
+ * day, unless the level has already been held with no breaks. The latest plank with breaks wins.
+ */
+export function upgradeTarget(completions: readonly Completion[], songId: string, today: DayKey): Completion[] | null {
+  const mine = completions.filter((c) => c.songId === songId)
+  const levelDone = mine.some((c) => c.mode === 'ladder' && !c.pauses?.length)
+  const candidates = mine.filter((c) => (c.mode === 'ladder' ? !levelDone : c.day === today))
+  const withBreaks = candidates.filter((c) => c.pauses?.length).sort((a, b) => b.at.localeCompare(a.at))
+  if (withBreaks.length === 0) return null
+  // Every record of that plank: they share its finishing time.
+  return mine.filter((c) => c.at === withBreaks[0].at)
 }
 
 /**

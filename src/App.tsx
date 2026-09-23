@@ -3,6 +3,7 @@ import { AccountDialog } from './components/AccountDialog'
 import { Avatar } from './components/Avatar'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { Flame, Icon, StarMark } from './components/Icon'
+import { LevelDialog } from './components/LevelDialog'
 import { MusicDialog } from './components/MusicDialog'
 import { PlankTimer, type FinishSummary, type PlankSession, type PlankShare } from './components/PlankTimer'
 import { Setlist } from './components/Setlist'
@@ -27,7 +28,9 @@ export function App() {
   const [session, setSession] = useState<PlankSession | null>(null)
   const [dialog, setDialog] = useState<'music' | 'account' | null>(null)
   const [dailyCount, setDailyCount] = useState<number | null>(null)
-  const [jumpTo, setJumpTo] = useState<number | null>(null)
+  const [restarting, setRestarting] = useState(false)
+  // The setlist level whose details are open.
+  const [levelInfo, setLevelInfo] = useState<number | null>(null)
   const [sharing, setSharing] = useState<ShareInput | null>(null)
 
   const daily = dailyView(data, today)
@@ -88,6 +91,11 @@ export function App() {
       const now = getData()
       const after = ladderView(now, today)
       const next = climbing && after.song ? { level: after.level, song: after.song } : null
+      // Practice: another go at a level already climbed, which doesn't move the ladder.
+      const practiceLevel =
+        !climbing && counted.length === 0 && now.completions.some((c) => c.mode === 'ladder' && c.songId === song.id)
+          ? LADDER.findIndex((s) => s.id === song.id) + 1
+          : null
       // Signed out, the finished screen shows what the plank would have earned.
       const xp = accountsEnabled
         ? {
@@ -100,14 +108,14 @@ export function App() {
             after: totalXp(now.completions),
           }
         : null
-      return { counted, streak: streakInfo(streakDays(now.completions), today).current, next, xp }
+      return { counted, streak: streakInfo(streakDays(now.completions), today).current, next, xp, practiceLevel }
     },
     [today, earningXp],
   )
 
-  const confirmJump = () => {
-    if (jumpTo !== null) void saveLadderCursor(setLadderLevel(jumpTo))
-    setJumpTo(null)
+  const restartLadder = () => {
+    void saveLadderCursor(setLadderLevel(1))
+    setRestarting(false)
   }
 
   const start = (song: Song, label: string) => setSession({ song, label })
@@ -214,7 +222,7 @@ export function App() {
                     </p>
                   </div>
                   <div className="row-actions">
-                    <button type="button" className="btn btn-secondary" onClick={() => setJumpTo(1)}>
+                    <button type="button" className="btn btn-secondary" onClick={() => setRestarting(true)}>
                       Start again
                     </button>
                   </div>
@@ -252,7 +260,7 @@ export function App() {
             onSignIn={offerSignIn}
             rank={rank}
           />
-          <Setlist level={ladder.level} completions={data.completions} onJump={setJumpTo} />
+          <Setlist level={ladder.level} completions={data.completions} onOpen={setLevelInfo} />
         </main>
 
         <footer className="site-footer grid">
@@ -287,17 +295,30 @@ export function App() {
       )}
       <MusicDialog open={dialog === 'music'} prefs={data.prefs} onClose={() => setDialog(null)} />
       {accountsEnabled && <AccountDialog open={dialog === 'account'} onClose={() => setDialog(null)} rank={rank} />}
+      {/* The one way the ladder moves other than climbing: back to the bottom, once it's all done. */}
       <ConfirmDialog
-        open={jumpTo !== null}
-        title={jumpTo === 1 && ladder.finished ? 'Start the ladder again?' : `Move to level ${jumpTo}?`}
-        confirmLabel={jumpTo === 1 && ladder.finished ? 'Start again' : `Move to level ${jumpTo}`}
+        open={restarting && ladder.finished}
+        title="Start the ladder again?"
+        confirmLabel="Start again"
         cancelLabel="Cancel"
-        onConfirm={confirmJump}
-        onCancel={() => setJumpTo(null)}
+        onConfirm={restartLadder}
+        onCancel={() => setRestarting(false)}
       >
-        {jumpTo !== null && <SongLine song={LADDER[jumpTo - 1]} />}
-        <p>Your ladder picks up from this song. Your calendar and streak stay as they are.</p>
+        <SongLine song={LADDER[0]} />
+        <p>You'll climb from level 1 again. Your calendar, streak and XP stay as they are.</p>
       </ConfirmDialog>
+      <LevelDialog
+        level={levelInfo}
+        cursor={ladder.level}
+        completions={data.completions}
+        today={today}
+        earningXp={earningXp}
+        onClose={() => setLevelInfo(null)}
+        onPlank={(song, label) => {
+          setLevelInfo(null)
+          start(song, label)
+        }}
+      />
       <ShareDialog share={sharing} onClose={() => setSharing(null)} />
     </>
   )

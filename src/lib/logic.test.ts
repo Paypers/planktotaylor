@@ -176,6 +176,22 @@ describe('replays and XP', () => {
     expect(straight.gained).toBe(plankXp(song.seconds, []).bonus)
   })
 
+  it('lets you practise a level you climbed with breaks for its bonus, without moving your ladder', () => {
+    const song = LADDER[0]
+    const climbed = applyPlank(emptyData(), song, today, t(0), breaks, true)
+    expect(climbed.data.ladder.level).toBe(2)
+    // Tomorrow, from the setlist: plank level 1 again. It's not tomorrow's song, and not your next level.
+    const later = '2026-09-23T12:00:00.000Z'
+    expect(dailySong(tomorrow).id).not.toBe(song.id)
+    const practice = applyPlank(climbed.data, song, tomorrow, later, [], true)
+    expect(practice).toMatchObject({ kind: 'upgrade', gained: plankXp(song.seconds, []).bonus, added: [] })
+    expect(practice.data.ladder.level).toBe(2)
+    // The level's own record is now the clean one, still dated the day it was climbed.
+    expect(ladderRecords(practice.data.completions).get(song.id)).toEqual({ clean: true, breaks: 0 })
+    expect(practice.updated[0].day).toBe(today)
+    expect(applyPlank(practice.data, song, tomorrow, later, [], true)).toMatchObject({ kind: 'repeat', gained: 0, bonusLeft: false })
+  })
+
   it('never pays a replay when signed out', () => {
     const first = applyPlank(emptyData(), daily, today, t(0), breaks, false)
     expect(applyPlank(first.data, daily, today, t(1), [], false).gained).toBe(0)
