@@ -18,6 +18,7 @@ interface Props {
   onSignIn?: () => void
   /** Signed-in players' rank. */
   rank?: RankInfo | null
+  onHistory: () => void
 }
 
 function formatTotal(seconds: number): string {
@@ -30,7 +31,7 @@ function formatTotal(seconds: number): string {
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
-export function StreakPanel({ completions, days, streak, today, onSignIn, rank }: Props) {
+export function StreakPanel({ completions, days, streak, today, onSignIn, rank, onHistory }: Props) {
   const message = streak.doneToday
     ? 'Safe for today. See you tomorrow.'
     : streak.atRisk
@@ -62,6 +63,11 @@ export function StreakPanel({ completions, days, streak, today, onSignIn, rank }
           <dt>Time planked</dt>
           <dd>{formatTotal(totalSeconds(completions))}</dd>
         </dl>
+        <div className="streak-history">
+          <button type="button" className="btn btn-secondary" onClick={onHistory}>
+            Plank history
+          </button>
+        </div>
       </div>
       <div className="streak-calendar">
         <Calendar completions={completions} days={days} today={today} />

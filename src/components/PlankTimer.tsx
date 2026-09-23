@@ -3,6 +3,7 @@ import { ALBUMS, LADDER, formatDuration, type Song } from '../data/songs'
 import { useWakeLock } from '../lib/hooks'
 import type { Completion, Pause, PlankResult, Prefs } from '../lib/progress'
 import { pausedSeconds, plankHeadline } from '../lib/share'
+import { beginAttempt, endAttempt, saveAttemptProgress, type AttemptKind, type AttemptOutcome } from '../lib/attempts'
 import { sounds, unlockAudio } from '../lib/sound'
 import { MARATHON_SECONDS, rankFor, type XpAward } from '../lib/xp'
 import { youtubeUrl } from '../lib/youtube'
@@ -21,6 +22,10 @@ export interface PlankSession {
   song: Song
   /** Shown in the top bar, e.g. "Today's song" or "Level 12 of 243". */
   label: string
+  /** What the plank is for, as it's written in the attempt history. */
+  kind: AttemptKind
+  /** The ladder level, for a climb or practice. */
+  level?: number
 }
 
 export interface FinishSummary {
@@ -66,7 +71,7 @@ interface Props {
   /** Set when accounts are on and nobody's signed in. */
   onSignIn?: () => void
   /** Go straight on to another plank (the next ladder level). */
-  onNext: (song: Song, label: string) => void
+  onNext: (session: PlankSession) => void
 }
 
 /**
@@ -86,6 +91,22 @@ type ClockSource = 'video' | 'manual'
 
 /** Breaks shorter than this are fumbles, not pauses. */
 const MIN_PAUSE_MS = 1000
+/** While the song is stuck this long, check whether the internet has gone (an ad or a slow load is fine). */
+const STALL_CHECK_MS = 5000
+
+/** True when the site can still be reached. navigator.onLine alone misses a connection that's up but dead. */
+async function isOnline(): Promise<boolean> {
+  if (!navigator.onLine) return false
+  try {
+    const response = await fetch(`${import.meta.env.BASE_URL}favicon.svg?online=${Date.now()}`, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(4000),
+    })
+    return response.ok
+  } catch {
+    return false
+  }
+}
 /** Song position not moving for this long while planking: an ad, buffering, or it never started. */
 const STALL_MS = 1500
 
@@ -133,6 +154,10 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
   const [pauses, setPauses] = useState<Pause[]>([])
   const [summary, setSummary] = useState<FinishSummary | null>(null)
   const [askingToStop, setAskingToStop] = useState(false)
+  /** Why a plank ended early: shown on the quit screen. */
+  const [endReason, setEndReason] = useState<'gave-up' | 'offline' | 'left'>('gave-up')
+  /** The attempt on the record, from the moment the plank begins until it ends, however it ends. */
+  const attempt = useRef<string | null>(null)
 
   const clock = useRef({ startedAt: 0, banked: 0 }) // manual clock
   const anchor = useRef({ pos: 0, at: 0 }) // last song position the player reported, and when
@@ -178,9 +203,22 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
     setPauses(pausesRef.current)
   }
 
+  const readElapsedRef = useRef(readElapsed)
+  readElapsedRef.current = readElapsed
+  const breakCount = () => pausesRef.current.length + (pauseStart.current ? 1 : 0)
+
+  /** Closes the attempt on the record, however the plank ended. */
+  const endRecord = (outcome: AttemptOutcome, reachedMs: number) => {
+    if (!attempt.current) return
+    endAttempt(attempt.current, outcome, reachedMs / 1000, breakCount())
+    attempt.current = null
+  }
+
   const run = () => {
     endPause()
     progress.current = { ms: readElapsed(), at: performance.now() }
+    // The plank begins (or carries on after a pause): from here it's on the record.
+    attempt.current ??= beginAttempt({ songId: song.id, kind: session.kind, level: session.level })
     setPhase('running')
   }
 
@@ -201,6 +239,7 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
     if (finished.current) return
     finished.current = true
     endPause()
+    endRecord('finished', total)
     setElapsed(total)
     setPhase('done')
     if (prefs.sounds) sounds.finish()
@@ -336,18 +375,65 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
     setPhase('ready')
   }
 
-  const giveUp = () => {
+  /** Ends the plank early: it goes on the record as how far it got, and why it stopped. */
+  const endEarly = (reason: 'gave-up' | 'offline' | 'left') => {
     const ms = readElapsed()
+    endRecord(reason, ms)
     pauseStart.current = null
     setElapsed(ms)
+    setEndReason(reason)
     setPhase('quit')
     music.stop()
   }
 
+  const giveUp = () => endEarly('gave-up')
+
   const stop = () => {
+    endRecord('stopped', readElapsed())
     music.stop()
     onClose()
   }
+
+  // Leaving or losing the connection ends the attempt on the spot: it's saved with how far it got.
+  // Refs, so the listeners below always call the latest versions.
+  const endEarlyRef = useRef(endEarly)
+  endEarlyRef.current = endEarly
+  useEffect(() => {
+    const lost = () => attempt.current && endEarlyRef.current('offline')
+    // Closing, refreshing or navigating away. (A phone that kills the tab outright is caught on the
+    // next visit: the attempt ends where it was last saved.)
+    const left = () => attempt.current && endEarlyRef.current('left')
+    window.addEventListener('offline', lost)
+    window.addEventListener('pagehide', left)
+    return () => {
+      window.removeEventListener('offline', lost)
+      window.removeEventListener('pagehide', left)
+      // The plank screen went away some other way mid-plank.
+      if (attempt.current) endAttempt(attempt.current, 'stopped', readElapsedRef.current() / 1000, breakCount())
+    }
+  }, [])
+
+  // Save the attempt's progress every couple of seconds, so however it ends, the record knows how far it got.
+  useEffect(() => {
+    if (phase !== 'running' && phase !== 'paused') return
+    const save = () => attempt.current && saveAttemptProgress(attempt.current, readElapsed() / 1000, breakCount())
+    save()
+    const timer = setInterval(save, 2000)
+    return () => clearInterval(timer)
+  }, [phase, readElapsed])
+
+  // The song stuck mid-plank: fine if it's an ad or a slow load, over if the internet has gone.
+  useEffect(() => {
+    if (!stalled || phase !== 'running') return
+    let live = true
+    const timer = setInterval(() => {
+      void isOnline().then((online) => live && !online && attempt.current && endEarlyRef.current('offline'))
+    }, STALL_CHECK_MS)
+    return () => {
+      live = false
+      clearInterval(timer)
+    }
+  }, [stalled, phase])
 
   // Mid-plank, ask first. The song and the timer carry on while you decide.
   const close = () => (active ? setAskingToStop(true) : stop())
@@ -387,7 +473,7 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
     waiting: 'Starting the song',
     running: 'Time left',
     paused: 'Paused',
-    quit: 'You held',
+    quit: { 'gave-up': 'You held', offline: 'Connection lost at', left: 'You left at' }[endReason],
     done: '',
   }[phase]
   const clockValue =
@@ -402,7 +488,11 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
     waiting: music.hint ?? 'Starting the song…',
     running: stalled ? (playing.current ? 'Waiting for the song…' : 'Tap ▶ on the video to carry on.') : coachLine(elapsed, total),
     paused: synced ? 'Paused. The song waits with you.' : 'Paused. Take a breath.',
-    quit: `of ${formatDuration(song.seconds)}. Every second counts. Go again when you're ready.`,
+    quit: {
+      'gave-up': `of ${formatDuration(song.seconds)}. Every second counts. It's in your plank history. Go again when you're ready.`,
+      offline: `of ${formatDuration(song.seconds)}. Losing the connection ends the attempt. It's in your plank history. Go again when you're back online.`,
+      left: `of ${formatDuration(song.seconds)}. Leaving the page ends the attempt. It's in your plank history.`,
+    }[endReason],
     done: '',
   }[phase]
 
@@ -534,7 +624,8 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
       >
         <p>
           {phase === 'running' || phase === 'paused' ? `You've held ${formatDuration(elapsed / 1000)} so far. ` : ''}
-          It only counts if you hold it to the end of the song.
+          It only counts if you hold it to the end of the song. Stopping ends this attempt, and it's saved in your
+          plank history.
         </p>
       </ConfirmDialog>
     </div>
@@ -552,7 +643,7 @@ function DoneView({
   summary: FinishSummary
   pauses: Pause[]
   onSignIn?: () => void
-  onNext: (song: Song, label: string) => void
+  onNext: (session: PlankSession) => void
 }) {
   const ladder = summary.counted.find((c) => c.mode === 'ladder')
   const daily = summary.counted.some((c) => c.mode === 'daily')
@@ -623,7 +714,7 @@ function DoneView({
           </div>
           <SongLine song={next.song} />
           <div>
-            <button type="button" className="btn btn-secondary" onClick={() => onNext(next.song, `Level ${next.level} of ${LADDER.length}`)}>
+            <button type="button" className="btn btn-secondary" onClick={() => onNext({ song: next.song, label: `Level ${next.level} of ${LADDER.length}`, kind: 'ladder', level: next.level })}>
               Keep climbing
             </button>
           </div>

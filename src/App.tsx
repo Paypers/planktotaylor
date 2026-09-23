@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AccountDialog } from './components/AccountDialog'
 import { Avatar } from './components/Avatar'
 import { ConfirmDialog } from './components/ConfirmDialog'
+import { HistoryDialog } from './components/HistoryDialog'
 import { Flame, Icon, StarMark } from './components/Icon'
 import { LevelDialog } from './components/LevelDialog'
 import { MusicDialog } from './components/MusicDialog'
@@ -32,6 +33,7 @@ export function App() {
   // The setlist level whose details are open.
   const [levelInfo, setLevelInfo] = useState<number | null>(null)
   const [sharing, setSharing] = useState<ShareInput | null>(null)
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   const daily = dailyView(data, today)
   const ladder = ladderView(data, today)
@@ -118,7 +120,7 @@ export function App() {
     setRestarting(false)
   }
 
-  const start = (song: Song, label: string) => setSession({ song, label })
+  const start = (next: PlankSession) => setSession(next)
   // Without an account, progress lives in this browser: say so quietly where there's something to keep.
   const offerSignIn = accountsEnabled && !user ? () => setDialog('account') : undefined
   const dateline = fromDayKey(today).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
@@ -199,9 +201,9 @@ export function App() {
                 song={daily.song}
                 done={daily.done}
                 startLabel="Start plank"
-                onStart={() => start(daily.song, "Today's song")}
+                onStart={() => start({ song: daily.song, label: "Today's song", kind: 'daily' })}
                 onShare={dailyDone && (() => shareCompletion(dailyDone))}
-                onAgain={() => start(daily.song, "Today's song · extra credit")}
+                onAgain={() => start({ song: daily.song, label: "Today's song · extra credit", kind: 'extra' })}
               >
                 {dailyDone && <p className="row-note">{plankSummary(dailyDone.pauses ?? [], dailyDone.seconds)}</p>}
                 {dailyCount !== null && dailyCount > 0 && (
@@ -233,7 +235,7 @@ export function App() {
                   song={ladder.song!}
                   done={false}
                   startLabel={`Start level ${ladder.level}`}
-                  onStart={() => start(ladder.song!, `Level ${ladder.level} of ${ladder.total}`)}
+                  onStart={() => start({ song: ladder.song!, label: `Level ${ladder.level} of ${ladder.total}`, kind: 'ladder', level: ladder.level })}
                   onShare={lastClimb && (() => shareCompletion(lastClimb))}
                 >
                   <LadderProgress done={ladder.level - 1} total={ladder.total} />
@@ -259,6 +261,7 @@ export function App() {
             today={today}
             onSignIn={offerSignIn}
             rank={rank}
+            onHistory={() => setHistoryOpen(true)}
           />
           <Setlist level={ladder.level} completions={data.completions} onOpen={setLevelInfo} />
         </main>
@@ -314,12 +317,13 @@ export function App() {
         today={today}
         earningXp={earningXp}
         onClose={() => setLevelInfo(null)}
-        onPlank={(song, label) => {
+        onPlank={(next) => {
           setLevelInfo(null)
-          start(song, label)
+          start(next)
         }}
       />
       <ShareDialog share={sharing} onClose={() => setSharing(null)} />
+      <HistoryDialog open={historyOpen} onClose={() => setHistoryOpen(false)} signedIn={earningXp} />
     </>
   )
 }

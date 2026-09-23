@@ -55,6 +55,32 @@ create policy "replace own avatar" on storage.objects for update to authenticate
 create policy "remove own avatar" on storage.objects for delete to authenticated
   using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
 
+-- Every plank attempt, finished or not: when it began, how far into the song it got, and how it
+-- ended. Players can add to their own record but never change or remove it.
+create table if not exists public.plank_attempts (
+  user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  id uuid not null,
+  song_id text not null,
+  kind text not null check (kind in ('daily', 'ladder', 'practice', 'extra')),
+  level int check (level is null or level >= 1),
+  started_at timestamptz not null,
+  ended_at timestamptz not null,
+  outcome text not null check (outcome in ('finished', 'gave-up', 'stopped', 'left', 'offline')),
+  -- Seconds into the song it got to.
+  reached numeric(6, 1) not null check (reached >= 0),
+  pauses int not null default 0 check (pauses >= 0),
+  primary key (user_id, id)
+);
+create index if not exists plank_attempts_recent on public.plank_attempts (user_id, started_at desc);
+
+alter table public.plank_attempts enable row level security;
+drop policy if exists "read own attempts" on public.plank_attempts;
+drop policy if exists "add own attempts" on public.plank_attempts;
+create policy "read own attempts" on public.plank_attempts for select to authenticated using (auth.uid() = user_id);
+create policy "add own attempts" on public.plank_attempts for insert to authenticated with check (auth.uid() = user_id);
+grant select, insert on public.plank_attempts to authenticated;
+revoke update, delete, truncate on public.plank_attempts from anon, authenticated;
+
 -- "N people planked today's song". Anonymous visitors count too.
 create table if not exists public.daily_counts (
   day date primary key,

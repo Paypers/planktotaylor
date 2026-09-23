@@ -11,6 +11,7 @@ import {
   type Mode,
   type Pause,
 } from './progress'
+import { getAttempts, mergeAttempts, onAttemptEnded, type AttemptKind, type AttemptOutcome } from './attempts'
 import { getData, onPlankRecorded, replaceProgress } from './store'
 
 // Just the project address. The dashboard's Data API page shows it with /rest/v1/ on the end, which breaks sign-in.
@@ -178,6 +179,9 @@ async function syncNow(user: User) {
     if (missing.length > 0) await upsertCompletions(supabase, user.id, missing)
     if (improved.length > 0) await replaceCompletions(supabase, user.id, improved)
     if (ladder !== remoteCursor) await pushLadderCursor(supabase, user.id, ladder)
+    // Attempts made while signed out, or while offline, go up now. They're a record, not progress,
+    // so a failure here doesn't fail the sync; they're retried next time.
+    await pushAttempts(supabase, user.id).catch((error) => console.error('Could not save attempts to account', error))
     setState({ sync: 'synced' })
   } catch (error) {
     console.error('Sync failed', error)
@@ -210,6 +214,75 @@ function listen(supabase: SupabaseClient) {
     })()
   })
 }
+
+interface AttemptRow {
+  user_id: string
+  id: string
+  song_id: string
+  kind: AttemptKind
+  level: number | null
+  started_at: string
+  ended_at: string
+  outcome: AttemptOutcome
+  reached: number
+  pauses: number
+}
+
+/** Sends attempts the account doesn't have yet. The account only ever adds them: none can be edited or removed. */
+async function pushAttempts(supabase: SupabaseClient, userId: string) {
+  const unsaved = getAttempts().filter((a) => !a.synced)
+  if (unsaved.length === 0) return
+  const rows: AttemptRow[] = unsaved.map((a) => ({
+    user_id: userId,
+    id: a.id,
+    song_id: a.songId,
+    kind: a.kind,
+    level: a.level ?? null,
+    started_at: a.startedAt,
+    ended_at: a.endedAt,
+    outcome: a.outcome,
+    reached: a.reached,
+    pauses: a.pauses,
+  }))
+  const { error } = await supabase.from('plank_attempts').upsert(rows, { onConflict: 'user_id,id', ignoreDuplicates: true })
+  if (error) throw error
+  mergeAttempts([], unsaved.map((a) => a.id))
+}
+
+/** The latest attempts from every device, for the history. */
+export async function pullAttempts() {
+  const user = state.user
+  if (!accountsEnabled || !user) return
+  const supabase = await client()
+  await pushAttempts(supabase, user.id)
+  const { data, error } = await supabase
+    .from('plank_attempts')
+    .select('id, song_id, kind, level, started_at, ended_at, outcome, reached, pauses')
+    .order('started_at', { ascending: false })
+    .limit(100)
+  if (error) throw error
+  mergeAttempts(
+    (data as Omit<AttemptRow, 'user_id'>[]).map((row) => ({
+      id: row.id,
+      songId: row.song_id,
+      kind: row.kind,
+      ...(row.level != null ? { level: row.level } : {}),
+      startedAt: new Date(row.started_at).toISOString(),
+      endedAt: new Date(row.ended_at).toISOString(),
+      outcome: row.outcome,
+      reached: Number(row.reached),
+      pauses: row.pauses,
+    })),
+  )
+}
+
+onAttemptEnded(() => {
+  const user = state.user
+  if (!accountsEnabled || !user) return
+  void client()
+    .then((supabase) => pushAttempts(supabase, user.id))
+    .catch((error) => console.error('Could not save attempt to account', error))
+})
 
 // Start right away so a returning magic link (#access_token=…) is picked up on page load.
 if (accountsEnabled) void client()

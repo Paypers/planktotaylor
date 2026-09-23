@@ -4,6 +4,7 @@ import { ladderRecords, upgradeTarget, type Completion } from '../lib/progress'
 import { plankXp, totalXp } from '../lib/xp'
 import { youtubeUrl } from '../lib/youtube'
 import { Dialog } from './Dialog'
+import type { PlankSession } from './PlankTimer'
 import { SongLine } from './SongRow'
 
 interface Props {
@@ -16,7 +17,7 @@ interface Props {
   earningXp: boolean
   onClose: () => void
   /** Plank this song: your next level, or practice on one you've climbed. */
-  onPlank: (song: Song, label: string) => void
+  onPlank: (session: PlankSession) => void
 }
 
 /** A level's details from the setlist. The ladder is climbed in order, so there's no moving to it. */
@@ -78,12 +79,12 @@ function LevelDetails({ song, level, cursor, completions, today, earningXp, onPl
 
       <div className="button-row">
         {level === cursor && (
-          <button type="button" className="btn btn-primary" onClick={() => onPlank(song, `Level ${level} of ${LADDER.length}`)}>
+          <button type="button" className="btn btn-primary" onClick={() => onPlank({ song, label: `Level ${level} of ${LADDER.length}`, kind: 'ladder', level })}>
             Start level {level}
           </button>
         )}
         {record && level !== cursor && (
-          <button type="button" className="btn btn-secondary" onClick={() => onPlank(song, `Level ${level} · practice`)}>
+          <button type="button" className="btn btn-secondary" onClick={() => onPlank({ song, label: `Level ${level} · practice`, kind: 'practice', level })}>
             Plank it again
           </button>
         )}

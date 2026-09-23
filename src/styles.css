@@ -478,6 +478,117 @@ a {
   border-bottom: 0;
 }
 
+/* Plank history: every attempt, finished or not */
+
+.streak-history {
+  margin: -16px 0 32px;
+}
+
+@media (min-width: 1100px) {
+  .streak-history {
+    margin: 16px 0 0;
+  }
+}
+
+.history-day h3 {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--ink-2);
+}
+
+.attempts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attempt {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  column-gap: 12px;
+  align-items: start;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.attempt:last-child {
+  border-bottom: 0;
+}
+
+.attempt-time {
+  padding-top: 1px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.attempt-main {
+  min-width: 0;
+}
+
+.attempt-song {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dialog-section .attempt-song {
+  color: var(--ink);
+}
+
+.dialog-section .attempt-kind {
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.dialog-section .attempt-end .meta {
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.attempt-bar {
+  height: 4px;
+  margin-top: 6px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--rule);
+}
+
+.attempt-bar > span {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+  background: var(--paused);
+}
+
+.attempt-bar > span.done {
+  background: var(--held);
+}
+
+.attempt-end {
+  text-align: right;
+}
+
+.dialog-section .attempt-outcome {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--paused-ink);
+  white-space: nowrap;
+}
+
+.dialog-section .attempt-outcome.done {
+  color: var(--held);
+}
+
 /* Buttons */
 
 .btn {
