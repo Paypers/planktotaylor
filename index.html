@@ -7,6 +7,26 @@
     <meta name="description" content="Hold a plank for one Taylor Swift song a day. A daily song for everyone, plus your own shortest-to-longest ladder and streak." />
     <meta name="theme-color" content="#f4f0e8" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#15120e" media="(prefers-color-scheme: dark)" />
+    <script>
+      // The saved theme, set before the first paint so the page never flashes the wrong colors.
+      // It reads what src/lib/theme.ts saves: keep the two in step.
+      ;(function () {
+        var root = document.documentElement
+        var scheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        try {
+          var saved = JSON.parse(localStorage.getItem('plank-to-taylor:theme:v1') || '{}')
+          var custom = (saved.themes || []).filter(function (t) {
+            return t && t.id === saved.selected
+          })[0]
+          if (saved.selected === 'light' || saved.selected === 'dark') scheme = saved.selected
+          if (custom) {
+            scheme = custom.scheme === 'dark' ? 'dark' : 'light'
+            for (var token in custom.colors) root.style.setProperty('--' + token, custom.colors[token])
+          }
+        } catch (e) {}
+        root.setAttribute('data-theme', scheme)
+      })()
+    </script>
     <!-- The preview card when a shared result is pasted into a chat. Update the address if the site moves domain. -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Plank to Taylor" />

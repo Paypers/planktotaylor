@@ -11,10 +11,10 @@ import {
   verifySignInCode,
 } from '../lib/account'
 import { squarePhoto } from '../lib/avatar'
-import type { RankInfo } from '../lib/xp'
+import type { PlayerRank } from '../lib/ranks'
 import { Avatar } from './Avatar'
 import { Dialog } from './Dialog'
-import { RankBar } from './Rank'
+import { RankCard } from './Rank'
 
 const SYNC_TEXT = {
   idle: '',
@@ -23,7 +23,7 @@ const SYNC_TEXT = {
   error: "Couldn't sync just now. Your progress is safe in this browser.",
 }
 
-export function AccountDialog({ open, onClose, rank }: { open: boolean; onClose: () => void; rank: RankInfo | null }) {
+export function AccountDialog({ open, onClose, rank }: { open: boolean; onClose: () => void; rank: PlayerRank | null }) {
   const { user } = useAccount()
   return (
     <Dialog open={open} title={user ? 'Your profile' : 'Sign in'} onClose={onClose}>
@@ -32,7 +32,7 @@ export function AccountDialog({ open, onClose, rank }: { open: boolean; onClose:
   )
 }
 
-function ProfileForm({ rank }: { rank: RankInfo | null }) {
+function ProfileForm({ rank }: { rank: PlayerRank | null }) {
   const { user, sync, profile } = useAccount()
   const [name, setName] = useState(profile.name ?? '')
   const [busy, setBusy] = useState<'name' | 'photo' | null>(null)
@@ -116,7 +116,7 @@ function ProfileForm({ rank }: { rank: RankInfo | null }) {
       {rank && (
         <section className="dialog-section">
           <h3>Your rank</h3>
-          <RankBar rank={rank} />
+          <RankCard rank={rank} />
         </section>
       )}
 

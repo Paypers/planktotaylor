@@ -7,6 +7,7 @@ Hold a plank for one Taylor Swift song a day.
 - **Streaks**: planking today's song keeps your streak. Ladder levels don't count towards it. You get a 🔥 streak, a calendar where each planked day is colored by that song's album, and your best streak, total planks and total time.
 - **Music**: the song's album track (Taylor's Version where there is one) plays from YouTube on the plank screen, starting when the countdown hits zero.
 - **No sign-up needed**: progress is saved in the browser. Signing in (optional) syncs it across devices.
+- **Themes**: System (follows the device), Light and Dark, plus your own. The ⚙ in the header opens Settings → Appearance, where you can make and save as many color themes as you like.
 
 It's a static single-page app (Vite + React + TypeScript). With no configuration at all it runs fully: progress saved in the browser, and each song's album track from YouTube on the plank screen. Accounts are the one optional extra.
 
@@ -73,12 +74,17 @@ This adds:
 | YouTube player | [src/lib/youtube.ts](src/lib/youtube.ts), [src/components/useMusic.ts](src/components/useMusic.ts) |
 | Video matching (app + sync script) | [src/lib/match.ts](src/lib/match.ts) |
 | Plank timer screen | [src/components/PlankTimer.tsx](src/components/PlankTimer.tsx) |
+| Settings page and its sections | [src/components/settings/](src/components/settings/) |
+| Theme colors, saving and applying themes | [src/lib/palette.ts](src/lib/palette.ts), [src/lib/theme.ts](src/lib/theme.ts) |
+| Page addresses (`#settings/…`) | [src/lib/route.ts](src/lib/route.ts) |
 
 Rules worth knowing:
 - Days are the visitor's **local** calendar day, for the daily song and for streaks.
 - A streak stays alive until the end of the day after you last planked today's song. The 🔥 in the header is grey until you've planked today's song.
 - Climb as many ladder levels a day as you like (each song once a day). Only today's song keeps the streak; the calendar fills in those days and marks ladder-only days with a small ring. If today's song happens to be your ladder level, one plank counts for both.
-- **XP** (signed-in players only, in [src/lib/xp.ts](src/lib/xp.ts)): a point for every second of song. No breaks: +50%. No breaks on a song over 6 minutes: double. Breaks never cost anything. XP is paid once per plank: today's song earns it every day, a ladder level the first time it's climbed. Doing either again earns nothing, except that the first go held with no breaks, after only goes with breaks, earns the no-break bonus. XP adds up into ranks (rank 2 at 500 XP, rank 10 at 22,500). Signed out, the finished screen says what a plank would have earned.
+- **XP** (signed-in players only, in [src/lib/xp.ts](src/lib/xp.ts)): a point for every second of song. No breaks: +50%. No breaks on a song over 6 minutes: double. Breaks never cost anything. XP is paid once per plank: today's song earns it every day, a ladder level the first time it's climbed. Doing either again earns nothing, except that the first go held with no breaks, after only goes with breaks, earns the no-break bonus. Signed out, the finished screen says what a plank would have earned.
+- **Ranks** (in [src/lib/ranks.ts](src/lib/ranks.ts)): each is a bigger piece of writing than the last: Scribble, Couplet, Verse, Sonnet, Ballad, Chapter and Anthology, each with four divisions (IV to I), then Manuscript, Masterpiece and Magnum Opus. XP moves you through the divisions (Scribble III at 500 XP, Sonnet IV at 39,000). Each new tier also needs a ladder level: Couplet level 10, Verse 25, Sonnet 50, Ballad 100, Chapter 150, Anthology 200. Until you reach it, you stay at I and see what it takes. Manuscript needs every level climbed; Masterpiece and Magnum Opus need every level held with no breaks at least once.
+- **Plaques and emblems** ([src/components/Rank.tsx](src/components/Rank.tsx), [src/components/RankEmblem.tsx](src/components/RankEmblem.tsx)): where the rank is a label (under your name, on your photo on phones, beside the XP bar) it's a plaque: the same flat plate for every rank in its tier's colour, always in the sans. Where the rank is the subject (your profile, a rank up) it's the emblem: a medallion holding that rank's piece of writing.
 - Finishing today's song (or ranking up) sets off a small burst of confetti, skipped when the device asks for reduced motion.
 - Stopping early doesn't count, but you can retry as often as you like. Pausing is fine; the pauses just show up in what you share.
 - **Sharing** opens a share box with two versions:
@@ -89,8 +95,25 @@ Rules worth knowing:
 - **The ladder is climbed, never skipped.** The only thing that moves it is planking your next level (or, once every level is done, starting again from level 1). Tapping a song in **The setlist** opens its details: how and when you planked it, your planks of it, and a YouTube link. For your next level there's a Start button; for a level you've climbed there's **Plank it again**, which is practice: it doesn't move the ladder, but held with no breaks it earns the level's no-break bonus if it hasn't had it.
 - **The setlist marks every level** by how it went: a green tick for no breaks, an orange count of breaks (the fewest over every go), a faint dash for a level moved past without planking it. The **No breaks · With breaks · Not yet** buttons above it show their counts and filter the list, so the levels worth redoing for the no-break bonus are one tap away.
 
-## Adding a new album
+## Settings and themes
 
-Add it to `ALBUMS` and `CATALOG` in [src/data/songs.ts](src/data/songs.ts), then run `npm run sync:youtube`. A bigger catalog reshuffles the upcoming daily songs, so deploy it around midnight. Past history isn't affected, because each plank stores its own song. New songs also join the ladder at their length position, which shifts later levels.
+Settings has its own address (`#settings/appearance`), so Back, bookmarks and links work. On a computer the sections are listed down the left; on a phone the list comes first and each section opens on its own.
+
+- **Adding a section** (or moving one): add an entry to `SECTIONS` in [src/components/settings/sections.ts](src/components/settings/sections.ts) with a component for its content. It gets a menu entry and its own address.
+- **Themes** are saved in the browser, separate from progress, and aren't synced to accounts. Picking System, Light, Dark or a saved theme applies it straight away. Editing a custom theme shows each change live across the site; **Save theme** keeps it, and leaving with unsaved edits asks first. A color that gets hard to read against its background (below WCAG AA) shows a warning.
+- **Colors** are CSS variables in [src/styles.css](src/styles.css). The ones a theme can change, with their labels in the editor, are listed in [src/lib/palette.ts](src/lib/palette.ts). The Light and Dark values are written in both files; a test fails if they drift apart. To make another part of the site customizable, give it its own variable in both places and add it to `COLOR_GROUPS`. Themes saved before then pick it up from Light or Dark.
+- A small script in [index.html](index.html) applies the saved theme before the page first draws, so it never flashes the wrong colors. It reads the same saved format as [src/lib/theme.ts](src/lib/theme.ts).
+
+## New releases
+
+A new album or single goes in `ALBUMS` and `CATALOG` in [src/data/songs.ts](src/data/songs.ts) with `afterLaunch: true`. That keeps its songs out of the daily rotation and off the ladder, because adding them there would reshuffle every day's song and shift everyone's ladder level. Instead, a song premieres as the song of the day: list it in `PREMIERES` in [src/lib/daily.ts](src/lib/daily.ts). The premiere takes that one day, and the rotation picks up where it left off the next day. Nothing earlier moves.
+
+To have it on the site the moment it's out:
+
+1. Before release day, add the song with `?` for its length (`Patient Zero | ?`), add its premiere, and push. It stays off the site until its track is found.
+2. Before the release (her new music comes out at midnight Eastern), run `npm run watch:release` and leave it running. It checks the Topic channel every 15 seconds. When the track appears, it commits the track and its exact length on top of `origin/main`, pushes, and waits for the redeploy to go live. It builds that commit without touching your working copy, so unfinished work stays local. It keeps Windows awake while it runs, but closing a laptop lid still puts it to sleep.
+   - `npm run watch:release -- --try "Some Song"` is a rehearsal on a song that's already out. It finds the track and shows the commit it would push, without pushing.
+   - `--dry-run` watches for the real song the same way, without pushing.
+3. Visitors whose day has already started when the release lands (Europe, Asia, Australia) get the premiere when they next load the page. If they planked the usual song first, that still counts for their streak.
 
 Fan-made. Not affiliated with Taylor Swift, her label, or YouTube.

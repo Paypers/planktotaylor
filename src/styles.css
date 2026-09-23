@@ -1,6 +1,9 @@
 /* Liner notes: the app typeset like the back of a record sleeve.
    One grid, text left and numbers right, rules instead of boxes. */
 
+/* Colours. <html data-theme> picks Light or Dark (index.html sets it before the first paint, following
+   the system unless a theme was chosen), and a custom theme sets these same variables on <html>.
+   The Light and Dark values are repeated in src/lib/palette.ts for the theme editor: keep them in step. */
 :root {
   --paper: #f4f0e8;
   --well: #ebe5da;
@@ -8,6 +11,9 @@
   --faint: #b3a99a;
   --ink-2: #5f564b;
   --ink: #1c1813;
+  --heading: #1c1813;
+  --button: #1c1813;
+  --button-ink: #f4f0e8;
   --signal: #c23b22;
   --screen: #0e0c0a;
   /* A plank's record, matching the shared 🟩 and 🟧 squares. */
@@ -23,21 +29,22 @@
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #15120e;
-    --well: #221d18;
-    --rule: #3a322a;
-    --faint: #5e564c;
-    --ink-2: #a99f92;
-    --ink: #f1eadf;
-    --signal: #e4603f;
-    --screen: #000000;
-    --held: #62b784;
-    --paused: #f0a060;
-    --paused-ink: #f0a060;
-    color-scheme: dark;
-  }
+:root[data-theme='dark'] {
+  --paper: #15120e;
+  --well: #221d18;
+  --rule: #3a322a;
+  --faint: #5e564c;
+  --ink-2: #a99f92;
+  --ink: #f1eadf;
+  --heading: #f1eadf;
+  --button: #f1eadf;
+  --button-ink: #15120e;
+  --signal: #e4603f;
+  --screen: #000000;
+  --held: #62b784;
+  --paused: #f0a060;
+  --paused-ink: #f0a060;
+  color-scheme: dark;
 }
 
 @media (min-width: 760px) {
@@ -152,6 +159,23 @@ a {
   color: var(--signal);
 }
 
+/* Headings and the big numbers, set in the display face */
+.headline,
+.row-title,
+.streak-num,
+.song-line-title,
+.dialog-head h2,
+.confirm-title,
+.profile-shown,
+.plank-title,
+.plank-time,
+.done-num,
+.done-title,
+.settings-title,
+.settings-section-title {
+  color: var(--heading);
+}
+
 /* Layout: a 12-column grid. Section names take columns 1–3, content 4–12. */
 
 .page {
@@ -242,19 +266,20 @@ a {
   }
 }
 
-/* Header */
+/* Header. Phones pack it close: the brand, the streak and four buttons share 360px. */
 
 .site-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   height: 64px;
   padding-inline: var(--margin);
 }
 
 @media (min-width: 760px) {
   .site-header {
+    gap: 12px;
     height: 88px;
   }
 }
@@ -262,18 +287,28 @@ a {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
+  color: var(--heading);
   text-decoration: none;
   font-family: var(--display);
-  font-size: 20px;
+  font-size: 18px;
   font-style: italic;
   font-weight: 600;
-  line-height: 24px;
+  line-height: 22px;
   letter-spacing: -0.01em;
+}
+
+/* Narrower still, the name gives way before the buttons do. */
+.brand span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (min-width: 760px) {
   .brand {
+    gap: 8px;
     font-size: 22px;
     line-height: 26px;
   }
@@ -281,13 +316,26 @@ a {
 
 .header-actions {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+}
+
+.header-actions .icon-btn {
+  width: 40px;
+}
+
+.header-actions .icon-btn[aria-current='page'] {
+  border-color: var(--ink);
+  background: var(--well);
 }
 
 @media (min-width: 760px) {
   .header-actions {
     gap: 8px;
+  }
+  .header-actions .icon-btn {
+    width: 44px;
   }
 }
 
@@ -296,7 +344,13 @@ a {
   align-items: center;
   gap: 6px;
   height: 44px;
-  padding: 0 10px;
+  padding: 0 4px;
+}
+
+@media (min-width: 760px) {
+  .streak-pill {
+    padding: 0 10px;
+  }
 }
 
 .streak-pill-num {
@@ -306,15 +360,17 @@ a {
   font-variant-numeric: tabular-nums;
 }
 
-.header-account {
+/* Also a .btn, which comes later: hence the longer selector. */
+.header-actions .header-account {
+  width: 40px;
+  min-width: 40px;
   height: 44px;
-  width: 44px;
   padding: 0;
   border-color: var(--rule);
 }
 
 @media (min-width: 760px) {
-  .header-account {
+  .header-actions .header-account {
     width: auto;
     padding: 0 20px;
     border-color: var(--ink);
@@ -362,27 +418,35 @@ a {
   display: inline-flex;
 }
 
-/* Phones: the rank rides on the photo. */
+/* Phones: the rank rides on the photo, its division on the rank's plate. */
 .profile-badge {
+  --plaque-edge: color-mix(in srgb, var(--ink) 10%, transparent);
   position: absolute;
-  right: -6px;
-  bottom: -4px;
-  min-width: 20px;
-  height: 20px;
+  right: -8px;
+  bottom: -5px;
+  min-width: 22px;
+  height: 22px;
   padding: 0 5px;
   border: 2px solid var(--paper);
-  border-radius: 10px;
-  background: var(--ink);
-  color: var(--paper);
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 16px;
+  border-radius: 6px;
+  background: var(--plaque);
+  box-shadow: inset 0 0 0 1px var(--plaque-edge);
+  color: var(--plaque-ink);
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 18px;
   text-align: center;
+}
+
+.profile-badge .star-mark {
+  vertical-align: -1px;
 }
 
 .profile-text {
   flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
   max-width: 160px;
 }
 
@@ -393,13 +457,6 @@ a {
   line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.profile-rank {
-  font-family: var(--mono);
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--ink-2);
 }
 
 @media (min-width: 760px) {
@@ -610,12 +667,13 @@ a {
 }
 
 .btn-primary {
-  background: var(--ink);
-  color: var(--paper);
+  border-color: var(--button);
+  background: var(--button);
+  color: var(--button-ink);
 }
 
 .btn-primary:hover {
-  background: color-mix(in srgb, var(--ink) 86%, var(--paper));
+  background: color-mix(in srgb, var(--button) 86%, var(--paper));
 }
 
 .btn-secondary {
@@ -662,6 +720,7 @@ a {
   border-radius: 4px;
   background: transparent;
   color: var(--ink);
+  text-decoration: none;
 }
 
 .icon-btn:hover:not(:disabled) {
@@ -766,10 +825,8 @@ a {
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  .sleeve {
-    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
-  }
+[data-theme='dark'] .sleeve {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
 }
 
 /* Today: song rows */
@@ -1765,6 +1822,525 @@ a {
   color: var(--ink);
 }
 
+/* Settings: the menu of sections on the left, the open one beside it. Phones show one at a time. */
+
+.settings {
+  padding-bottom: 48px;
+}
+
+.settings-top {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 0 16px;
+}
+
+.settings-title {
+  font-family: var(--display);
+  font-size: 40px;
+  font-weight: 600;
+  line-height: 44px;
+  letter-spacing: -0.025em;
+}
+
+/* Headings take focus when a page opens, for screen readers; no ring for that. */
+.settings-title:focus,
+.settings-section-title:focus {
+  outline: none;
+}
+
+.settings-nav {
+  grid-column: 1 / -1;
+}
+
+.settings-nav ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.settings-link:hover {
+  background: var(--well);
+}
+
+.settings-link-text {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.settings-link-label {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.settings-link-summary {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-2);
+}
+
+.settings-link-chevron {
+  color: var(--ink-2);
+}
+
+.settings-body {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.settings-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  margin-top: 4px;
+  color: var(--ink-2);
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.settings-back:hover {
+  color: var(--ink);
+}
+
+.settings-section-title {
+  padding: 4px 0 16px;
+  font-family: var(--display);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 32px;
+  letter-spacing: -0.015em;
+}
+
+/* Phones: the menu, or one section with a way back to it. */
+.settings.at-menu .settings-body,
+.settings.at-section .settings-nav {
+  display: none;
+}
+
+@media (min-width: 760px) {
+  .settings {
+    padding-bottom: 80px;
+  }
+  .settings-top {
+    padding: 40px 0 24px;
+  }
+  .settings-title {
+    font-size: 56px;
+    line-height: 60px;
+  }
+  .settings.at-menu .settings-body,
+  .settings.at-section .settings-nav {
+    display: block;
+  }
+  .settings-nav {
+    grid-column: 1 / 4;
+    position: sticky;
+    top: 16px;
+    align-self: start;
+    padding-top: 16px;
+  }
+  .settings-link {
+    gap: 10px;
+    min-height: 44px;
+    padding: 8px 12px;
+    border-bottom: 0;
+    border-radius: 4px;
+    color: var(--ink-2);
+  }
+  .settings-link[aria-current='page'] {
+    background: var(--well);
+    color: var(--ink);
+  }
+  .settings-link-label {
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 20px;
+  }
+  .settings-link[aria-current='page'] .settings-link-label {
+    font-weight: 600;
+  }
+  .settings-link-summary,
+  .settings-link-chevron,
+  .settings-back {
+    display: none;
+  }
+  .settings-body {
+    grid-column: 4 / 12;
+    padding-top: 16px;
+  }
+  .settings-section-title {
+    padding: 4px 0 20px;
+    font-size: 32px;
+    line-height: 36px;
+  }
+}
+
+/* A group of settings under a heading, ruled off from the next */
+
+.settings-group {
+  display: grid;
+  gap: 12px;
+  padding: 20px 0 32px;
+  border-top: 1px solid var(--rule);
+}
+
+.settings-group h3 {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.settings-group > p {
+  margin-top: -6px;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--ink-2);
+}
+
+.settings-group > .fine {
+  margin-top: 0;
+}
+
+/* Appearance: themes as small pictures of the site in their colors */
+
+.theme-choices {
+  display: grid;
+  gap: 12px;
+}
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+  gap: 12px;
+}
+
+.theme-subhead {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--ink-2);
+}
+
+.theme-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.theme-card:hover {
+  background: var(--well);
+}
+
+.theme-card:has(input:checked) {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+
+.theme-card:has(input:focus-visible) {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+
+.theme-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 2px 2px;
+}
+
+.theme-radio {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--ink-2);
+  border-radius: 50%;
+}
+
+.theme-card input:checked ~ .theme-card-foot .theme-radio {
+  border: 5px solid var(--ink);
+}
+
+.theme-card-name {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Sits on the preview's corner, leaving the name its room. */
+.theme-card-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 1px 6px;
+  border: 1px solid var(--rule);
+  border-radius: 9px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 14px;
+}
+
+/* The site in miniature, painted by the card's own --p-* colors */
+.theme-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  aspect-ratio: 16 / 10;
+  padding: 9px 10px;
+  overflow: hidden;
+  border-radius: 4px;
+  outline: 1px solid var(--rule);
+  outline-offset: -1px;
+  background: var(--p-paper);
+}
+
+.tp-top {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 3px;
+}
+
+.tp-star {
+  width: 8px;
+  height: 8px;
+  background: var(--p-signal);
+  clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
+}
+
+.tp-brand {
+  width: 34%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--p-heading);
+}
+
+.tp-headline {
+  width: 80%;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--p-heading);
+}
+
+.tp-text {
+  width: 58%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--p-ink-2);
+}
+
+.tp-rule {
+  height: 1px;
+  margin-top: auto;
+  background: var(--p-ink);
+}
+
+.tp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  border-radius: 2px;
+  background: var(--p-well);
+}
+
+.tp-bar {
+  display: flex;
+  flex-grow: 1;
+  gap: 2px;
+  height: 4px;
+}
+
+.tp-held {
+  flex: 3;
+  border-radius: 2px;
+  background: var(--p-held);
+}
+
+.tp-paused {
+  flex: 1;
+  border-radius: 2px;
+  background: var(--p-paused);
+}
+
+.tp-button {
+  width: 30%;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--p-button);
+}
+
+/* System: Light and Dark, cut corner to corner. */
+.theme-preview-split {
+  display: grid;
+}
+
+.theme-preview-split > * {
+  grid-area: 1 / 1;
+}
+
+.theme-preview-split > :last-child {
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+}
+
+/* The theme editor: a row per color, grouped by the part of the site it paints */
+
+.theme-name {
+  max-width: 360px;
+  margin: 0;
+}
+
+.color-group {
+  display: grid;
+  padding-top: 12px;
+}
+
+.color-group h4 {
+  margin: 0;
+  padding-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--ink-2);
+}
+
+.color-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 92px;
+  column-gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--rule);
+}
+
+.color-swatch {
+  width: 44px;
+  height: 44px;
+  padding: 3px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.color-swatch::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.color-swatch::-webkit-color-swatch {
+  border: 0;
+  border-radius: 4px;
+}
+
+.color-swatch::-moz-color-swatch {
+  border: 0;
+  border-radius: 4px;
+}
+
+.color-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.color-label {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.color-hint {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-2);
+}
+
+.color-warn {
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  color: var(--signal);
+}
+
+.color-hex {
+  height: 40px;
+  padding: 0 8px;
+  font-family: var(--mono);
+  font-size: 14px;
+}
+
+.color-hex[aria-invalid='true'] {
+  border-color: var(--signal);
+}
+
+.theme-editor > .button-row {
+  padding-top: 8px;
+}
+
+/* Unsaved changes: pinned to the bottom of the screen while the editor is in view */
+.save-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--ink);
+  background: var(--paper);
+}
+
+.save-bar p {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.save-bar .button-row {
+  flex-grow: 1;
+  justify-content: flex-end;
+}
+
+@media (min-width: 760px) {
+  .save-bar .button-row {
+    flex-grow: 0;
+  }
+}
+
 /* The plank screen */
 
 .plank {
@@ -2102,7 +2678,64 @@ a {
   font-variant-numeric: tabular-nums;
 }
 
-/* Rank: the number, XP so far out of the next rank, and a thin bar */
+/* Rank plaques: the same flat plate for every rank, only the colour changes, and always the sans.
+   The tier's colours arrive as --plaque and --plaque-ink. */
+
+.plaque {
+  --plaque-edge: color-mix(in srgb, var(--ink) 10%, transparent);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 4px;
+  background: var(--plaque);
+  box-shadow: inset 0 0 0 1px var(--plaque-edge);
+  color: var(--plaque-ink);
+  font-family: var(--sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Centre the letters themselves rather than the line box around them. */
+.plaque > span {
+  text-box: trim-both cap alphabetic;
+}
+
+.plaque-div {
+  font-weight: 500;
+  opacity: 0.7;
+}
+
+.plaque-md {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 5px;
+  font-size: 13px;
+}
+
+.plaque-lg {
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 6px;
+  font-size: 15px;
+}
+
+/* Scribble: a clear plate. */
+.plaque-clear {
+  --plaque: transparent;
+  --plaque-ink: var(--ink-2);
+  --plaque-edge: var(--faint);
+}
+
+.profile-badge.plaque-clear {
+  --plaque: var(--paper);
+}
+
+/* Rank: the plaque, XP so far out of the next rank, a thin bar and what the next rank takes */
 
 .rank {
   display: flex;
@@ -2113,19 +2746,38 @@ a {
 
 .rank-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
-.rank-name {
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 20px;
+.rank-xp,
+.rank-next {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
 }
 
 .rank .bar > span {
   background: var(--held);
+}
+
+/* Where the rank is the subject (your profile), its emblem sits beside the bar. */
+.rank-card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.rank-card .emblem {
+  flex: none;
+}
+
+.rank-card .rank {
+  flex: 1;
+  min-width: 0;
+  margin-top: 0;
 }
 
 /* XP on the finished screen */
@@ -2159,12 +2811,18 @@ a {
 
 .done-rankup {
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 8px;
-  margin-top: 12px;
-  font-size: 15px;
+  margin-top: 20px;
+  text-align: center;
+}
+
+.done-rankup-label {
+  font-size: 13px;
   font-weight: 600;
-  line-height: 20px;
+  line-height: 18px;
+  color: var(--ink-2);
 }
 
 /* Confetti: a small one-off burst for today's song done (and rank ups) */

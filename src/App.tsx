@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AccountDialog } from './components/AccountDialog'
 import { Avatar } from './components/Avatar'
 import { ConfirmDialog } from './components/ConfirmDialog'
@@ -7,6 +7,8 @@ import { Flame, Icon, StarMark } from './components/Icon'
 import { LevelDialog } from './components/LevelDialog'
 import { MusicDialog } from './components/MusicDialog'
 import { PlankTimer, type FinishSummary, type PlankSession, type PlankShare } from './components/PlankTimer'
+import { RankBadge, RankPlaque } from './components/Rank'
+import { SettingsPage } from './components/settings/SettingsPage'
 import { Setlist } from './components/Setlist'
 import { ShareDialog } from './components/ShareDialog'
 import { LadderProgress, SongLine, SongRow } from './components/SongRow'
@@ -17,10 +19,14 @@ import { fromDayKey } from './lib/dates'
 import { useToday } from './lib/hooks'
 import { dailyView, ladderView, songFor, streakDays, type Completion, type Pause } from './lib/progress'
 import { dailyNumber } from './lib/daily'
+import { followLink, hashFor, HOME, useRoute, type Route } from './lib/route'
+import { playerRank, rankName } from './lib/ranks'
 import { plankSummary, type ShareInput } from './lib/share'
 import { getData, recordPlank, setLadderLevel, useAppData } from './lib/store'
 import { streakInfo } from './lib/streaks'
-import { plankXp, rankFor, totalXp } from './lib/xp'
+import { plankXp, totalXp } from './lib/xp'
+
+const SETTINGS: Route = { page: 'settings', section: null }
 
 export function App() {
   const data = useAppData()
@@ -34,6 +40,24 @@ export function App() {
   const [levelInfo, setLevelInfo] = useState<number | null>(null)
   const [sharing, setSharing] = useState<ShareInput | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const route = useRoute()
+  const inSettings = route.page === 'settings'
+  const homeScroll = useRef(0)
+  const wasInSettings = useRef(inSettings)
+
+  // Settings opens at the top; coming back finds the home page where it was left.
+  useEffect(() => {
+    const remember = () => {
+      if (!wasInSettings.current) homeScroll.current = window.scrollY
+    }
+    window.addEventListener('scroll', remember, { passive: true })
+    return () => window.removeEventListener('scroll', remember)
+  }, [])
+  useLayoutEffect(() => {
+    if (wasInSettings.current === inSettings) return
+    wasInSettings.current = inSettings
+    window.scrollTo(0, inSettings ? 0 : homeScroll.current)
+  }, [inSettings])
 
   const daily = dailyView(data, today)
   const ladder = ladderView(data, today)
@@ -42,7 +66,7 @@ export function App() {
   const twofer = !ladder.finished && ladder.song?.id === daily.song.id
   // XP is for signed-in players only.
   const earningXp = accountsEnabled && user !== null
-  const rank = earningXp ? rankFor(totalXp(data.completions)) : null
+  const rank = useMemo(() => (earningXp ? playerRank(data.completions) : null), [earningXp, data.completions])
   const shownName = user ? displayName(user, profile) : ''
   const climbed = ladder.climbedToday.length
   const lastClimb = ladder.climbedToday.at(-1)
@@ -82,7 +106,7 @@ export function App() {
 
   const finish = useCallback(
     (song: Song, pauses: Pause[]): FinishSummary => {
-      const before = totalXp(getData().completions)
+      const rankBefore = playerRank(getData().completions)
       // Any plank of your ladder level moves you up, a redone one included.
       const climbing = ladderView(getData(), today).song?.id === song.id
       const result = recordPlank(song, pauses, earningXp)
@@ -106,8 +130,8 @@ export function App() {
             gained: result.gained,
             kind: result.kind,
             bonusLeft: result.bonusLeft,
-            before,
-            after: totalXp(now.completions),
+            rankBefore,
+            rankAfter: playerRank(now.completions),
           }
         : null
       return { counted, streak: streakInfo(streakDays(now.completions), today).current, next, xp, practiceLevel }
@@ -129,11 +153,15 @@ export function App() {
     <>
       <div className="page">
         <header className="site-header">
-          <a className="brand" href={import.meta.env.BASE_URL}>
+          <a
+            className="brand"
+            href={import.meta.env.BASE_URL}
+            onClick={inSettings ? (e) => followLink(e, HOME) : undefined}
+          >
             <StarMark size={18} />
             <span>Plank to Taylor</span>
           </a>
-          <nav className="header-actions" aria-label="Settings">
+          <nav className="header-actions" aria-label="Account and settings">
             <span className="streak-pill" title={streak.doneToday ? 'Streak safe today' : "Plank today's song to keep your streak"}>
               <Flame size={20} lit={streak.doneToday} />
               <span className="streak-pill-num">{streak.current}</span>
@@ -142,6 +170,15 @@ export function App() {
             <button type="button" className="icon-btn" onClick={() => setDialog('music')} aria-label="Music and sound">
               <Icon name="music" />
             </button>
+            <a
+              href={hashFor(SETTINGS)}
+              className="icon-btn"
+              onClick={(e) => followLink(e, SETTINGS)}
+              aria-label="Settings"
+              aria-current={inSettings ? 'page' : undefined}
+            >
+              <Icon name="settings" />
+            </a>
             {accountsEnabled &&
               (user && rank ? (
                 // Signed in: your photo, name and rank. The rank sits on the photo on phones.
@@ -149,15 +186,15 @@ export function App() {
                   type="button"
                   className="profile-btn"
                   onClick={() => setDialog('account')}
-                  aria-label={`Your profile: ${shownName}, rank ${rank.rank}`}
+                  aria-label={`Your profile: ${shownName}, ${rankName(rank.tier, rank.division)}`}
                 >
                   <span className="profile-photo">
                     <Avatar name={shownName} url={profile.avatarUrl} size={36} />
-                    <span className="profile-badge narrow-only">{rank.rank}</span>
+                    <RankBadge rank={rank} />
                   </span>
                   <span className="profile-text wide-only">
                     <span className="profile-name">{shownName}</span>
-                    <span className="profile-rank">Rank {rank.rank}</span>
+                    <RankPlaque tier={rank.tier} division={rank.division} />
                   </span>
                 </button>
               ) : (
@@ -174,7 +211,8 @@ export function App() {
           </nav>
         </header>
 
-        <main>
+        {/* Home stays mounted behind settings, so the setlist comes back as it was left. */}
+        <main hidden={inSettings}>
           <section className="masthead grid">
             <div className="masthead-meta">
               <p>{dateline}</p>
@@ -265,6 +303,11 @@ export function App() {
           />
           <Setlist level={ladder.level} completions={data.completions} onOpen={setLevelInfo} />
         </main>
+        {route.page === 'settings' && (
+          <main>
+            <SettingsPage section={route.section} />
+          </main>
+        )}
 
         <footer className="site-footer grid">
           <div className="section-rule light" />

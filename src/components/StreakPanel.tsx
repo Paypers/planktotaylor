@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react'
 import { ALBUMS, formatDuration } from '../data/songs'
 import { addDays, fromDayKey, type DayKey } from '../lib/dates'
 import { songFor, totalSeconds, type Completion } from '../lib/progress'
+import type { PlayerRank } from '../lib/ranks'
 import { runLengths, type StreakInfo } from '../lib/streaks'
-import type { RankInfo } from '../lib/xp'
 import { Flame, Icon } from './Icon'
 import { RankBar } from './Rank'
 import { SaveNote } from './SaveNote'
@@ -17,7 +17,7 @@ interface Props {
   /** Set when accounts are on and nobody's signed in. */
   onSignIn?: () => void
   /** Signed-in players' rank. */
-  rank?: RankInfo | null
+  rank?: PlayerRank | null
   onHistory: () => void
 }
 

@@ -2,15 +2,17 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ALBUMS, LADDER, formatDuration, type Song } from '../data/songs'
 import { useWakeLock } from '../lib/hooks'
 import type { Completion, Pause, PlankResult, Prefs } from '../lib/progress'
+import type { PlayerRank } from '../lib/ranks'
 import { pausedSeconds, plankHeadline } from '../lib/share'
 import { beginAttempt, endAttempt, saveAttemptProgress, type AttemptKind, type AttemptOutcome } from '../lib/attempts'
 import { sounds, unlockAudio } from '../lib/sound'
-import { MARATHON_SECONDS, rankFor, type XpAward } from '../lib/xp'
+import { MARATHON_SECONDS, type XpAward } from '../lib/xp'
 import { youtubeUrl } from '../lib/youtube'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Confetti } from './Confetti'
-import { Flame, Icon, StarMark } from './Icon'
-import { RankBar } from './Rank'
+import { Flame, Icon } from './Icon'
+import { RankBar, RankPlaque } from './Rank'
+import { RankEmblem } from './RankEmblem'
 import { PlankReceipt } from './Receipt'
 import { SaveNote } from './SaveNote'
 import { Sleeve } from './Sleeve'
@@ -50,9 +52,9 @@ export interface FinishXp {
   kind: PlankResult['kind']
   /** Holding this song with no breaks would still earn the no-break bonus. */
   bonusLeft: boolean
-  /** Total XP before and after this plank. */
-  before: number
-  after: number
+  /** Your rank before and after this plank: a climb can move it as well as XP. */
+  rankBefore: PlayerRank
+  rankAfter: PlayerRank
 }
 
 /** One finished plank, as it gets shared. */
@@ -661,7 +663,7 @@ function DoneView({
       : ladder || daily
         ? `You held a plank for all of ${song.title}, ${length}.`
         : `Today was already in the bag. That's ${length} more.`
-  const rankedUp = !!xp?.earned && rankFor(xp.after).rank > rankFor(xp.before).rank
+  const rankedUp = !!xp?.earned && xp.rankAfter.step > xp.rankBefore.step
   const album = ALBUMS[song.album]
 
   return (
@@ -727,7 +729,7 @@ function DoneView({
 /** "+318 XP", where it came from, and the rank it moves you along. Replays say what's left to earn. */
 function XpEarned({ xp, seconds, rankedUp }: { xp: FinishXp; seconds: number; rankedUp: boolean }) {
   const { award, gained } = xp
-  const rank = rankFor(xp.after)
+  const rank = xp.rankAfter
   const bonusName = seconds >= MARATHON_SECONDS ? 'marathon bonus (double XP)' : 'no-break bonus (+50%)'
   let total = `+${gained.toLocaleString()} XP`
   let detail: string
@@ -752,13 +754,14 @@ function XpEarned({ xp, seconds, rankedUp }: { xp: FinishXp; seconds: number; ra
     <section className="done-xp" aria-label="XP earned">
       <p className="done-xp-total">{total}</p>
       <p className="done-xp-detail">{detail}</p>
-      <RankBar rank={rank} />
       {rankedUp && (
-        <p className="done-rankup">
-          <StarMark size={14} />
-          Rank up. You're rank {rank.rank}.
-        </p>
+        <div className="done-rankup">
+          <RankEmblem tier={rank.tier} size={120} />
+          <p className="done-rankup-label">Rank up</p>
+          <RankPlaque tier={rank.tier} division={rank.division} size="lg" />
+        </div>
       )}
+      <RankBar rank={rank} />
     </section>
   )
 }

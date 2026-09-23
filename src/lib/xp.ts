@@ -45,6 +45,11 @@ export interface RankInfo {
   next: number
 }
 
+/** Total XP where rank n begins: 0, 500, 1,500, 3,000… */
+export function rankFloor(rank: number): number {
+  return (RANK_STEP * rank * (rank - 1)) / 2
+}
+
 export function rankFor(xp: number): RankInfo {
   let rank = 1
   let floor = 0
