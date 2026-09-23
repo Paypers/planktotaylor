@@ -36,10 +36,6 @@ export function daysBetween(a: DayKey, b: DayKey): number {
   return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86_400_000)
 }
 
-export function formatLongDate(key: DayKey): string {
-  return fromDayKey(key).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
-}
-
 export function formatShortDate(key: DayKey): string {
   return fromDayKey(key).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }

@@ -1,7 +1,4 @@
-/**
- * A quiet by-the-way for people without an account: their progress lives in this browser only.
- * Shown where there's something to lose (the streak, a finished plank), never as a popup.
- */
+/** A quiet note for people without an account, shown where there's something to lose. */
 export function SaveNote({ onSignIn, className = '' }: { onSignIn: () => void; className?: string }) {
   return (
     <p className={`save-note ${className}`}>

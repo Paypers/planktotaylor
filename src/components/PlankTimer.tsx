@@ -82,6 +82,8 @@ interface Props {
  * waiting    countdown over, waiting for the song to actually play
  * running    planking
  * paused     song and timer both stopped
+ * done       held to the end
+ * quit       ended early: gave up, went offline or left
  */
 type Phase = 'ready' | 'countdown' | 'waiting' | 'running' | 'paused' | 'done' | 'quit'
 
@@ -93,7 +95,9 @@ type ClockSource = 'video' | 'manual'
 
 /** Breaks shorter than this are fumbles, not pauses. */
 const MIN_PAUSE_MS = 1000
-/** While the song is stuck this long, check whether the internet has gone (an ad or a slow load is fine). */
+/** Song position not moving for this long while planking: an ad, buffering, or it never started. */
+const STALL_MS = 1500
+/** While the song is stuck, how often to check whether the internet has gone. */
 const STALL_CHECK_MS = 5000
 
 /** True when the site can still be reached. navigator.onLine alone misses a connection that's up but dead. */
@@ -109,8 +113,6 @@ async function isOnline(): Promise<boolean> {
     return false
   }
 }
-/** Song position not moving for this long while planking: an ad, buffering, or it never started. */
-const STALL_MS = 1500
 
 function coachLine(elapsed: number, total: number): string {
   const remaining = total - elapsed
@@ -659,10 +661,10 @@ function DoneView({
     : practice
       ? `Another go at ${song.title}, ${length}. Practice doesn't move your ladder.`
       : ladder && daily
-      ? `${song.title} counted for today's song and level ${ladder.level}.`
-      : ladder || daily
-        ? `You held a plank for all of ${song.title}, ${length}.`
-        : `Today was already in the bag. That's ${length} more.`
+        ? `${song.title} counted for today's song and level ${ladder.level}.`
+        : ladder || daily
+          ? `You held a plank for all of ${song.title}, ${length}.`
+          : `Today was already in the bag. That's ${length} more.`
   const rankedUp = !!xp?.earned && xp.rankAfter.step > xp.rankBefore.step
   const album = ALBUMS[song.album]
 

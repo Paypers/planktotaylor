@@ -1,5 +1,4 @@
-// Title matching shared by the app (setlist search) and scripts/sync-youtube.ts,
-// so keep this file free of imports.
+// Title and video matching, shared by the app and the scripts: keep this file free of imports.
 
 /** Lower-case, drop "(Taylor's Version)", "(From The Vault)", "(From "Some Film")", "(feat. …)" and punctuation. */
 export function normalizeTitle(title: string): string {
@@ -52,6 +51,9 @@ export function parseIsoDuration(iso: string): number {
   return Number(h) * 3600 + Number(m) * 60 + Number(s)
 }
 
+/** A YouTube video id: 11 letters, digits, - or _. Anything else from outside is ignored. */
+export const isVideoId = (id: string) => /^[\w-]{11}$/.test(id)
+
 export interface VideoCandidate {
   id: string
   title: string
@@ -69,11 +71,7 @@ export interface WantedSong {
 /** How far a video's length may be from the catalog's before it's considered a different recording. */
 export const LENGTH_TOLERANCE = 10
 
-/**
- * Only album tracks: YouTube's auto-generated "Taylor Swift - Topic" uploads, which are the album
- * recording itself with the cover art on screen. Music videos, lyric videos and visualizers (which
- * add intros and title cards) and fan re-uploads are all left out.
- */
+/** Only album tracks: YouTube's auto-generated uploads of the album recording, never videos or re-uploads. */
 export const ALBUM_AUDIO_CHANNEL = 'Taylor Swift - Topic'
 export const ALBUM_AUDIO_CHANNEL_ID = 'UCPC0L1d253x-KuMNwa05TpA'
 
@@ -84,9 +82,8 @@ export function isAlbumAudioChannel(channel: string): boolean {
 }
 
 /**
- * Whether an upload is the right recording of the song: an album track, titled as the song, and
- * the re-recording (Taylor's Version) where the catalog uses one. Live takes, remixes, acoustic
- * and piano versions never pass the title check.
+ * An album track titled exactly as the song (so no live takes, remixes or acoustic versions),
+ * and Taylor's Version where the catalog uses one.
  */
 export function isRightVideo(video: Pick<VideoCandidate, 'title' | 'channel'>, song: Pick<WantedSong, 'title' | 'taylorsVersion'>): boolean {
   if (!isAlbumAudioChannel(video.channel)) return false
@@ -94,11 +91,7 @@ export function isRightVideo(video: Pick<VideoCandidate, 'title' | 'channel'>, s
   return !song.taylorsVersion || /taylor['’]?s version/i.test(video.title)
 }
 
-/**
- * Picks the album track for a song, or null if none qualifies. The same track often appears on
- * several editions of an album (standard, deluxe, 3am…); any of them will do, so take the one
- * closest to the catalog length.
- */
+/** The song's album track, or null. Several album editions carry it: take the one closest in length. */
 export function pickVideo(candidates: readonly VideoCandidate[], song: WantedSong): VideoCandidate | null {
   let best: { video: VideoCandidate; off: number } | null = null
   for (const video of candidates) {

@@ -5,10 +5,8 @@ import { daysBetween, type DayKey } from './dates'
 export const DAILY_EPOCH: DayKey = '2026-09-22'
 
 /**
- * New releases, each the song of the day on its release day. A premiere is slotted into the
- * rotation rather than taking a day from it: the day after, the rotation picks up where it left off.
- * It only happens once the song is out (its track found by `npm run watch:release`); until then
- * that day keeps its usual song.
+ * New releases, the song of the day on their release day once they're out. A premiere is slotted
+ * in rather than taking a day from the rotation, which carries on unchanged the day after.
  */
 export const PREMIERES: Readonly<Record<DayKey, string>> = {
   '2026-09-25': 'patient-zero',

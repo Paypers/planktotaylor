@@ -21,7 +21,10 @@
           if (saved.selected === 'light' || saved.selected === 'dark') scheme = saved.selected
           if (custom) {
             scheme = custom.scheme === 'dark' ? 'dark' : 'light'
-            for (var token in custom.colors) root.style.setProperty('--' + token, custom.colors[token])
+            for (var token in custom.colors) {
+              var value = custom.colors[token]
+              if (/^[a-z-]+$/.test(token) && /^#[0-9a-f]{6}$/i.test(value)) root.style.setProperty('--' + token, value)
+            }
           }
         } catch (e) {}
         root.setAttribute('data-theme', scheme)

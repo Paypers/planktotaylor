@@ -3,7 +3,7 @@ import { ALBUMS, LADDER, LAUNCH_SONGS, SONG_BY_ID, SONGS, UPCOMING, formatDurati
 import { DAILY_EPOCH, PREMIERES, dailyNumber, dailySong, songOfTheDay } from './daily'
 import { addDays, daysBetween } from './dates'
 import { applyPlank, emptyData, ladderRecords, ladderView, mergeCompletions, newerCursor, newerSettings, streakDays, type Completion } from './progress'
-import { normalizeTitle, parseIsoDuration, pickVideo, videoSongName, type VideoCandidate } from './match'
+import { isVideoId, normalizeTitle, parseIsoDuration, pickVideo, videoSongName, type VideoCandidate } from './match'
 import { pauseLabel, plankBar, plankHeadline, plankSegments, plankSummary } from './share'
 import { runLengths, streakInfo } from './streaks'
 import { plankXp, rankFor, totalXp } from './xp'
@@ -353,6 +353,13 @@ describe('sync merge', () => {
 
 describe('youtube matching', () => {
   const v = (id: string, title: string, seconds: number, channel = 'Taylor Swift - Topic'): VideoCandidate => ({ id, title, seconds, channel })
+
+  it('keeps only real video ids', () => {
+    expect(isVideoId('dQw4w9WgXcQ')).toBe(true)
+    expect(isVideoId('dQw4w9WgXcQ"><')).toBe(false)
+    expect(isVideoId('')).toBe(false)
+    for (const song of SONGS) if (song.youtubeId) expect(isVideoId(song.youtubeId), song.title).toBe(true)
+  })
 
   it('reduces upload titles to the song name', () => {
     expect(videoSongName('Taylor Swift - Anti-Hero (Official Music Video)')).toBe('anti hero')

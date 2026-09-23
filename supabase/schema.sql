@@ -49,11 +49,15 @@ values ('avatars', 'avatars', true, 1048576, array['image/jpeg', 'image/png', 'i
 on conflict (id) do update
   set public = excluded.public, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
 
+-- Photos load through their public links, which need no policy. Reading through the API is only for
+-- your own folder, so nobody can list the bucket (and with it every player's id).
 drop policy if exists "read avatars" on storage.objects;
+drop policy if exists "read own avatar" on storage.objects;
 drop policy if exists "add own avatar" on storage.objects;
 drop policy if exists "replace own avatar" on storage.objects;
 drop policy if exists "remove own avatar" on storage.objects;
-create policy "read avatars" on storage.objects for select using (bucket_id = 'avatars');
+create policy "read own avatar" on storage.objects for select to authenticated
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
 create policy "add own avatar" on storage.objects for insert to authenticated
   with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
 create policy "replace own avatar" on storage.objects for update to authenticated
@@ -141,3 +145,25 @@ $$;
 
 revoke all on function public.bump_daily(date) from public;
 grant execute on function public.bump_daily(date) to anon, authenticated;
+
+-- Limits on what a player can store, so nobody can fill the database through their own rows.
+-- "not valid" checks new and changed rows only, so older rows never stop this script.
+alter table public.plank_completions drop constraint if exists plank_completions_limits;
+alter table public.plank_completions add constraint plank_completions_limits check (
+  char_length(song_id) <= 100
+  and seconds <= 3600
+  and (xp is null or xp <= 2 * seconds)
+  and (pauses is null or (jsonb_typeof(pauses) = 'array' and octet_length(pauses::text) <= 20000))
+) not valid;
+
+alter table public.plank_attempts drop constraint if exists plank_attempts_limits;
+alter table public.plank_attempts add constraint plank_attempts_limits check (
+  char_length(song_id) <= 100 and reached <= 3600 and pauses <= 1000
+) not valid;
+
+-- A photo link can only point at the player's own photo in this project's bucket.
+alter table public.plank_profiles drop constraint if exists plank_profiles_avatar;
+alter table public.plank_profiles add constraint plank_profiles_avatar check (
+  avatar_url is null
+  or (char_length(avatar_url) <= 500 and avatar_url like ('%/storage/v1/object/public/avatars/' || user_id::text || '/%'))
+) not valid;

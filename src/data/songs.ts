@@ -64,13 +64,10 @@ export const ALBUMS: Record<AlbumId, Album> = {
 /** Release order, used to break ties between songs of equal length. */
 export const ALBUM_ORDER = Object.keys(ALBUMS) as AlbumId[]
 
-// "Title | m:ss" per line, in album track order. Studio albums including deluxe and vault
-// tracks; alternate mixes, acoustic and piano versions are left out, except the one that
-// matters: All Too Well (10 Minute Version), the grand finale.
-// Durations are the album versions. `npm run sync:youtube` replaces them with the exact length
-// of the album track it finds on YouTube, so the plank ends when the song does.
-// A song that isn't out yet has "?" for its length. It stays off the site until
-// `npm run watch:release` finds its track on YouTube.
+// "Title | m:ss" per line, in album track order: studio albums with deluxe and vault tracks, but no
+// alternate mixes, except All Too Well (10 Minute Version). `npm run sync:youtube` swaps in each
+// album track's exact length. "?" marks a song that isn't out yet: it stays off the site until
+// `npm run watch:release` finds it.
 const CATALOG: Record<AlbumId, string> = {
   debut: `
     Tim McGraw | 3:52
@@ -397,8 +394,4 @@ export const LADDER: Song[] = [...LAUNCH_SONGS].sort(
 export function formatDuration(totalSeconds: number): string {
   const s = Math.max(0, Math.round(totalSeconds))
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
-}
-
-export function albumOf(song: Song): Album {
-  return ALBUMS[song.album]
 }

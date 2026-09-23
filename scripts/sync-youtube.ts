@@ -1,26 +1,20 @@
-// Finds each song's album track on YouTube and writes src/data/youtube-videos.json with the video
-// id and exact length. Only YouTube's auto-generated "Taylor Swift - Topic" uploads count: the album
-// recording itself with the cover art on screen, never a music video or lyric video. Re-recorded
-// songs must be the Taylor's Version track.
+// Finds each song's album track (a "Taylor Swift - Topic" upload, Taylor's Version where the
+// catalog uses one) and writes its video id and exact length to src/data/youtube-videos.json.
 //
 //   npm run sync:youtube              re-check saved tracks, then look up the missing ones
 //   npm run sync:youtube -- --check   only re-check saved tracks and report (no changes)
 //   npm run sync:youtube -- --fresh   forget everything and look it all up again
 //
-// Re-checking uses YouTube's public oEmbed endpoint: free, no quota, no key needed. It drops
-// tracks that were removed or had embedding turned off, and anything that isn't a matching album
-// track, so the lookup replaces them. Without a key, a run stops there.
-//
-// Quota (a free key gets 10,000 units a day):
-//   1. The Topic channel's upload list, read 50 tracks per unit. Usually finds nearly everything.
-//   2. Searches limited to the Topic channel for whatever's left, 100 units each.
-// If the quota runs out, progress is saved: run it again the next day to finish.
+// Re-checking is free (YouTube's oEmbed endpoint) and drops removed, unembeddable or wrong tracks.
+// Looking up needs YOUTUBE_API_KEY: first the channel's upload list (1 unit per 50 tracks), then
+// searches for what's left (100 units each). Out of quota, progress is saved for tomorrow.
 
 import { readFile, writeFile } from 'node:fs/promises'
 import { ALBUMS, ALBUM_ORDER, SONGS, type Song } from '../src/data/songs.ts'
 import {
   ALBUM_AUDIO_CHANNEL_ID,
   isRightVideo,
+  isVideoId,
   normalizeTitle,
   parseIsoDuration,
   pickVideo,
@@ -72,7 +66,7 @@ async function videoDetails(ids: string[]): Promise<VideoCandidate[]> {
   for (let i = 0; i < ids.length; i += 50) {
     const details = await call('videos', { part: 'snippet,contentDetails,status', id: ids.slice(i, i + 50).join(',') }, 1)
     for (const v of details.items) {
-      if (v.status?.embeddable === false) continue
+      if (v.status?.embeddable === false || !isVideoId(v.id)) continue
       videos.push({ id: v.id, title: v.snippet.title, channel: v.snippet.channelTitle, seconds: parseIsoDuration(v.contentDetails.duration) })
     }
   }

@@ -1,27 +1,20 @@
-// Watches YouTube for announced songs and puts each one on the live site the moment it's out.
-// An announced song has "?" for its length in src/data/songs.ts. As soon as its "Taylor Swift -
-// Topic" upload appears, this commits the track and its exact length on top of origin/main and
-// pushes, and Cloudflare Pages redeploys. A song listed in PREMIERES (src/lib/daily.ts) becomes the
-// song of the day on its day as soon as that build is live.
+// Watches the "Taylor Swift - Topic" channel for announced songs ("?" for their length in
+// src/data/songs.ts) and, the moment one is out, commits its track and length on top of
+// origin/main and pushes, so the site redeploys with it. See "New releases" in the README.
 //
 //   npm run watch:release                    watch, and publish each song the moment it's out
 //   npm run watch:release -- --dry-run       watch, and show the commit it would push instead
 //   npm run watch:release -- --try "Title"   rehearse on a song that's already out (never pushes)
 //
-// Start it before the release (her new music comes out at midnight Eastern) and leave it running.
-// It keeps Windows awake while it runs, but a closed laptop lid still wins.
-//
-// Two sources: the Topic channel's RSS feed (free, every 15s) and, with YOUTUBE_API_KEY set, its
-// upload list through the API (1 quota unit every 30s: about 120 an hour of the 10,000 a day).
-// The commit is built on origin/main directly, so your working copy, uncommitted changes and
-// unpushed commits are left alone.
+// Sources: the channel's RSS feed every 15s, plus its upload list through the API every 30s when
+// YOUTUBE_API_KEY is set (about 120 of the 10,000 daily quota units an hour).
 
 import { execFileSync, spawn } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { UPCOMING, formatDuration, slugify, type UpcomingSong } from '../src/data/songs.ts'
-import { ALBUM_AUDIO_CHANNEL, ALBUM_AUDIO_CHANNEL_ID, isAlbumAudioChannel, isRightVideo, parseIsoDuration } from '../src/lib/match.ts'
+import { ALBUM_AUDIO_CHANNEL, ALBUM_AUDIO_CHANNEL_ID, isAlbumAudioChannel, isRightVideo, isVideoId, parseIsoDuration } from '../src/lib/match.ts'
 
 const KEY = process.env.YOUTUBE_API_KEY
 const SITE = 'https://planktotaylor.pages.dev'
@@ -91,17 +84,15 @@ async function feedUploads(): Promise<Upload[]> {
       title: decodeXml(/<title>([^<]*)</.exec(entry)?.[1] ?? ''),
       published: /<published>([^<]+)</.exec(entry)?.[1] ?? '',
     }))
-    .filter((upload) => upload.id)
+    .filter((upload) => isVideoId(upload.id))
 }
 
 /** The newest 50 uploads from the Topic channel's upload list (1 unit). */
 async function apiUploads(): Promise<Upload[]> {
   const page = await api('playlistItems', { part: 'snippet', playlistId: UPLOADS_PLAYLIST, maxResults: '50' }, 1)
-  return (page.items as { snippet: { title: string; publishedAt: string; resourceId: { videoId: string } } }[]).map(({ snippet }) => ({
-    id: snippet.resourceId.videoId,
-    title: snippet.title,
-    published: snippet.publishedAt,
-  }))
+  return (page.items as { snippet: { title: string; publishedAt: string; resourceId: { videoId: string } } }[])
+    .map(({ snippet }) => ({ id: snippet.resourceId.videoId, title: snippet.title, published: snippet.publishedAt }))
+    .filter((upload) => isVideoId(upload.id))
 }
 
 /** The track's exact length, from the API (1 unit) or, without one, from its watch page. Null until it's public. */

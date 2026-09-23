@@ -54,7 +54,7 @@ How playback behaves:
 4. Put the project URL and the **publishable (anon)** key in `VITE_SUPABASE_URL` / `VITE_SUPABASE_KEY`.
 5. Recommended: Authentication → Email Templates → Magic Link: add `{{ .Token }}` to the template. People who open the email on a different device from the one they're signing in on can then type the 6-digit code.
 
-Already ran `schema.sql` before? Run it again **before deploying new code**: it adds whatever columns are new (`pauses` and `xp` on planks, `prefs` and `theme` on profiles), lets a day hold more than one ladder level, and leaves your data alone. Until it's run, settings just don't reach the account; everything else still syncs.
+Already ran `schema.sql` before? Run it again **before deploying new code**: it adds whatever columns are new (`pauses` and `xp` on planks, `prefs` and `theme` on profiles), lets a day hold more than one ladder level, tightens the rules (limits on what a player can store, photos readable only through their links), and leaves your data alone. Until it's run, settings just don't reach the account; everything else still syncs.
 
 This adds:
 - A **Sign in** button (email magic link or code, no passwords).
@@ -64,6 +64,11 @@ This adds:
 - **One browser, one account's progress.** Signing out keeps this browser's copy. If someone else then signs in here, that copy is cleared first instead of merged, so one person's planks never land in another's account. Progress made before ever signing in still comes along.
 - Signed out, nothing personal leaves the browser. The only thing sent is the +1 on today's anonymous counter.
 - "**N people have planked this today**" on the daily card. Anonymous visitors count too.
+
+Security, in short:
+- Every table has row-level security: players read and write only their own rows, attempts can't be changed or removed, and the daily counter only moves up by one through `bump_daily`. The counter is open to anyone by design, so treat it as a fun number, not a tamper-proof one.
+- The site ships only the publishable key. Keep the secret key out of `.env`.
+- [public/_headers](public/_headers) sets security headers on Cloudflare Pages: no framing by other sites, no MIME sniffing, and no camera, microphone or location access.
 
 ## How it works
 

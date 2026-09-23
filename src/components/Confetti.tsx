@@ -30,10 +30,7 @@ function burst(colors: readonly string[]): Piece[] {
   })
 }
 
-/**
- * A small, one-off burst of paper confetti (with a few of the site's stars) from where it's placed.
- * Pinned to the viewport so it never makes the page scroll. Hidden when reduced motion is asked for.
- */
+/** A one-off burst of confetti from where it's placed. Skipped when reduced motion is asked for. */
 export function Confetti({ colors }: { colors: readonly string[] }) {
   const anchor = useRef<HTMLSpanElement>(null)
   const [origin, setOrigin] = useState<{ x: number; y: number } | null>(null)

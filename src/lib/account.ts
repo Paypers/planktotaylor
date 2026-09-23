@@ -18,7 +18,7 @@ import { forgetAttempts, getAttempts, mergeAttempts, onAttemptEnded, type Attemp
 import { applyPrefs, getData, onPlankRecorded, onPrefsChanged, replaceProgress } from './store'
 import { applySavedTheme, onThemeSaved, readSaved, savedTheme, type SavedTheme } from './theme'
 
-// Just the project address. The dashboard's Data API page shows it with /rest/v1/ on the end, which breaks sign-in.
+// The project address, without the /rest/v1/ the dashboard shows on the end (it breaks sign-in).
 const url = (import.meta.env.VITE_SUPABASE_URL as string | undefined)
   ?.trim()
   .replace(/\/(rest|auth)\/v1\/?$/, '')
@@ -35,8 +35,7 @@ function client(): Promise<SupabaseClient> {
   if (!accountsEnabled) return Promise.reject(new Error('Accounts are not set up on this site.'))
   clientPromise ??= import('@supabase/supabase-js').then(({ createClient }) => {
     const supabase = createClient(url!, key!, {
-      // Implicit flow: the magic link carries the session itself, so it still signs you in when
-      // the email is opened in a different browser from the one that asked for it.
+      // Implicit flow: the magic link carries the session, so it works in any browser.
       auth: { flowType: 'implicit', persistSession: true, detectSessionInUrl: true },
     })
     listen(supabase)
@@ -198,30 +197,26 @@ async function syncSettings(supabase: SupabaseClient, userId: string, row: Profi
   if (push.prefs || push.theme) await saveProfileRow(supabase, userId, push)
 }
 
-// Whose progress this browser holds: the last account signed in here. Signing out keeps it, so
-// signing in as someone else must never merge one person's planks into another's account.
+// The account whose progress this browser holds. Signing out keeps that progress, so someone
+// else signing in here starts clean instead of merging it into their account.
 const OWNER_KEY = 'plank-to-taylor:account'
 
 function claimBrowser(userId: string) {
   let owner: string | null = null
   try {
     owner = localStorage.getItem(OWNER_KEY)
+    localStorage.setItem(OWNER_KEY, userId)
   } catch {
-    // Storage is off: this browser only ever holds what this visit did.
+    // Storage is off: there's nothing kept from anyone else.
   }
   if (owner && owner !== userId) {
     replaceProgress([], emptyData().ladder)
     forgetAttempts()
-    // Settings stay on screen until this account's arrive, but never count as newer than them.
+    // Their settings stay on screen until this account's arrive, but never count as newer.
     const { updatedAt: _prefsAt, ...prefs } = getData().prefs
     applyPrefs(prefs)
     const { updatedAt: _themeAt, ...theme } = savedTheme()
     applySavedTheme(theme)
-  }
-  try {
-    localStorage.setItem(OWNER_KEY, userId)
-  } catch {
-    // As above.
   }
 }
 
@@ -245,8 +240,7 @@ function sync(user: User) {
   })
 }
 
-// Phones keep a tab open for days. Whenever the site comes back into view, or back online, it
-// catches up with what changed on other devices meanwhile: a new photo, planks, settings.
+// Phones keep a tab open for days: coming back into view (or online) picks up other devices' changes.
 function catchUp() {
   if (!state.user || document.visibilityState !== 'visible') return
   if (state.sync === 'error' || Date.now() - lastSync > FRESH_MS) sync(state.user)
@@ -264,7 +258,7 @@ async function syncNow(user: User) {
     ])
     if (profile.error) throw profile.error
     const row = profile.data
-    setState({ profile: { name: row?.display_name ?? null, avatarUrl: row?.avatar_url ?? null } })
+    setState({ profile: { name: row?.display_name ?? null, avatarUrl: ownPhoto(row?.avatar_url) } })
 
     const local = getData()
     const merged = mergeCompletions(local.completions, remote)
@@ -284,10 +278,8 @@ async function syncNow(user: User) {
     if (missing.length > 0) await upsertCompletions(supabase, user.id, missing)
     if (improved.length > 0) await replaceCompletions(supabase, user.id, improved)
     if (ladder !== remoteCursor) await pushLadderCursor(supabase, user.id, ladder)
-    // Settings aren't progress either: a failure is retried next time, since the copy here stays newer.
+    // Settings and attempts aren't progress: a failure doesn't fail the sync, and the next one retries.
     await syncSettings(supabase, user.id, row).catch((error) => console.error('Could not sync settings with account', error))
-    // Attempts made while signed out, or while offline, go up now. They're a record, not progress,
-    // so a failure here doesn't fail the sync; they're retried next time.
     await pushAttempts(supabase, user.id).catch((error) => console.error('Could not save attempts to account', error))
     setState({ sync: 'synced' })
   } catch (error) {
@@ -392,6 +384,18 @@ export async function pullAttempts() {
   )
 }
 
+/** A setting changed while signed in goes straight up. If that fails, the next sync sends it. */
+async function pushSettings(fields: SettingsFields) {
+  const user = state.user
+  if (!accountsEnabled || !user) return
+  try {
+    await saveProfileRow(await client(), user.id, fields)
+  } catch (error) {
+    console.error('Could not save settings to account', error)
+  }
+}
+
+// Signed in, attempts and settings go to the account as they happen. Signed out, nothing leaves the browser.
 onAttemptEnded(() => {
   const user = state.user
   if (!accountsEnabled || !user) return
@@ -399,24 +403,11 @@ onAttemptEnded(() => {
     .then((supabase) => pushAttempts(supabase, user.id))
     .catch((error) => console.error('Could not save attempt to account', error))
 })
+onPrefsChanged((prefs) => void pushSettings({ prefs }))
+onThemeSaved((theme) => void pushSettings({ theme }))
 
 // Start right away so a returning magic link (#access_token=…) is picked up on page load.
 if (accountsEnabled) void client()
-
-// A setting changed here while signed in goes to the account straight away. Signed out, nothing
-// leaves the browser.
-async function pushSettings(fields: SettingsFields) {
-  const user = state.user
-  if (!accountsEnabled || !user) return
-  try {
-    await saveProfileRow(await client(), user.id, fields)
-  } catch (error) {
-    // The copy here stays newer, so the next sync sends it.
-    console.error('Could not save settings to account', error)
-  }
-}
-onPrefsChanged((prefs) => void pushSettings({ prefs }))
-onThemeSaved((theme) => void pushSettings({ theme }))
 
 export function retrySync() {
   if (state.user) sync(state.user)
@@ -457,8 +448,8 @@ export function displayName(user: User, profile: Profile): string {
 }
 
 /**
- * Changes the name, photo or settings without touching the ladder. A player who has never had a profile
- * row gets one seeded with this browser's ladder, so a fresh row can't look like a newer ladder.
+ * Changes the name, photo or settings, never the ladder. A first row is seeded with this
+ * browser's ladder, so it can't look like a newer one.
  */
 async function saveProfileRow(
   supabase: SupabaseClient,
@@ -493,6 +484,10 @@ export async function saveDisplayName(name: string) {
 }
 
 const avatarPath = (userId: string) => `${userId}/avatar.jpg`
+
+/** Only a photo from this project's own bucket is ever shown. */
+const ownPhoto = (link: string | null | undefined): string | null =>
+  link?.startsWith(`${url}/storage/v1/object/public/avatars/`) ? link : null
 
 /** Uploads an already-resized photo (see lib/avatar.ts) to the public avatars bucket. */
 export async function uploadAvatar(photo: Blob) {
