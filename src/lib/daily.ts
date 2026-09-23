@@ -1,8 +1,18 @@
-import { SONGS, type Song } from '../data/songs'
+import { LAUNCH_SONGS, SONG_BY_ID, type Song } from '../data/songs'
 import { daysBetween, type DayKey } from './dates'
 
 /** Daily #1. Everyone on the same calendar date gets the same song, like Wordle. */
 export const DAILY_EPOCH: DayKey = '2026-09-22'
+
+/**
+ * New releases, each the song of the day on its release day. A premiere is slotted into the
+ * rotation rather than taking a day from it: the day after, the rotation picks up where it left off.
+ * It only happens once the song is out (its track found by `npm run watch:release`); until then
+ * that day keeps its usual song.
+ */
+export const PREMIERES: Readonly<Record<DayKey, string>> = {
+  '2026-09-25': 'patient-zero',
+}
 
 export function dailyNumber(day: DayKey): number {
   return daysBetween(DAILY_EPOCH, day) + 1
@@ -29,7 +39,7 @@ function mulberry32(seed: number): () => number {
 
 // Sorted by id rather than duration so that refreshing durations from YouTube
 // never changes which song is "today's song".
-const POOL = [...SONGS].sort((a, b) => a.id.localeCompare(b.id))
+const POOL = [...LAUNCH_SONGS].sort((a, b) => a.id.localeCompare(b.id))
 const decks = new Map<number, Song[]>()
 
 function deck(cycle: number): Song[] {
@@ -46,14 +56,33 @@ function deck(cycle: number): Song[] {
   return shuffled
 }
 
+const RELEASED_PREMIERES = new Map(
+  Object.entries(PREMIERES).flatMap(([day, id]) => {
+    const song = SONG_BY_ID.get(id)
+    return song ? [[day, song] as const] : []
+  }),
+)
+
 /**
- * The global song of the day. Songs are dealt from a shuffled deck, so every song
- * comes up once before any song repeats.
+ * The song of the day given which premieres are out (a parameter for tests). Rotation songs are
+ * dealt from a shuffled deck, so every one comes up once before any repeats.
  */
-export function dailySong(day: DayKey): Song {
-  const index = daysBetween(DAILY_EPOCH, day)
+export function songOfTheDay(day: DayKey, premieres: ReadonlyMap<DayKey, Song>): Song {
+  const premiere = premieres.get(day)
+  if (premiere) return premiere
+  const offset = daysBetween(DAILY_EPOCH, day)
+  const slotted = [...premieres.keys()].filter((p) => {
+    const at = daysBetween(DAILY_EPOCH, p)
+    return at >= 0 && at < offset
+  }).length
+  const index = offset - slotted
   const size = POOL.length
   const cycle = Math.floor(index / size)
   const position = ((index % size) + size) % size
   return deck(cycle)[position]
+}
+
+/** The global song of the day. */
+export function dailySong(day: DayKey): Song {
+  return songOfTheDay(day, RELEASED_PREMIERES)
 }

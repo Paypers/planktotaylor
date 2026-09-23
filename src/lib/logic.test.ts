@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { LADDER, SONGS, formatDuration, slugify } from '../data/songs'
-import { DAILY_EPOCH, dailyNumber, dailySong } from './daily'
+import { ALBUMS, LADDER, LAUNCH_SONGS, SONG_BY_ID, SONGS, UPCOMING, formatDuration, slugify } from '../data/songs'
+import { DAILY_EPOCH, PREMIERES, dailyNumber, dailySong, songOfTheDay } from './daily'
 import { addDays, daysBetween } from './dates'
 import { applyPlank, emptyData, ladderRecords, ladderView, mergeCompletions, newerCursor, streakDays, type Completion } from './progress'
 import { normalizeTitle, parseIsoDuration, pickVideo, videoSongName, type VideoCandidate } from './match'
@@ -44,8 +44,34 @@ describe('daily song', () => {
   })
 
   it('deals every song once before any repeats', () => {
-    const ids = Array.from({ length: SONGS.length }, (_, i) => dailySong(addDays(DAILY_EPOCH, i)).id)
-    expect(new Set(ids).size).toBe(SONGS.length)
+    const ids = Array.from({ length: LAUNCH_SONGS.length }, (_, i) => songOfTheDay(addDays(DAILY_EPOCH, i), new Map()).id)
+    expect(new Set(ids).size).toBe(LAUNCH_SONGS.length)
+  })
+
+  it('slots a premiere in without moving the days before it or skipping a song', () => {
+    const premieres = new Map([[addDays(DAILY_EPOCH, 3), { ...LAUNCH_SONGS[0], id: 'new-single', title: 'New Single' }]])
+    const usual = (i: number) => songOfTheDay(addDays(DAILY_EPOCH, i), new Map()).id
+    const withPremiere = (i: number) => songOfTheDay(addDays(DAILY_EPOCH, i), premieres).id
+    for (let i = 0; i < 3; i++) expect(withPremiere(i)).toBe(usual(i))
+    expect(withPremiere(3)).toBe('new-single')
+    for (let i = 4; i < 600; i++) expect(withPremiere(i)).toBe(usual(i - 1))
+  })
+
+  it('premieres songs from the catalog, released after launch', () => {
+    for (const id of Object.values(PREMIERES)) {
+      const song = SONG_BY_ID.get(id) ?? UPCOMING.find((s) => s.id === id)
+      expect(song, id).toBeDefined()
+      expect(ALBUMS[song!.album].afterLaunch).toBe(true)
+    }
+  })
+
+  it('keeps songs released after launch out of the rotation and off the ladder', () => {
+    const later = SONGS.filter((s) => ALBUMS[s.album].afterLaunch)
+    for (const song of later) {
+      expect(LAUNCH_SONGS).not.toContain(song)
+      expect(LADDER).not.toContain(song)
+    }
+    expect(LADDER.length).toBe(LAUNCH_SONGS.length)
   })
 })
 
@@ -322,6 +348,12 @@ describe('youtube matching', () => {
     expect(videoSongName('Taylor Swift - End Game ft. Ed Sheeran, Future')).toBe('end game')
     expect(videoSongName('Taylor Swift - Elizabeth Taylor (Official Audio)')).toBe('elizabeth taylor')
     expect(videoSongName('Snow On The Beach (feat. Lana Del Rey)')).toBe('snow on the beach')
+  })
+
+  it('reads soundtrack singles as the song, but not their alternate versions', () => {
+    expect(videoSongName('I Knew It, I Knew You (From "Toy Story 5")')).toBe('i knew it i knew you')
+    expect(videoSongName('I Knew It, I Knew You (From &quot;Toy Story 5&quot;)')).toBe('i knew it i knew you')
+    expect(videoSongName('I Knew It, I Knew You (Piano Version (From "Toy Story 5"))')).not.toBe('i knew it i knew you')
   })
 
   it('parses API durations', () => {

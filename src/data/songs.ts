@@ -13,6 +13,7 @@ export type AlbumId =
   | 'midnights'
   | 'ttpd'
   | 'showgirl'
+  | 'patientzero'
 
 export interface Album {
   id: AlbumId
@@ -24,6 +25,12 @@ export interface Album {
   /** Era fill colour and the text colour that reads on top of it. */
   color: string
   ink: string
+  /**
+   * Released after the site launched. Its songs stay out of the daily rotation and the ladder:
+   * adding them there would reshuffle every day's song and shift everyone's ladder level.
+   * They premiere as the song of the day instead (PREMIERES in src/lib/daily.ts).
+   */
+  afterLaunch?: boolean
 }
 
 export interface Song {
@@ -51,6 +58,7 @@ export const ALBUMS: Record<AlbumId, Album> = {
   midnights: { id: 'midnights', title: 'Midnights', short: 'Midnights', year: 2022, color: '#2f3d73', ink: '#eef0ff' },
   ttpd: { id: 'ttpd', title: 'The Tortured Poets Department', short: 'TTPD', year: 2024, color: '#d6cdbf', ink: '#2b2621' },
   showgirl: { id: 'showgirl', title: 'The Life of a Showgirl', short: 'Showgirl', year: 2025, color: '#e8742f', ink: '#2a1206' },
+  patientzero: { id: 'patientzero', title: 'Patient Zero', short: 'Patient Zero', year: 2026, color: '#c5d93b', ink: '#232b06', afterLaunch: true },
 }
 
 /** Release order, used to break ties between songs of equal length. */
@@ -61,6 +69,8 @@ export const ALBUM_ORDER = Object.keys(ALBUMS) as AlbumId[]
 // matters: All Too Well (10 Minute Version), the grand finale.
 // Durations are the album versions. `npm run sync:youtube` replaces them with the exact length
 // of the album track it finds on YouTube, so the plank ends when the song does.
+// A song that isn't out yet has "?" for its length. It stays off the site until
+// `npm run watch:release` finds its track on YouTube.
 const CATALOG: Record<AlbumId, string> = {
   debut: `
     Tim McGraw | 3:52
@@ -317,6 +327,8 @@ const CATALOG: Record<AlbumId, string> = {
     CANCELLED! | 3:31
     Honey | 3:01
     The Life of a Showgirl | 4:01`,
+  patientzero: `
+    Patient Zero | ?`,
 }
 
 export function slugify(title: string): string {
@@ -336,8 +348,11 @@ function parseDuration(text: string): number {
 
 const videos = youtubeVideos as Record<string, { id: string; seconds?: number }>
 
-function buildCatalog(): Song[] {
+export type UpcomingSong = Pick<Song, 'id' | 'title' | 'album' | 'track'>
+
+function buildCatalog(): { songs: Song[]; upcoming: UpcomingSong[] } {
   const songs: Song[] = []
+  const upcoming: UpcomingSong[] = []
   const seen = new Set<string>()
   for (const album of ALBUM_ORDER) {
     const lines = CATALOG[album].trim().split('\n')
@@ -347,26 +362,32 @@ function buildCatalog(): Song[] {
       if (seen.has(id)) throw new Error(`Duplicate song id "${id}"`)
       seen.add(id)
       const video = videos[id]
-      songs.push({
-        id,
-        title,
-        album,
-        track: i + 1,
-        seconds: video?.seconds ?? parseDuration(length),
-        youtubeId: video?.id,
-      })
+      const seconds = video?.seconds ?? (length === '?' ? undefined : parseDuration(length))
+      if (seconds === undefined) {
+        upcoming.push({ id, title, album, track: i + 1 })
+        return
+      }
+      songs.push({ id, title, album, track: i + 1, seconds, youtubeId: video?.id })
     })
   }
-  return songs
+  return { songs, upcoming }
 }
 
-/** Every song, in album/track order. */
-export const SONGS: Song[] = buildCatalog()
+const catalog = buildCatalog()
+
+/** Every song that's out, in album/track order. */
+export const SONGS: Song[] = catalog.songs
+
+/** Announced songs that aren't out yet: they join SONGS once their track is found on YouTube. */
+export const UPCOMING: UpcomingSong[] = catalog.upcoming
 
 export const SONG_BY_ID = new Map(SONGS.map((song) => [song.id, song]))
 
+/** Songs from the albums the site launched with: the daily rotation and the ladder. */
+export const LAUNCH_SONGS: Song[] = SONGS.filter((song) => !ALBUMS[song.album].afterLaunch)
+
 /** The ladder: shortest song first, longest last. Level n is LADDER[n - 1]. */
-export const LADDER: Song[] = [...SONGS].sort(
+export const LADDER: Song[] = [...LAUNCH_SONGS].sort(
   (a, b) =>
     a.seconds - b.seconds ||
     ALBUM_ORDER.indexOf(a.album) - ALBUM_ORDER.indexOf(b.album) ||

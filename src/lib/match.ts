@@ -1,16 +1,18 @@
 // Title matching shared by the app (setlist search) and scripts/sync-youtube.ts,
 // so keep this file free of imports.
 
-/** Lower-case, drop "(Taylor's Version)", "(From The Vault)", "(feat. …)" and punctuation. */
+/** Lower-case, drop "(Taylor's Version)", "(From The Vault)", "(From "Some Film")", "(feat. …)" and punctuation. */
 export function normalizeTitle(title: string): string {
   return title
     .toLowerCase()
     .replace(/&amp;/g, '&')
     .replace(/&#39;|&quot;/g, "'")
     .replace(/[’‘]/g, "'")
+    .replace(/[“”]/g, '"')
     .replace(/[([](feat\.?|featuring|ft\.?|with) [^)\]]*[)\]]/g, '')
     .replace(/\(taylor's version\)/g, '')
     .replace(/\(from the vault\)/g, '')
+    .replace(/\(from ['"][^)]*\)/g, '')
     .replace(/\$/g, 's')
     .replace(/&/g, ' and ')
     .replace(/[^a-z0-9]+/g, ' ')
