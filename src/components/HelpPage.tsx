@@ -40,6 +40,11 @@ export function HelpPage() {
           Give up, close the plank, leave the page or lose your connection, and that attempt ends there. It's kept in
           your plank history, and you can go again as often as you like.
         </dd>
+        <dt>Time planked</dt>
+        <dd>
+          Under your streak, a ring shows where your time went: today's song, the ladder, or planking again, or split by
+          album. Every plank held to the end counts once, goes again included. Tap a slice to see it on its own.
+        </dd>
         <dt>Your best</dt>
         <dd>
           Until you've finished a song, a mark on the progress bar shows the furthest you've held it before. Pass it

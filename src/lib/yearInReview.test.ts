@@ -63,6 +63,13 @@ describe('your plank year', () => {
     expect(review.longest).toEqual({ song: atw, seconds: atw.seconds })
   })
 
+  it('counts goes again too: extra credit and practice', () => {
+    const extraCredit: Attempt = { ...go('2026-10-01T15:00:00.000Z', style, 'finished'), kind: 'extra' }
+    const practice: Attempt = { ...go('2026-10-05T15:00:00.000Z', atw, 'finished'), kind: 'practice' }
+    const review = yearInReview([plank('2026-10-01', style)], [extraCredit, practice], 2026, '2026-12-05')
+    expect(review).toMatchObject({ planks: 3, days: 2, seconds: 2 * style.seconds + atw.seconds })
+  })
+
   it('leaves out planks from other years', () => {
     const completions = [plank('2026-12-30', style), plank('2027-01-02', style)]
     expect(yearInReview(completions, [], 2026, '2027-01-10').planks).toBe(1)

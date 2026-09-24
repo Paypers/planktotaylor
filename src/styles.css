@@ -20,6 +20,10 @@
   --held: #3a8f5c;
   --paused: #e8862a;
   --paused-ink: #a3500d;
+  /* Where the time went (the ring in Streak): colourblind-safe as a set, checked in both themes. Not themeable. */
+  --chart-daily: #c23b22;
+  --chart-ladder: #2a78d6;
+  --chart-again: #1baf7a;
 
   --display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
   --sans: 'Instrument Sans', 'Helvetica Neue', system-ui, sans-serif;
@@ -44,6 +48,9 @@
   --held: #62b784;
   --paused: #f0a060;
   --paused-ink: #f0a060;
+  --chart-daily: #e4603f;
+  --chart-ladder: #3987e5;
+  --chart-again: #199e70;
   color-scheme: dark;
 }
 
@@ -1398,6 +1405,180 @@ a {
 .facts dt:last-of-type,
 .facts dd:last-of-type {
   border-bottom: 1px solid var(--rule);
+}
+
+/* Time planked: a ring split by what the planks were for, or by album, with the total in the middle */
+
+.time-split {
+  margin-bottom: 32px;
+  container-type: inline-size;
+}
+
+.time-split-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.time-split-head h3 {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.split-toggle {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+}
+
+.split-toggle button {
+  min-height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.split-toggle button[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.time-split-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.ring {
+  position: relative;
+  flex-shrink: 0;
+  width: 168px;
+  height: 168px;
+}
+
+.ring svg {
+  display: block;
+  overflow: visible;
+}
+
+.ring-slice {
+  cursor: pointer;
+  transition:
+    stroke-width 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.ring-middle {
+  position: absolute;
+  inset: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  pointer-events: none;
+  text-align: center;
+}
+
+.ring-value {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 26px;
+}
+
+.ring-label {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-2);
+}
+
+.split-legend {
+  width: 100%;
+  padding: 0;
+  list-style: none;
+}
+
+.split-row {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  grid-template-areas: 'swatch label time' 'swatch count time';
+  align-items: center;
+  column-gap: 10px;
+  width: 100%;
+  padding: 8px 6px;
+  border: 0;
+  border-top: 1px solid var(--rule);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.split-legend li:last-child .split-row {
+  border-bottom: 1px solid var(--rule);
+}
+
+.split-row:hover,
+.split-row.active {
+  background: var(--well);
+}
+
+.split-swatch {
+  grid-area: swatch;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.split-label {
+  grid-area: label;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+
+.split-count {
+  grid-area: count;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-2);
+}
+
+.split-time {
+  grid-area: time;
+  font-family: var(--mono);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Side by side only when the section itself has room for both: the Streak column is narrow on wide screens. */
+@container (min-width: 440px) {
+  .time-split-body {
+    flex-direction: row;
+    align-items: center;
+    gap: 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ring-slice {
+    transition: none;
+  }
 }
 
 .streak-calendar {

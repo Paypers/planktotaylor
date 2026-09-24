@@ -1,12 +1,15 @@
 import { useMemo, useState } from 'react'
 import { ALBUMS, formatDuration } from '../data/songs'
 import { addDays, fromDayKey, type DayKey } from '../lib/dates'
-import { songFor, totalSeconds, type Completion } from '../lib/progress'
+import { useAttempts } from '../lib/attempts'
+import { allPlanks } from '../lib/planks'
+import { songFor, type Completion } from '../lib/progress'
 import type { PlayerRank } from '../lib/ranks'
 import { streakRuns, type StreakInfo } from '../lib/streaks'
 import { Flame, Icon } from './Icon'
 import { RankBar } from './Rank'
 import { SaveNote } from './SaveNote'
+import { TimeSplit } from './TimeSplit'
 
 interface Props {
   completions: Completion[]
@@ -21,17 +24,12 @@ interface Props {
   onHistory: () => void
 }
 
-function formatTotal(seconds: number): string {
-  const h = Math.floor(seconds / 3600)
-  const m = Math.round((seconds % 3600) / 60)
-  if (h > 0) return `${h} h ${m} min`
-  if (seconds >= 60) return `${m} min`
-  return `${seconds} s`
-}
-
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
 export function StreakPanel({ completions, days, streak, today, onSignIn, rank, onHistory }: Props) {
+  // Every plank held to the end, once each: goes again included, a two-for-one counted once.
+  const attempts = useAttempts()
+  const planks = useMemo(() => allPlanks(completions, attempts), [completions, attempts])
   const message = streak.doneToday
     ? 'Safe for today. See you tomorrow.'
     : streak.lastChance
@@ -82,10 +80,9 @@ export function StreakPanel({ completions, days, streak, today, onSignIn, rank, 
           <dt>Best streak</dt>
           <dd>{plural(streak.best, 'day')}</dd>
           <dt>Planks</dt>
-          <dd>{completions.length}</dd>
-          <dt>Time planked</dt>
-          <dd>{formatTotal(totalSeconds(completions))}</dd>
+          <dd>{planks.length}</dd>
         </dl>
+        <TimeSplit planks={planks} />
         <div className="streak-history">
           <button type="button" className="btn btn-secondary" onClick={onHistory}>
             Plank history

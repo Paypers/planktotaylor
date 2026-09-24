@@ -295,7 +295,3 @@ export function ladderRecords(completions: readonly Completion[]): Map<string, L
 export function songFor(c: Completion): Song | undefined {
   return SONG_BY_ID.get(c.songId)
 }
-
-export function totalSeconds(completions: readonly Completion[]): number {
-  return completions.reduce((sum, c) => sum + c.seconds, 0)
-}

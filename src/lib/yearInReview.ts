@@ -3,6 +3,7 @@ import type { Attempt } from './attempts'
 import { toDayKey, type DayKey } from './dates'
 import { DAILY_EPOCH } from './daily'
 import type { Completion } from './progress'
+import { allPlanks, type Plank } from './planks'
 import { streakInfo } from './streaks'
 import { rankName, type PlayerRank } from './ranks'
 
@@ -43,38 +44,12 @@ export interface YearReview {
   lights: number
 }
 
-interface Plank {
-  song: Song
-  day: DayKey
-  seconds: number
-  clean: boolean
-  lights: number
-}
-
-/** One finished plank per entry: a plank that counted for both today's song and a ladder level is two records. */
-function planksOf(completions: readonly Completion[]): Plank[] {
-  const byTime = new Map<string, Completion[]>()
-  for (const c of completions) byTime.set(c.at, [...(byTime.get(c.at) ?? []), c])
-  const planks: Plank[] = []
-  for (const records of byTime.values()) {
-    const song = SONG_BY_ID.get(records[0].songId)
-    if (!song) continue
-    planks.push({
-      song,
-      day: records[0].day,
-      seconds: records[0].seconds,
-      clean: records.every((c) => !c.pauses?.length),
-      lights: records.reduce((sum, c) => sum + (c.lights ?? 0), 0),
-    })
-  }
-  return planks
-}
-
 export function yearInReview(completions: readonly Completion[], attempts: readonly Attempt[], year: number, today: DayKey): YearReview {
   const from = `${year}-01-01` < DAILY_EPOCH ? DAILY_EPOCH : `${year}-01-01`
   const to = `${year}-12-31` < today ? `${year}-12-31` : today
   const inYear = completions.filter((c) => c.day >= from && c.day <= to)
-  const planks = planksOf(inYear)
+  // Every plank held to the end, goes again included, a two-for-one counted once.
+  const planks = allPlanks(completions, attempts).filter((p) => p.day >= from && p.day <= to)
 
   const byAlbum = new Map<AlbumId, { planks: number; seconds: number }>()
   for (const p of planks) {
@@ -93,7 +68,7 @@ export function yearInReview(completions: readonly Completion[], attempts: reado
     from,
     to,
     planks: planks.length,
-    days: new Set(inYear.map((c) => c.day)).size,
+    days: new Set(planks.map((p) => p.day)).size,
     seconds: planks.reduce((sum, p) => sum + p.seconds, 0),
     bestStreak: streakInfo(new Set(inYear.filter((c) => c.mode === 'daily').map((c) => c.day)), to).best,
     topAlbum: top ? { album: ALBUMS[top], planks: byAlbum.get(top)!.planks } : null,
