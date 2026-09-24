@@ -2,6 +2,8 @@
 
 Features we've decided on but haven't built yet, with enough detail to pick any one up and build it. Suggested order is at the bottom.
 
+To build them, use [the roadmap in parts](roadmap-parts/README.md): the same features grouped into sessions, one part at a time.
+
 ## Rules every feature follows
 
 - **Breaks never cost anything.** Finishing the song is what counts. Holding it with no breaks earns an extra on top. No feature may make taking a break look like failing: no ranking by breaks, no "you did better than X%", no counts of what someone missed. Planks with no breaks get a shout-out, and nobody else loses anything for it. This matters most anywhere people see each other's results (today's stats, Discord, groups).
