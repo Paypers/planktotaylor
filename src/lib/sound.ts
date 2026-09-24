@@ -1,4 +1,4 @@
-// Tiny synthesized cues so you can hear the countdown and the finish with your face to the floor.
+// Tiny synthesized cues so you can hear the countdown, how far along you are, and the finish with your face to the floor.
 let ctx: AudioContext | null = null
 
 /** Must run inside a tap/click; browsers keep audio locked until then. */
@@ -30,4 +30,10 @@ export const sounds = {
   tick: () => tone(660, 0, 0.14),
   go: () => tone(990, 0, 0.3, 0.22),
   finish: () => [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, i * 0.13, 0.4, 0.2)),
+  /** Past halfway: a slow, low rise. Breathe. */
+  halfway: () => [392, 587.33].forEach((f, i) => tone(f, i * 0.22, 0.5, 0.16)),
+  /** Last 30 seconds: ding, ding, up. */
+  lastThirty: () => [880, 880, 1174.66].forEach((f, i) => tone(f, i * 0.16, i === 2 ? 0.35 : 0.14, 0.18)),
+  /** Past your best on this song: a quick high sparkle. */
+  pastBest: () => [1318.51, 1567.98, 2093].forEach((f, i) => tone(f, i * 0.08, 0.28, 0.12)),
 }

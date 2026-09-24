@@ -171,6 +171,8 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
   const progress = useRef({ ms: 0, at: 0 }) // for spotting stalls
   const stalledRef = useRef(false)
   const lastBeep = useRef(Infinity)
+  // The halfway and last-30-seconds chimes: once each per plank.
+  const chimed = useRef({ halfway: false, lastThirty: false })
   const finished = useRef(false)
 
   const active = phase === 'countdown' || phase === 'waiting' || phase === 'running' || phase === 'paused'
@@ -232,6 +234,7 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
     setPauses([])
     finished.current = false
     lastBeep.current = Infinity
+    chimed.current = { halfway: false, lastThirty: false }
     anchor.current = { pos: 0, at: performance.now() }
     clock.current = { startedAt: performance.now(), banked: 0 }
     setElapsed(0)
@@ -325,6 +328,14 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
       if (isStalled !== stalledRef.current) {
         stalledRef.current = isStalled
         setStalled(isStalled)
+      }
+      // Heard with your face to the floor. Both at once (back from a background tab): just the later one.
+      if (!chimed.current.lastThirty && total - ms <= 30_000) {
+        chimed.current = { halfway: true, lastThirty: true }
+        if (prefs.sounds) sounds.lastThirty()
+      } else if (!chimed.current.halfway && ms >= total / 2) {
+        chimed.current.halfway = true
+        if (prefs.sounds) sounds.halfway()
       }
       const secondsLeft = Math.ceil((total - ms) / 1000)
       if (secondsLeft <= 3 && secondsLeft < lastBeep.current) {
