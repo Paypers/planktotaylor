@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { plankSummary, shareText, siteLink, type ShareInput } from '../lib/share'
 import { CARD_HEIGHT, CARD_WIDTH, renderShareCard } from '../lib/shareCard'
 import { Dialog } from './Dialog'
@@ -8,15 +8,41 @@ import { Icon } from './Icon'
 export function ShareDialog({ share, onClose }: { share: ShareInput | null; onClose: () => void }) {
   return (
     <Dialog open={share !== null} title="Share your plank" onClose={onClose}>
-      {share && <ShareOptions share={share} />}
+      {share && <PlankShareSheet share={share} />}
     </Dialog>
+  )
+}
+
+function PlankShareSheet({ share }: { share: ShareInput }) {
+  const render = useCallback(() => renderShareCard(share), [share])
+  const text = useMemo(() => shareText(share), [share])
+  return (
+    <ShareSheet
+      render={render}
+      fileName={`plank-to-taylor-${share.day}.png`}
+      alt={`${share.song.title}: ${plankSummary(share.pauses, share.song.seconds)}. ${share.streak}-day streak.`}
+      width={CARD_WIDTH}
+      height={CARD_HEIGHT}
+      text={text}
+    />
   )
 }
 
 type Done = 'image' | 'text' | null
 
-function ShareOptions({ share }: { share: ShareInput }) {
-  const text = useMemo(() => shareText(share), [share])
+interface SheetProps {
+  /** Draws the card. A new function draws it again (a different size, say). */
+  render: () => Promise<Blob>
+  fileName: string
+  alt: string
+  width: number
+  height: number
+  /** The same as text, with the link. */
+  text: string
+}
+
+/** A card image to share, copy or save, and the same as text with the link. */
+export function ShareSheet({ render, fileName, alt, width, height, text }: SheetProps) {
   const [card, setCard] = useState<{ blob: Blob; url: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<Done>(null)
@@ -25,7 +51,8 @@ function ShareOptions({ share }: { share: ShareInput }) {
   useEffect(() => {
     let live = true
     let url = ''
-    renderShareCard(share)
+    setCard(null)
+    render()
       .then((blob) => {
         if (!live) return
         url = URL.createObjectURL(blob)
@@ -36,7 +63,7 @@ function ShareOptions({ share }: { share: ShareInput }) {
       live = false
       if (url) URL.revokeObjectURL(url)
     }
-  }, [share])
+  }, [render])
 
   useEffect(() => () => clearTimeout(doneTimer.current), [])
 
@@ -47,7 +74,7 @@ function ShareOptions({ share }: { share: ShareInput }) {
     doneTimer.current = setTimeout(() => setDone(null), 2000)
   }
 
-  const file = useMemo(() => card && new File([card.blob], `plank-to-taylor-${share.day}.png`, { type: 'image/png' }), [card, share.day])
+  const file = useMemo(() => card && new File([card.blob], fileName, { type: 'image/png' }), [card, fileName])
   // Phones get the share sheet (Messages, Instagram, Save Image); computers copy or download.
   const touch = matchMedia('(pointer: coarse)').matches
   const canShareImage = touch && !!file && !!navigator.canShare?.({ files: [file] })
@@ -104,14 +131,9 @@ function ShareOptions({ share }: { share: ShareInput }) {
     <>
       <div className="share-card">
         {card ? (
-          <img
-            src={card.url}
-            width={CARD_WIDTH}
-            height={CARD_HEIGHT}
-            alt={`${share.song.title}: ${plankSummary(share.pauses, share.song.seconds)}. ${share.streak}-day streak.`}
-          />
+          <img src={card.url} width={width} height={height} alt={alt} />
         ) : (
-          <div className="share-card-waiting" style={{ aspectRatio: `${CARD_WIDTH} / ${CARD_HEIGHT}` }}>
+          <div className="share-card-waiting" style={{ aspectRatio: `${width} / ${height}` }}>
             {error ? null : 'Drawing your card…'}
           </div>
         )}

@@ -17,18 +17,20 @@ import { ShareDialog } from './components/ShareDialog'
 import { LadderProgress, SongLine, SongRow } from './components/SongRow'
 import { StreakPanel } from './components/StreakPanel'
 import { Together } from './components/Together'
+import { YearReview } from './components/YearReview'
 import { LADDER, type Song } from './data/songs'
 import { accountsEnabled, bumpDailyStats, displayName, fetchDailyStats, saveLadderCursor, useAccount } from './lib/account'
 import { fromDayKey } from './lib/dates'
 import { useToday } from './lib/hooks'
 import { dailyView, ladderView, songFor, streakDays, type Completion, type Pause } from './lib/progress'
 import { dailyNumber } from './lib/daily'
-import { followLink, hashFor, HELP, HOME, useRoute, type Route } from './lib/route'
+import { followLink, hashFor, HELP, HOME, useRoute, YEAR, type Route } from './lib/route'
 import { playerRank, rankName } from './lib/ranks'
 import { plankSummary, type ShareInput } from './lib/share'
 import { getData, recordPlank, setLadderLevel, useAppData } from './lib/store'
 import { streakInfo } from './lib/streaks'
 import { breakSlots, type DailyStats } from './lib/together'
+import { REVIEW_NAME, reviewYear } from './lib/yearInReview'
 import { plankXp, totalXp } from './lib/xp'
 
 const SETTINGS: Route = { page: 'settings', section: null }
@@ -76,6 +78,9 @@ export function App() {
   ]
     .filter(Boolean)
     .join(' · ')
+  // Your Plank Year, from 1 December to the end of January: offered on the home page once there's a plank in it.
+  const promoYear = reviewYear(today)
+  const promo = promoYear !== null && data.completions.some((c) => c.day.startsWith(`${promoYear}-`))
   const twofer = !ladder.finished && ladder.song?.id === daily.song.id
   // XP is for signed-in players only.
   const earningXp = accountsEnabled && user !== null
@@ -268,6 +273,25 @@ export function App() {
             </div>
           </section>
 
+          {promo && (
+            <section className="section grid year-promo" aria-labelledby="year-heading">
+              <div className="section-rule" />
+              <div className="section-label">
+                <h2 id="year-heading">{REVIEW_NAME}</h2>
+                <p className="label-meta">{promoYear}</p>
+              </div>
+              <div className="section-body year-promo-body">
+                <p>
+                  Your {promoYear} in planks is here: the time you held, your top album, your longest hold and more, with a card to
+                  share for each.
+                </p>
+                <a className="btn btn-primary" href={hashFor(YEAR)} onClick={(e) => followLink(e, YEAR)}>
+                  Open {REVIEW_NAME}
+                </a>
+              </div>
+            </section>
+          )}
+
           <section className="section grid" aria-labelledby="today-heading">
             <div className="section-rule" />
             <div className="section-label">
@@ -361,6 +385,7 @@ export function App() {
             <HelpPage />
           </main>
         )}
+        {route.page === 'year' && <YearReview completions={data.completions} today={today} earningXp={earningXp} />}
 
         <footer className="site-footer grid">
           <div className="section-rule light" />

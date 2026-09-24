@@ -973,6 +973,204 @@ a {
   background: var(--ink);
 }
 
+/* Your Plank Year: a card on the home page in December and January, and the slides themselves */
+
+.year-promo-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px 0 8px;
+}
+
+.year-promo-body p {
+  max-width: 560px;
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.year-review {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  padding: env(safe-area-inset-top) 16px calc(16px + env(safe-area-inset-bottom));
+  background: var(--paper);
+  color: var(--ink);
+  transition: background-color 0.3s ease;
+  animation: plank-in 0.2s ease;
+}
+
+/* The top album's slide, in its colours: the page's own colours are swapped for the album's. */
+.year-review.on-album {
+  --paper: var(--year-bg);
+  --ink: var(--year-ink);
+  --heading: var(--year-ink);
+  --ink-2: color-mix(in srgb, var(--year-ink) 72%, var(--year-bg));
+  --rule: color-mix(in srgb, var(--year-ink) 28%, var(--year-bg));
+  --well: color-mix(in srgb, var(--year-ink) 10%, var(--year-bg));
+  --button: var(--year-ink);
+  --button-ink: var(--year-bg);
+}
+
+.year-top,
+.year-stage,
+.year-actions {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.year-top {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+}
+
+.year-marks {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+}
+
+.year-marks span {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--rule);
+}
+
+.year-marks span.seen {
+  background: var(--ink);
+}
+
+.year-stage {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-height: 0;
+  overflow-y: auto;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: pan-y;
+}
+
+.year-slide {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 24px 0;
+  animation: slide-in 0.35s ease-out;
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+.year-eyebrow {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 22px;
+  color: var(--ink-2);
+}
+
+.year-big {
+  font-family: var(--display);
+  font-size: clamp(96px, 30vw, 168px);
+  font-weight: 600;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  font-variant-numeric: lining-nums tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.year-big.words {
+  font-size: clamp(40px, 11vw, 64px);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.year-unit {
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 28px;
+  color: var(--ink-2);
+}
+
+.year-line {
+  margin-top: 12px;
+  font-size: 19px;
+  font-weight: 500;
+  line-height: 28px;
+}
+
+.year-rank {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.year-rows {
+  margin: 16px 0 0;
+}
+
+.year-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 16px;
+}
+
+.size-choice {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.size-choice label {
+  padding: 8px 18px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.size-choice label.chosen {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.size-choice label:focus-within {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+
+/* A story card is tall: keep its preview small enough to see the buttons too. */
+.share-tall .share-card img,
+.share-tall .share-card-waiting {
+  max-width: 200px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .year-slide {
+    animation: none;
+  }
+}
+
 /* Keep it on your home screen: a quiet row under today's songs, from the second plank on */
 
 .install-row {

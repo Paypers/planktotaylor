@@ -50,27 +50,6 @@ How everyone did today (the stats on the daily card once you've planked today's 
 
 **Size:** Discord level 2 is medium.
 
-## 7. Year in review
-
-Like Spotify Wrapped: slides you tap through, each with its own share card.
-
-- **Opens 1 December**, open until the end of January. It works it all out in the browser from planks and attempts, so no server is needed and it works signed out. The first one covers 22 September to December 2026.
-- **Slides:**
-  1. Total time planked, with a fun comparison: "that's the Eras Tour three times over" (the show ran about 3½ hours), or "all of Midnights, 9 times".
-  2. Planks, days planked, and best streak.
-  3. Top album: the one you planked most, in its colors.
-  4. Longest single hold: which song, and how long.
-  5. Planks held all the way through 🟩.
-  6. The one that fought back: the song that took the most attempts before you finished it. Only show it once finished, so it reads as a win.
-  7. Ladder levels climbed and the rank you reached, with its emblem.
-  8. Lights caught, if 6 is built.
-  9. A summary card to share.
-- Don't show how many breaks someone took anywhere.
-- Build on [shareCard.ts](../src/lib/shareCard.ts), adding a 1080×1920 story size for Instagram and TikTok stories.
-- Name is still open: "Your Year in Planks" works.
-
-**Size:** medium. **Deadline:** ready by 30 November.
-
 ## 8. Later: Collect the eras
 
 Achievements, done her way.
@@ -103,7 +82,6 @@ The biggest gap: right now nobody on the site can see anyone else.
 
 | # | Feature | Size | Notes |
 | --- | --- | --- | --- |
-| 7 | Year in review | Medium | Ready by 30 November |
 | 4b | Daily reminders | Medium | First server-side code |
 | 5 | Discord daily post | Medium | Uses the same server setup as 4b |
 | 8 | Collect the eras | Medium | |

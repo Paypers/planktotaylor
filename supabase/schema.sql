@@ -34,7 +34,7 @@ create table if not exists public.plank_profiles (
   updated_at timestamptz not null default now(),
   display_name text check (char_length(display_name) <= 40),
   avatar_url text,
-  -- Music and sound: { "music": bool, "sounds": bool, "updatedAt": when last changed }.
+  -- Music, sound and aurora lights: { "music": bool, "sounds": bool, "lights": bool, "updatedAt": when last changed }.
   prefs jsonb check (octet_length(prefs::text) <= 1024),
   -- Custom themes: { "themes": [...], "updatedAt": ... }. Which theme shows is each device's own choice, so it
   -- stays in the browser. (Copies saved before that also have a "selected", which the site ignores.)

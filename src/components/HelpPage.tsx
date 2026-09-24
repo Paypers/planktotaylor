@@ -168,6 +168,19 @@ export function HelpPage() {
         </dd>
       </Topic>
 
+      <Topic id="year" title="Your Plank Year">
+        <dt>When</dt>
+        <dd>
+          From 1 December to the end of January, look back on your year in planks: the time you held, your top album,
+          your longest hold, the one that fought back and more. December shows the year so far; January, the year just
+          ended.
+        </dd>
+        <dt>Sharing it</dt>
+        <dd>Every slide has its own card to share, sized for a post or a story.</dd>
+        <dt>Just yours</dt>
+        <dd>It's worked out on your device from your own planks, signed in or not, and it never counts breaks.</dd>
+      </Topic>
+
       <Topic id="share" title="Sharing">
         <dt>After a plank</dt>
         <dd>

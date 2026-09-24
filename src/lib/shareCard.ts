@@ -5,9 +5,11 @@ import { pauseLabel, plankHeadline, plankSegments, plankSummary, type ShareInput
 /** 4:5 portrait: fills a phone screen in chats and stories without being cropped. */
 export const CARD_WIDTH = 1080
 export const CARD_HEIGHT = 1350
+/** 9:16, the full screen of an Instagram or TikTok story. */
+export const STORY_HEIGHT = 1920
 
 // Always the light palette, whatever theme the page is in: the card is a printed thing, like the liner notes.
-const COLOR = {
+export const COLOR = {
   paper: '#f4f0e8',
   ink: '#1c1813',
   ink2: '#5f564b',
@@ -18,28 +20,19 @@ const COLOR = {
   pausedInk: '#a3500d',
 }
 
-const DISPLAY = 'Fraunces, Georgia, serif'
-const SANS = '"Instrument Sans", "Helvetica Neue", Arial, sans-serif'
-const MONO = '"IBM Plex Mono", Menlo, monospace'
+export const DISPLAY = 'Fraunces, Georgia, serif'
+export const SANS = '"Instrument Sans", "Helvetica Neue", Arial, sans-serif'
+export const MONO = '"IBM Plex Mono", Menlo, monospace'
 
-const STAR = 'M12 1.5 14.2 9.8 22.5 12 14.2 14.2 12 22.5 9.8 14.2 1.5 12 9.8 9.8Z'
+export const STAR = 'M12 1.5 14.2 9.8 22.5 12 14.2 14.2 12 22.5 9.8 14.2 1.5 12 9.8 9.8Z'
 const FLAME =
   'M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z'
 
-const MARGIN = 96
+export const MARGIN = 96
 
 /** Draws the finished-plank card (streak, song, the green and orange bar, the link) and returns it as a PNG. */
 export async function renderShareCard(share: ShareInput): Promise<Blob> {
-  // The page already loads these; wait so the card never draws in a fallback font.
-  await Promise.allSettled(
-    [`600 80px ${DISPLAY}`, `600 40px ${SANS}`, `400 40px ${SANS}`, `500 30px ${MONO}`].map((font) => document.fonts.load(font)),
-  )
-
-  const canvas = document.createElement('canvas')
-  canvas.width = CARD_WIDTH
-  canvas.height = CARD_HEIGHT
-  const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('Canvas is not available')
+  const { canvas, ctx } = await newCard(CARD_HEIGHT)
 
   const left = MARGIN
   const right = CARD_WIDTH - MARGIN
@@ -104,12 +97,33 @@ export async function renderShareCard(share: ShareInput): Promise<Blob> {
   text(ctx, plankSummary(share.pauses, song.seconds), left, barTop + 32 + 58, `500 30px ${MONO}`, COLOR.ink2)
   if (share.xp) text(ctx, `+${share.xp.toLocaleString()} XP`, right, barTop + 32 + 58, `600 30px ${MONO}`, COLOR.ink, 'right')
 
-  // Footer: the invite and where to find it.
-  rule(ctx, left, right, CARD_HEIGHT - MARGIN - 108, 2, COLOR.rule)
-  text(ctx, 'Hold a plank for the length of a Taylor Swift song.', left, CARD_HEIGHT - MARGIN - 54, `400 30px ${SANS}`, COLOR.ink2)
-  icon(ctx, STAR, left, CARD_HEIGHT - MARGIN - 26, 28, COLOR.signal)
-  text(ctx, window.location.host, left + 42, CARD_HEIGHT - MARGIN, `600 34px ${SANS}`, COLOR.ink)
+  cardFooter(ctx, CARD_HEIGHT)
+  return toPng(canvas)
+}
 
+/** A blank card, once the fonts it uses have loaded (the page already loads them), so it never draws in a fallback. */
+export async function newCard(height: number): Promise<{ canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D }> {
+  await Promise.allSettled(
+    [`600 80px ${DISPLAY}`, `600 40px ${SANS}`, `500 40px ${SANS}`, `400 40px ${SANS}`, `500 30px ${MONO}`].map((font) => document.fonts.load(font)),
+  )
+  const canvas = document.createElement('canvas')
+  canvas.width = CARD_WIDTH
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Canvas is not available')
+  return { canvas, ctx }
+}
+
+/** The invite at the foot of every card, and where to find it. */
+export function cardFooter(ctx: CanvasRenderingContext2D, height: number, ink = COLOR.ink, ink2 = COLOR.ink2, rules = COLOR.rule, star = COLOR.signal) {
+  const left = MARGIN
+  rule(ctx, left, CARD_WIDTH - MARGIN, height - MARGIN - 108, 2, rules)
+  text(ctx, 'Hold a plank for the length of a Taylor Swift song.', left, height - MARGIN - 54, `400 30px ${SANS}`, ink2)
+  icon(ctx, STAR, left, height - MARGIN - 26, 28, star)
+  text(ctx, window.location.host, left + 42, height - MARGIN, `600 34px ${SANS}`, ink)
+}
+
+export function toPng(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) =>
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Could not draw the card'))), 'image/png'),
   )
@@ -143,7 +157,7 @@ function bar(ctx: CanvasRenderingContext2D, share: ShareInput, left: number, rig
   }
 }
 
-function text(
+export function text(
   ctx: CanvasRenderingContext2D,
   value: string,
   x: number,
@@ -159,12 +173,12 @@ function text(
   ctx.fillText(value, x, y)
 }
 
-function rule(ctx: CanvasRenderingContext2D, from: number, to: number, y: number, weight: number, color: string) {
+export function rule(ctx: CanvasRenderingContext2D, from: number, to: number, y: number, weight: number, color: string) {
   ctx.fillStyle = color
   ctx.fillRect(from, y, to - from, weight)
 }
 
-function box(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number, color: string) {
+export function box(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number, color: string) {
   ctx.fillStyle = color
   ctx.beginPath()
   if (typeof ctx.roundRect === 'function') ctx.roundRect(x, y, width, height, radius)
@@ -173,7 +187,7 @@ function box(ctx: CanvasRenderingContext2D, x: number, y: number, width: number,
 }
 
 /** An icon from its 24×24 path, with its top left at x, y. The flame is also stroked, as the lit icon is. */
-function icon(ctx: CanvasRenderingContext2D, path: string, x: number, y: number, size: number, color: string, stroke = false) {
+export function icon(ctx: CanvasRenderingContext2D, path: string, x: number, y: number, size: number, color: string, stroke = false) {
   const shape = new Path2D(path)
   ctx.save()
   ctx.translate(x, y)
@@ -191,7 +205,7 @@ function icon(ctx: CanvasRenderingContext2D, path: string, x: number, y: number,
 }
 
 /** Breaks text into lines that fit, ending the last one with … if it runs over. Uses the current ctx.font. */
-function wrap(ctx: CanvasRenderingContext2D, value: string, maxWidth: number, maxLines: number): string[] {
+export function wrap(ctx: CanvasRenderingContext2D, value: string, maxWidth: number, maxLines: number): string[] {
   const lines: string[] = []
   let line = ''
   for (const word of value.split(' ')) {
