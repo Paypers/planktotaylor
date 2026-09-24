@@ -55,7 +55,7 @@ How playback behaves:
 4. Put the project URL and the **publishable (anon)** key in `VITE_SUPABASE_URL` / `VITE_SUPABASE_KEY`.
 5. Recommended: Authentication → Email Templates → Magic Link: add `{{ .Token }}` to the template. People who open the email on a different device from the one they're signing in on can then type the 6-digit code.
 
-Already ran `schema.sql` before? Run it again **before deploying new code**: it adds whatever columns are new (`pauses` and `xp` on planks, `prefs` and `theme` on profiles), lets a day hold more than one ladder level, tightens the rules (limits on what a player can store, photos readable only through their links), and leaves your data alone. Until it's run, settings just don't reach the account; everything else still syncs.
+Already ran `schema.sql` before? Run it again **before deploying new code**: it adds whatever columns are new (`pauses` and `xp` on planks, `prefs` and `theme` on profiles, how everyone did on the daily counts), lets a day hold more than one ladder level, tightens the rules (limits on what a player can store, photos readable only through their links), and leaves your data alone. Until it's run, settings just don't reach the account; everything else still syncs.
 
 This adds:
 - A **Sign in** button (email magic link or code, no passwords).
@@ -63,11 +63,12 @@ This adds:
 - **Everything tied to the account lives in the account**, so every device a player signs in on shows the same: planks, ladder, XP and rank, attempts, name and photo, and settings (music and sound, custom themes). Planks, attempts, the photo and name are saved the moment they happen; a setting changed on two devices keeps whichever change was made last. The one exception is which theme shows: each device keeps its own choice (System until one's picked there), so a laptop can be dark while a phone stays light.
 - **Catching up:** phones keep a tab open for days, so whenever the site comes back into view (or back online) it syncs again, at most every 30 seconds, and picks up whatever changed on another device meanwhile.
 - **One browser, one account's progress.** Signing out keeps this browser's copy. If someone else then signs in here, that copy is cleared first instead of merged, so one person's planks never land in another's account. Progress made before ever signing in still comes along.
-- Signed out, nothing personal leaves the browser. The only thing sent is the +1 on today's anonymous counter.
+- Signed out, nothing personal leaves the browser. The only thing sent is today's anonymous count when you plank today's song: a +1, the song's length, and where in it you took breaks. Nothing that says who.
 - "**N people have planked this today**" on the daily card. Anonymous visitors count too.
+- **How everyone did today** ([src/lib/together.ts](src/lib/together.ts)): once you've planked today's song, the card shows how many planked it, the time held together ("Together: 26 hours of planking"), how many held it all the way through 🟩, and, once 20 people have planked, the song's toughest stretch ("around 2:40") with a faint heat strip of where breaks bunched up. Planks with no breaks are a count, never a percentage; there are no break counts and nothing that ranks anyone. Like the counter, these are fun numbers, not tamper-proof ones.
 
 Security, in short:
-- Every table has row-level security: players read and write only their own rows, attempts can't be changed or removed, and the daily counter only moves up by one through `bump_daily`. The counter is open to anyone by design, so treat it as a fun number, not a tamper-proof one.
+- Every table has row-level security: players read and write only their own rows, attempts can't be changed or removed, and the daily counter and its stats only move through `bump_daily`, one plank at a time, which refuses anything out of range (a song over an hour, more than 20 breaks). The counter is open to anyone by design, so treat it as a fun number, not a tamper-proof one.
 - The site ships only the publishable key. Keep the secret key out of `.env`.
 - [public/_headers](public/_headers) sets security headers on Cloudflare Pages: no framing by other sites, no MIME sniffing, and no camera, microphone or location access. It also has `sw.js` checked on every visit (`Cache-Control: no-cache`), so a changed service worker takes effect straight away.
 
@@ -87,6 +88,7 @@ Security, in short:
 | Settings page and its sections | [src/components/settings/](src/components/settings/) |
 | Theme colors, saving and applying themes | [src/lib/palette.ts](src/lib/palette.ts), [src/lib/theme.ts](src/lib/theme.ts) |
 | Page addresses (`#settings/…`, `#ranks`, `#help`) | [src/lib/route.ts](src/lib/route.ts) |
+| How everyone did today | [src/lib/together.ts](src/lib/together.ts), [src/components/Together.tsx](src/components/Together.tsx) |
 | Home screen: app manifest, icons, service worker, the install offer | [public/manifest.webmanifest](public/manifest.webmanifest), [public/sw.js](public/sw.js), [src/lib/install.ts](src/lib/install.ts) |
 
 Rules worth knowing:

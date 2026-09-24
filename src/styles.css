@@ -946,6 +946,33 @@ a {
   color: var(--signal);
 }
 
+/* How everyone did today: under today's song once you've planked it */
+
+.together {
+  display: flex;
+  flex-direction: column;
+}
+
+.together-tough {
+  margin-top: 10px;
+}
+
+/* The song end to end, darker where breaks bunched up. */
+.heat {
+  display: grid;
+  grid-template-columns: repeat(20, minmax(0, 1fr));
+  gap: 1px;
+  height: 8px;
+  max-width: 320px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--well);
+}
+
+.heat > span {
+  background: var(--ink);
+}
+
 /* Keep it on your home screen: a quiet row under today's songs, from the second plank on */
 
 .install-row {

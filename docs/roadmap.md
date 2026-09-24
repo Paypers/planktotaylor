@@ -38,33 +38,17 @@ Adding the site to the home screen (4a) is built: a manifest, icons and a servic
 
 **Size:** 4b medium (the first server-side code), 4c large.
 
-## 5. How everyone did today (+ Discord)
+## 5. Discord
 
-After you finish today's song, show how everyone did, kept friendly.
+How everyone did today (the stats on the daily card once you've planked today's song) is built. They're what the Discord posts share.
 
-**What to show:**
-
-- "412 people planked Style today" (the counter already does this).
-- "Together: 26 hours of planking" (total time held).
-- "148 held it all the way through 🟩": a shout-out given as a count, not a percentage, so people who took a break don't feel like the minority.
-- "Toughest stretch today: around 2:40": where breaks bunched up in the song, drawn as a faint heat strip along the song's bar. Show it as how hard the song is, not as people failing. Only show it once at least 20 people have planked.
-
-**Never show:** a spread of break counts, "you did better than X%", or anything that ranks people.
-
-**Data:**
-
-- Add `no_break int`, `seconds bigint` and `break_slices int[]` (breaks in each 5% of the song) to `daily_counts`.
-- Add a new `bump_daily` that also takes the plank's seconds and break positions, all anonymous. Cap the values: seconds at most 3600, at most 20 break positions. Keep the old one working for tabs that are still open.
-- Signed-out visitors send these too. The README's privacy line ("The only thing sent is the +1") has to change to say anonymous time and break positions go too.
-- Like the counter, these are fun numbers, not tamper-proof ones.
-
-**Discord**, three levels. It's still open which one we want:
+**Discord**, three levels. Level 2 is next ([Part 6](roadmap-parts/part-06-discord-daily-post.md)); level 3 is still open:
 
 1. **Sharing a result**: works now. The text share and the link preview card both show up fine in Discord.
-2. **A daily post in a server** (recommended first). A server admin pastes a Discord webhook URL into the site. Each morning a scheduled function posts "Today's song: Style (3:51) · Plank along: link", and each night today's stats (the friendly version above). There's no bot to host. It uses the same scheduled-function setup as reminders (4b), and the sign-up form needs rate limits.
-3. **A Discord Activity**: the site running inside a voice channel so a group planks to the same song together. This is the big one, and it overlaps with Friends and groups (8). YouTube playing inside Discord is a risk to check first.
+2. **A daily post in a server** (recommended first). A server admin pastes a Discord webhook URL into the site. Each morning a scheduled function posts "Today's song: Style (3:51) · Plank along: link", and each night today's stats, the friendly version from the daily card. There's no bot to host. It uses the same scheduled-function setup as reminders (4b), and the sign-up form needs rate limits.
+3. **A Discord Activity**: the site running inside a voice channel so a group planks to the same song together. This is the big one, and it overlaps with Friends and groups (9). YouTube playing inside Discord is a risk to check first.
 
-**Size:** medium. Discord level 2 is medium on top of that.
+**Size:** Discord level 2 is medium.
 
 ## 6. Aurora lights
 
@@ -146,7 +130,6 @@ The biggest gap: right now nobody on the site can see anyone else.
 
 | # | Feature | Size | Notes |
 | --- | --- | --- | --- |
-| 5 | How everyone did today | Medium | Schema change |
 | 6 | Aurora lights | Medium | Schema change |
 | 7 | Year in review | Medium | Ready by 30 November |
 | 4b | Daily reminders | Medium | First server-side code |

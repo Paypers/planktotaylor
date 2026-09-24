@@ -17,6 +17,7 @@ import {
 import { forgetAttempts, getAttempts, mergeAttempts, onAttemptEnded, type AttemptKind, type AttemptOutcome } from './attempts'
 import { applyPrefs, getData, onPlankRecorded, onPrefsChanged, replaceProgress } from './store'
 import { accountThemes, applyAccountThemes, onThemeSaved, readSaved, type AccountThemes } from './theme'
+import { readStats, type DailyStats } from './together'
 
 // The project address, without the /rest/v1/ the dashboard shows on the end (it breaks sign-in).
 const url = (import.meta.env.VITE_SUPABASE_URL as string | undefined)
@@ -508,17 +509,29 @@ export async function removeAvatar() {
   await saveProfile({ avatar_url: null })
 }
 
-/** How many people finished today's global song. Null when accounts aren't configured. */
-export async function fetchDailyCount(day: DayKey): Promise<number | null> {
+// Until schema.sql has been run for how everyone did today, the database has only the count: these
+// errors mean "not there yet", and the count alone is used as before.
+const MISSING_COLUMN = '42703'
+const MISSING_FUNCTION = 'PGRST202'
+
+/** How many people planked today's song, and how everyone did. Null when accounts aren't configured. */
+export async function fetchDailyStats(day: DayKey): Promise<DailyStats | null> {
   if (!accountsEnabled) return null
-  const { data, error } = await (await client()).from('daily_counts').select('planks').eq('day', day).maybeSingle()
-  if (error) return null
-  return data?.planks ?? 0
+  const supabase = await client()
+  const { data, error } = await supabase.from('daily_counts').select('planks, no_break, seconds, break_slices').eq('day', day).maybeSingle()
+  if (!error) return readStats(data)
+  if (error.code !== MISSING_COLUMN) return null
+  const counted = await supabase.from('daily_counts').select('planks').eq('day', day).maybeSingle()
+  return counted.error ? null : readStats(counted.data)
 }
 
-export async function bumpDailyCount(day: DayKey): Promise<number | null> {
+/** The +1 on today's count, with the song's length and where the breaks fell. Nothing that says who. */
+export async function bumpDailyStats(day: DayKey, seconds: number, breaks: number[]): Promise<DailyStats | null> {
   if (!accountsEnabled) return null
-  const { data, error } = await (await client()).rpc('bump_daily', { p_day: day })
-  if (error) return null
-  return data as number
+  const supabase = await client()
+  const { data, error } = await supabase.rpc('bump_daily', { p_day: day, p_seconds: Math.round(seconds), p_breaks: breaks })
+  if (!error) return readStats(data)
+  if (error.code !== MISSING_FUNCTION) return null
+  const counted = await supabase.rpc('bump_daily', { p_day: day })
+  return counted.error ? null : readStats({ planks: counted.data })
 }

@@ -9,7 +9,7 @@ To build one, hand Claude the file: *"Build docs/roadmap-parts/part-01-quick-win
 | Part | Builds | Size | Needs first | Schema change | Notes | Done |
 | --- | --- | --- | --- | --- | --- | --- |
 | [1](part-01-quick-wins.md) | Chimes, your ghost, streak freezes, add to home screen | 4 small | | No | Test on a real iPhone after | ✓ |
-| [2](part-02-everyone-today.md) | How everyone did today | Medium | | Yes | | |
+| [2](part-02-everyone-today.md) | How everyone did today | Medium | | Yes | | ✓ |
 | [3](part-03-aurora-lights.md) | Aurora lights | Medium | 1 | Yes | | |
 | [4](part-04-year-in-review.md) | Year in review | Medium | 1, 3 | No | **Ready by 30 November** | |
 | [5](part-05-daily-reminders.md) | Daily reminders | Medium | 1 | Yes | First server code; two checks before building | |

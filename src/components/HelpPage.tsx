@@ -72,6 +72,15 @@ export function HelpPage() {
         </dd>
         <dt>Again</dt>
         <dd>Plank today's song as many times as you like after that. The first go is the one that keeps your streak.</dd>
+        {accountsEnabled && (
+          <>
+            <dt>Everyone</dt>
+            <dd>
+              Once you've planked it, see how everyone did today: how many planked it, the time held together, how many
+              held it all the way through, and, once enough people have planked, where the song gets toughest.
+            </dd>
+          </>
+        )}
       </Topic>
 
       <Topic id="ladder" title="The ladder">
@@ -113,8 +122,9 @@ export function HelpPage() {
           <Topic id="account" title="Your account">
             <dt>Without one</dt>
             <dd>
-              Everything works without an account. Your progress stays in this browser; the only thing sent is an
-              anonymous +1 to today's count when you plank today's song.
+              Everything works without an account. Your progress stays in this browser. The only thing sent is today's
+              anonymous count when you plank today's song: a +1, the song's length and where you took breaks, with
+              nothing that says who.
             </dd>
             <dt>Signed in</dt>
             <dd>

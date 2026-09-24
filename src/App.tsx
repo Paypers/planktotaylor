@@ -16,8 +16,9 @@ import { Setlist } from './components/Setlist'
 import { ShareDialog } from './components/ShareDialog'
 import { LadderProgress, SongLine, SongRow } from './components/SongRow'
 import { StreakPanel } from './components/StreakPanel'
+import { Together } from './components/Together'
 import { LADDER, type Song } from './data/songs'
-import { accountsEnabled, bumpDailyCount, displayName, fetchDailyCount, saveLadderCursor, useAccount } from './lib/account'
+import { accountsEnabled, bumpDailyStats, displayName, fetchDailyStats, saveLadderCursor, useAccount } from './lib/account'
 import { fromDayKey } from './lib/dates'
 import { useToday } from './lib/hooks'
 import { dailyView, ladderView, songFor, streakDays, type Completion, type Pause } from './lib/progress'
@@ -27,6 +28,7 @@ import { playerRank, rankName } from './lib/ranks'
 import { plankSummary, type ShareInput } from './lib/share'
 import { getData, recordPlank, setLadderLevel, useAppData } from './lib/store'
 import { streakInfo } from './lib/streaks'
+import { breakSlots, type DailyStats } from './lib/together'
 import { plankXp, totalXp } from './lib/xp'
 
 const SETTINGS: Route = { page: 'settings', section: null }
@@ -37,7 +39,8 @@ export function App() {
   const { user, profile } = useAccount()
   const [session, setSession] = useState<PlankSession | null>(null)
   const [dialog, setDialog] = useState<'music' | 'account' | null>(null)
-  const [dailyCount, setDailyCount] = useState<number | null>(null)
+  // Today's count, and how everyone did: shown once you've planked today's song.
+  const [dailyStats, setDailyStats] = useState<DailyStats | null>(null)
   const [restarting, setRestarting] = useState(false)
   // The setlist level whose details are open.
   const [levelInfo, setLevelInfo] = useState<number | null>(null)
@@ -82,11 +85,20 @@ export function App() {
   const lastClimb = ladder.climbedToday.at(-1)
   const climbedXp = totalXp(data.completions.filter((c) => c.day === today && ladder.climbedToday.some((l) => l.at === c.at)))
 
+  // The numbers move all day: fetched on load, and again on coming back to the site a while later.
   useEffect(() => {
     let live = true
-    void fetchDailyCount(today).then((n) => live && setDailyCount(n))
+    let fetchedAt = 0
+    const load = () => {
+      fetchedAt = Date.now()
+      void fetchDailyStats(today).then((stats) => live && setDailyStats(stats))
+    }
+    const onVisible = () => document.visibilityState === 'visible' && Date.now() - fetchedAt > 60_000 && load()
+    load()
+    document.addEventListener('visibilitychange', onVisible)
     return () => {
       live = false
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [today])
 
@@ -122,7 +134,7 @@ export function App() {
       const result = recordPlank(song, pauses, earningXp)
       const counted = result.added
       if (counted.some((c) => c.mode === 'daily')) {
-        void bumpDailyCount(today).then((n) => n !== null && setDailyCount(n))
+        void bumpDailyStats(today, song.seconds, breakSlots(pauses, song.seconds)).then((stats) => stats && setDailyStats(stats))
       }
       const now = getData()
       const after = ladderView(now, today)
@@ -269,9 +281,10 @@ export function App() {
                 onAgain={() => start({ song: daily.song, label: "Today's song · extra credit", kind: 'extra' })}
               >
                 {dailyDone && <p className="row-note">{plankSummary(dailyDone.pauses ?? [], dailyDone.seconds)}</p>}
-                {dailyCount !== null && dailyCount > 0 && (
+                {dailyStats && dailyStats.planks > 0 && dailyDone && <Together stats={dailyStats} song={daily.song} />}
+                {dailyStats && dailyStats.planks > 0 && !dailyDone && (
                   <p className="row-note">
-                    {dailyCount.toLocaleString()} {dailyCount === 1 ? 'person has' : 'people have'} planked it today
+                    {dailyStats.planks.toLocaleString()} {dailyStats.planks === 1 ? 'person has' : 'people have'} planked it today
                   </p>
                 )}
                 {twofer && <p className="row-note signal">It's also your ladder level: one plank counts for both.</p>}

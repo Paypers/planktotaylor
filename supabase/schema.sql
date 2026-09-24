@@ -33,7 +33,8 @@ create table if not exists public.plank_profiles (
   avatar_url text,
   -- Music and sound: { "music": bool, "sounds": bool, "updatedAt": when last changed }.
   prefs jsonb check (octet_length(prefs::text) <= 1024),
-  -- Themes: { "selected": ..., "themes": [...], "updatedAt": ... }, as the site saves them in the browser.
+  -- Custom themes: { "themes": [...], "updatedAt": ... }. Which theme shows is each device's own choice, so it
+  -- stays in the browser. (Copies saved before that also have a "selected", which the site ignores.)
   theme jsonb check (octet_length(theme::text) <= 65536)
 );
 -- For databases created before names and photos, and before settings.
@@ -145,6 +146,58 @@ $$;
 
 revoke all on function public.bump_daily(date) from public;
 grant execute on function public.bump_daily(date) to anon, authenticated;
+
+-- How everyone did today, shown once you've planked today's song: the time held together, how many
+-- held it with no breaks, and where in the song breaks bunched up (20 slots, each 5% of the song).
+-- Anonymous like the counter, and a fun number like it too: nothing here says who.
+alter table public.daily_counts add column if not exists no_break int not null default 0;
+alter table public.daily_counts add column if not exists seconds bigint not null default 0;
+alter table public.daily_counts add column if not exists break_slices int[] not null default array_fill(0, array[20]);
+
+-- The +1, with how the plank went: the song's length in seconds, and each break's slot (0 to 19), at
+-- most 20 of them. Returns the day's new totals. bump_daily(p_day) above stays for tabs opened before this.
+create or replace function public.bump_daily(p_day date, p_seconds int, p_breaks int[])
+returns public.daily_counts
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  breaks int[] := coalesce(p_breaks, '{}');
+  slots int[] := array_fill(0, array[20]);
+  slot int;
+  totals public.daily_counts;
+begin
+  if p_day < current_date - 1 or p_day > current_date + 1 then
+    raise exception 'day out of range';
+  end if;
+  if p_seconds is null or p_seconds < 1 or p_seconds > 3600 then
+    raise exception 'seconds out of range';
+  end if;
+  if cardinality(breaks) > 20 then
+    raise exception 'too many breaks';
+  end if;
+  foreach slot in array breaks loop
+    if slot is null or slot < 0 or slot > 19 then
+      raise exception 'break out of range';
+    end if;
+    slots[slot + 1] := slots[slot + 1] + 1;
+  end loop;
+
+  insert into public.daily_counts (day) values (p_day) on conflict (day) do nothing;
+  update public.daily_counts d set
+    planks = d.planks + 1,
+    no_break = d.no_break + (case when cardinality(breaks) = 0 then 1 else 0 end),
+    seconds = d.seconds + p_seconds,
+    break_slices = array(select coalesce(d.break_slices[i], 0) + slots[i] from generate_series(1, 20) as i order by i)
+  where d.day = p_day
+  returning d.* into totals;
+  return totals;
+end;
+$$;
+
+revoke all on function public.bump_daily(date, int, int[]) from public;
+grant execute on function public.bump_daily(date, int, int[]) to anon, authenticated;
 
 -- Limits on what a player can store, so nobody can fill the database through their own rows.
 -- "not valid" checks new and changed rows only, so older rows never stop this script.
