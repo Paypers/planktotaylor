@@ -66,6 +66,12 @@ export function App() {
   const ladder = ladderView(data, today)
   const days = useMemo(() => streakDays(data.completions), [data.completions])
   const streak = streakInfo(days, today)
+  const streakTitle = [
+    streak.doneToday ? 'Streak safe today' : "Plank today's song to keep your streak",
+    streak.current > 0 && `${streak.freezesLeft} ${streak.freezesLeft === 1 ? 'freeze' : 'freezes'} left this month`,
+  ]
+    .filter(Boolean)
+    .join(' · ')
   const twofer = !ladder.finished && ladder.song?.id === daily.song.id
   // XP is for signed-in players only.
   const earningXp = accountsEnabled && user !== null
@@ -165,7 +171,7 @@ export function App() {
             <span>Plank to Taylor</span>
           </a>
           <nav className="header-actions" aria-label="Account and settings">
-            <span className="streak-pill" title={streak.doneToday ? 'Streak safe today' : "Plank today's song to keep your streak"}>
+            <span className="streak-pill" title={streakTitle}>
               <Flame size={20} lit={streak.doneToday} />
               <span className="streak-pill-num">{streak.current}</span>
               <span className="sr-only">-day streak</span>

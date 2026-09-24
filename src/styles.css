@@ -1048,6 +1048,30 @@ a {
   line-height: 24px;
 }
 
+/* Streak freezes: how many are left this month, by the streak, and a note the morning after one's used */
+
+.streak-freezes {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-bottom: 6px;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 22px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.streak-saved {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-2);
+}
+
 /* A quiet by-the-way: without an account, progress lives in this browser only */
 
 .save-note {
@@ -1118,8 +1142,11 @@ a {
     font-size: 112px;
     line-height: 100px;
   }
-  .streak-unit {
+  .streak-unit,
+  .streak-freezes {
     padding-bottom: 8px;
+  }
+  .streak-unit {
     font-size: 17px;
   }
   .facts {
@@ -1228,6 +1255,20 @@ a {
   height: 7px;
   border: 1.5px solid var(--ink-2);
   border-radius: 50%;
+}
+
+/* A missed day a freeze covered: the streak carried on through it. */
+.day.frozen {
+  background: var(--well);
+}
+
+.day.climbed.frozen::after {
+  content: none;
+}
+
+.day-frozen {
+  align-self: flex-end;
+  display: inline-flex;
 }
 
 .day.today {

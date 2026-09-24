@@ -3,7 +3,7 @@ import { ALBUMS, formatDuration } from '../data/songs'
 import { addDays, fromDayKey, type DayKey } from '../lib/dates'
 import { songFor, totalSeconds, type Completion } from '../lib/progress'
 import type { PlayerRank } from '../lib/ranks'
-import { runLengths, type StreakInfo } from '../lib/streaks'
+import { streakRuns, type StreakInfo } from '../lib/streaks'
 import { Flame, Icon } from './Icon'
 import { RankBar } from './Rank'
 import { SaveNote } from './SaveNote'
@@ -34,9 +34,19 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 export function StreakPanel({ completions, days, streak, today, onSignIn, rank, onHistory }: Props) {
   const message = streak.doneToday
     ? 'Safe for today. See you tomorrow.'
-    : streak.atRisk
-      ? "Plank today's song to keep it going."
-      : "Plank today's song to start one."
+    : streak.lastChance
+      ? "Plank today's song to keep it going. A freeze can't cover today."
+      : streak.atRisk
+        ? "Plank today's song to keep it going."
+        : "Plank today's song to start one."
+  // The morning after a freeze kept the streak alive, say so, quietly.
+  const yesterday = addDays(today, -1)
+  const saved =
+    streak.current === 0 || !streak.frozen.has(yesterday)
+      ? null
+      : streak.frozen.has(addDays(today, -2))
+        ? 'Freezes saved your streak the last two days.'
+        : 'A freeze saved your streak yesterday.'
 
   return (
     <section className="section grid" aria-labelledby="streak-heading">
@@ -51,8 +61,21 @@ export function StreakPanel({ completions, days, streak, today, onSignIn, rank, 
             <Flame size={22} lit={streak.doneToday} />
             day streak
           </span>
+          {streak.current > 0 && (
+            <span className="streak-freezes" title="Streak freezes left this month">
+              <Icon name="snowflake" size={18} />
+              {streak.freezesLeft} left
+              <span className="sr-only"> {streak.freezesLeft === 1 ? 'freeze' : 'freezes'} this month</span>
+            </span>
+          )}
         </div>
         <p className="streak-msg">{message}</p>
+        {saved && (
+          <p className="streak-saved">
+            <Icon name="snowflake" size={16} />
+            {saved}
+          </p>
+        )}
         {onSignIn && completions.length > 0 && <SaveNote onSignIn={onSignIn} className="streak-save" />}
         {rank && <RankBar rank={rank} linked />}
         <dl className="facts">
@@ -70,7 +93,7 @@ export function StreakPanel({ completions, days, streak, today, onSignIn, rank, 
         </div>
       </div>
       <div className="streak-calendar">
-        <Calendar completions={completions} days={days} today={today} />
+        <Calendar completions={completions} days={days} frozen={streak.frozen} today={today} />
       </div>
     </section>
   )
@@ -78,10 +101,18 @@ export function StreakPanel({ completions, days, streak, today, onSignIn, rank, 
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
-function Calendar({ completions, days, today }: { completions: Completion[]; days: ReadonlySet<DayKey>; today: DayKey }) {
+interface CalendarProps {
+  completions: Completion[]
+  days: ReadonlySet<DayKey>
+  /** Missed days a freeze covered. */
+  frozen: ReadonlySet<DayKey>
+  today: DayKey
+}
+
+function Calendar({ completions, days, frozen, today }: CalendarProps) {
   const [month, setMonth] = useState(() => today.slice(0, 7))
   const [selected, setSelected] = useState<DayKey>(today)
-  const runs = useMemo(() => runLengths(days), [days])
+  const runs = useMemo(() => streakRuns(days, today), [days, today])
   const byDay = useMemo(() => {
     const map = new Map<DayKey, Completion[]>()
     for (const c of completions) map.set(c.day, [...(map.get(c.day) ?? []), c])
@@ -132,9 +163,17 @@ function Calendar({ completions, days, today }: { completions: Completion[]; day
           const song = streakDay && planks ? songFor(planks[0]) : undefined
           const album = song && ALBUMS[song.album]
           // The flame and count sit on the last day of each run of two or more days.
-          const run = runs.get(day) ?? 0
-          const runEnd = run >= 2 && !days.has(addDays(day, 1))
-          const classes = ['day', streakDay && 'planked', planks && !streakDay && 'climbed', day === today && 'today', day === selected && 'selected']
+          const run = runs.lengths.get(day) ?? 0
+          const runEnd = run >= 2 && runs.ends.has(day)
+          const froze = frozen.has(day)
+          const classes = [
+            'day',
+            streakDay && 'planked',
+            planks && !streakDay && 'climbed',
+            froze && 'frozen',
+            day === today && 'today',
+            day === selected && 'selected',
+          ]
           const date = fromDayKey(day).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })
           return (
             <button
@@ -145,9 +184,14 @@ function Calendar({ completions, days, today }: { completions: Completion[]; day
               onClick={() => setSelected(day)}
               disabled={day > today}
               aria-pressed={day === selected}
-              aria-label={`${date}${streakDay ? ", planked today's song" : planks ? ', ladder levels only' : ''}${runEnd ? `, end of a ${run}-day streak` : ''}${day === today ? ', today' : ''}`}
+              aria-label={`${date}${streakDay ? ", planked today's song" : planks ? ', ladder levels only' : ''}${froze ? ', a freeze kept the streak' : ''}${runEnd ? `, end of a ${run}-day streak` : ''}${day === today ? ', today' : ''}`}
             >
               <span>{Number(day.slice(8))}</span>
+              {froze && (
+                <span className="day-frozen">
+                  <Icon name="snowflake" size={12} />
+                </span>
+              )}
               {runEnd && (
                 <span className="day-run">
                   <Icon name="flame" size={12} filled />
@@ -160,8 +204,9 @@ function Calendar({ completions, days, today }: { completions: Completion[]; day
       </div>
       <div className="calendar-detail" aria-live="polite">
         <strong>{fromDayKey(selected).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</strong>
+        {frozen.has(selected) && <p>A freeze kept your streak going.</p>}
         {selectedPlanks.length === 0 ? (
-          <p>{selected === today ? 'Nothing yet today.' : 'Rest day.'}</p>
+          !frozen.has(selected) && <p>{selected === today ? 'Nothing yet today.' : 'Rest day.'}</p>
         ) : (
           selectedPlanks.map((c) => {
             const planked = songFor(c)

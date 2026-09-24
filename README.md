@@ -4,7 +4,7 @@ Hold a plank for one Taylor Swift song a day.
 
 - **Today's song**: one random song per calendar day, the same for everyone (like Wordle). Songs are dealt from a shuffled deck, so all 243 come up before any repeat.
 - **Your ladder**: the whole catalog sorted shortest to longest. Level 1 is *I Look in People's Windows* (2:11). The last level is *All Too Well (10 Minute Version)* (10:13). Climb as many levels a day as you like.
-- **Streaks**: planking today's song keeps your streak. Ladder levels don't count towards it. You get a 🔥 streak, a calendar where each planked day is colored by that song's album, and your best streak, total planks and total time.
+- **Streaks**: planking today's song keeps your streak. Ladder levels don't count towards it. Miss a day and a streak freeze covers it (3 a month, used automatically). You get a 🔥 streak, a calendar where each planked day is colored by that song's album, and your best streak, total planks and total time.
 - **Music**: the song's album track (Taylor's Version where there is one) plays from YouTube on the plank screen, starting when the countdown hits zero.
 - **No sign-up needed**: progress is saved in the browser. Signing in (optional) syncs it across devices.
 - **Themes**: System (follows the device), Light and Dark, plus your own. The ⚙ in the header opens Settings → Appearance, where you can make and save as many color themes as you like.
@@ -76,7 +76,7 @@ Security, in short:
 | --- | --- |
 | Song catalog, album colors, ladder order | [src/data/songs.ts](src/data/songs.ts) |
 | Daily song (seeded shuffle per cycle) | [src/lib/daily.ts](src/lib/daily.ts) |
-| Streak math | [src/lib/streaks.ts](src/lib/streaks.ts) |
+| Streak math and freezes | [src/lib/streaks.ts](src/lib/streaks.ts) |
 | Recording planks, ladder, merge rules | [src/lib/progress.ts](src/lib/progress.ts) |
 | Browser storage | [src/lib/store.ts](src/lib/store.ts) |
 | Supabase sign-in + sync | [src/lib/account.ts](src/lib/account.ts) |
@@ -89,7 +89,8 @@ Security, in short:
 
 Rules worth knowing:
 - Days are the visitor's **local** calendar day, for the daily song and for streaks.
-- A streak stays alive until the end of the day after you last planked today's song. The 🔥 in the header is grey until you've planked today's song.
+- Today only counts as missed once it's over: the 🔥 in the header is grey until you've planked today's song.
+- **Streak freezes** (in [src/lib/streaks.ts](src/lib/streaks.ts)): 3 each calendar month, refilled on the 1st, unused ones don't carry over. A missed day uses one automatically while a streak is alive, charged to the month of that day. They cover at most 2 missed days in a row: a third ends the streak, freezes left or not. A frozen day keeps the streak but doesn't add to it (10 days, a frozen day, then a plank makes 11). They're worked out from the planked days alone, so nothing extra is stored or synced. The calendar marks frozen days with a snowflake, the Streak section shows how many are left, and the morning after one's used it says so. Freezes can't be bought with XP.
 - Climb as many ladder levels a day as you like (each song once a day). Only today's song keeps the streak; the calendar fills in those days and marks ladder-only days with a small ring. If today's song happens to be your ladder level, one plank counts for both.
 - **XP** (signed-in players only, in [src/lib/xp.ts](src/lib/xp.ts)): a point for every second of song. No breaks: +50%. No breaks on a song over 6 minutes: double. Breaks never cost anything. XP is paid once per plank: today's song earns it every day, a ladder level the first time it's climbed. Doing either again earns nothing, except that the first go held with no breaks, after only goes with breaks, earns the no-break bonus. Signed out, the finished screen says what a plank would have earned.
 - **Ranks** (in [src/lib/ranks.ts](src/lib/ranks.ts)): each is a bigger piece of writing than the last: Scribble, Couplet, Verse, Sonnet, Ballad, Chapter and Anthology, each with four divisions (IV to I), then Manuscript, Masterpiece and Magnum Opus. XP moves you through the divisions (Scribble III at 500 XP, Sonnet IV at 39,000). Each new tier also needs a ladder level: Couplet level 10, Verse 25, Sonnet 50, Ballad 100, Chapter 150, Anthology 200. Until you reach it, you stay at I and see what it takes. Manuscript needs every level climbed; Masterpiece and Magnum Opus need every level held with no breaks at least once.

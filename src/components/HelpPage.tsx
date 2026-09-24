@@ -61,8 +61,14 @@ export function HelpPage() {
         <dd>Everyone gets the same song each day, by their own calendar. New releases take the spot on their release day.</dd>
         <dt>Your streak</dt>
         <dd>
-          Plank today's song to keep your streak going. It lasts until the end of the day after you last planked it,
-          and the flame in the header lights up once today's is done. Ladder levels don't count towards it.
+          Plank today's song to keep your streak going. The flame in the header lights up once today's is done. Ladder
+          levels don't count towards it.
+        </dd>
+        <dt>Freezes</dt>
+        <dd>
+          Miss a day and a freeze covers it, so your streak carries on. You get 3 a month, used automatically, and they
+          refill on the 1st. A frozen day keeps your streak but doesn't add to it. Freezes cover two days in a row at
+          most: miss a third and your streak starts again.
         </dd>
         <dt>Again</dt>
         <dd>Plank today's song as many times as you like after that. The first go is the one that keeps your streak.</dd>

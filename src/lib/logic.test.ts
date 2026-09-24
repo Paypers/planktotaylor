@@ -5,7 +5,7 @@ import { addDays, daysBetween } from './dates'
 import { applyPlank, emptyData, ladderRecords, ladderView, mergeCompletions, newerCursor, newerSettings, streakDays, type Completion } from './progress'
 import { isVideoId, normalizeTitle, parseIsoDuration, pickVideo, videoSongName, type VideoCandidate } from './match'
 import { pauseLabel, plankBar, plankHeadline, plankSegments, plankSummary } from './share'
-import { runLengths, streakInfo } from './streaks'
+import { streakInfo, streakRuns } from './streaks'
 import { plankXp, rankFor, totalXp } from './xp'
 
 describe('catalog', () => {
@@ -99,25 +99,77 @@ describe('daily song', () => {
 describe('streaks', () => {
   const today = '2026-09-22'
   const set = (...days: string[]) => new Set(days)
+  /** Every day from `from` to `to`, except `skip`. */
+  const span = (from: string, to: string, ...skip: string[]) => {
+    const days = new Set<string>()
+    for (let day = from; day <= to; day = addDays(day, 1)) if (!skip.includes(day)) days.add(day)
+    return days
+  }
 
   it('counts a streak that includes today', () => {
     expect(streakInfo(set('2026-09-20', '2026-09-21', today), today)).toMatchObject({ current: 3, doneToday: true, atRisk: false })
   })
 
   it("keeps yesterday's streak alive until today ends", () => {
-    expect(streakInfo(set('2026-09-20', '2026-09-21'), today)).toMatchObject({ current: 2, doneToday: false, atRisk: true })
+    const info = streakInfo(set('2026-09-20', '2026-09-21'), today)
+    expect(info).toMatchObject({ current: 2, doneToday: false, atRisk: true, lastChance: false, freezesLeft: 3 })
+    expect(info.frozen.size).toBe(0)
   })
 
-  it('resets after a missed day but remembers the best run', () => {
-    const info = streakInfo(set('2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04', '2026-09-20'), today)
+  it("covers a missed day with a freeze: it keeps the streak but doesn't add to it", () => {
+    // Ten days, a day off, then today: 11.
+    const info = streakInfo(span('2026-09-11', today, '2026-09-21'), today)
+    expect(info).toMatchObject({ current: 11, best: 11, freezesLeft: 2 })
+    expect([...info.frozen]).toEqual(['2026-09-21'])
+  })
+
+  it('covers two missed days in a row, and a third ends the streak even with freezes left', () => {
+    const four = span('2026-09-01', '2026-09-04')
+    const twoOff = streakInfo(four, '2026-09-07')
+    expect(twoOff).toMatchObject({ current: 4, atRisk: true, lastChance: true, freezesLeft: 1 })
+    expect([...twoOff.frozen]).toEqual(['2026-09-05', '2026-09-06'])
+    expect(streakInfo(four, '2026-09-08')).toMatchObject({ current: 0, best: 4, atRisk: false })
+  })
+
+  it('resets after three missed days in a row, and remembers the best run', () => {
+    const info = streakInfo(set('2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04', '2026-09-10'), today)
     expect(info.current).toBe(0)
     expect(info.best).toBe(4)
   })
 
-  it('reports run lengths for the calendar', () => {
-    const runs = runLengths(set('2026-09-01', '2026-09-02', '2026-09-05'))
-    expect(runs.get('2026-09-01')).toBe(2)
-    expect(runs.get('2026-09-05')).toBe(1)
+  it('gives 3 freezes a month and refills them on the 1st', () => {
+    // Three days off in October use them all; the fourth ends the streak.
+    const october = streakInfo(span('2026-10-01', '2026-10-25', '2026-10-05', '2026-10-10', '2026-10-15', '2026-10-20'), '2026-10-25')
+    expect(october).toMatchObject({ current: 5, best: 16, freezesLeft: 0 })
+    // With no freezes left, missing today would end it.
+    expect(streakInfo(span('2026-10-01', '2026-10-24', '2026-10-05', '2026-10-10', '2026-10-15'), '2026-10-25')).toMatchObject({
+      atRisk: true,
+      lastChance: true,
+    })
+    // November starts with 3 again.
+    const november = streakInfo(span('2026-10-01', '2026-11-03', '2026-10-05', '2026-10-10', '2026-10-15', '2026-11-01'), '2026-11-03')
+    expect(november).toMatchObject({ current: 30, freezesLeft: 2 })
+  })
+
+  it('charges each missed day to its own month', () => {
+    // 30 September and 1 October off: one freeze from each month.
+    const across = streakInfo(span('2026-09-01', '2026-10-04', '2026-09-30', '2026-10-01'), '2026-10-04')
+    expect(across).toMatchObject({ current: 32, freezesLeft: 2 })
+    // September's are gone by the 30th, so that day ends it, October's freezes or not.
+    const spent = streakInfo(span('2026-09-01', '2026-10-03', '2026-09-05', '2026-09-10', '2026-09-15', '2026-09-30'), '2026-10-03')
+    expect(spent).toMatchObject({ current: 3, best: 26, freezesLeft: 3 })
+  })
+
+  it('counts runs across frozen days for the calendar', () => {
+    // 3 and 4 September frozen: 1, 2 and 5 are one run. The 6th takes the last freeze, the 7th ends it.
+    // The 9th starts again, and with no freezes left the 10th ends that one.
+    const { lengths, ends } = streakRuns(set('2026-09-01', '2026-09-02', '2026-09-05', '2026-09-09'), '2026-09-12')
+    expect(Object.fromEntries(lengths)).toEqual({ '2026-09-01': 3, '2026-09-02': 3, '2026-09-05': 3, '2026-09-09': 1 })
+    expect([...ends]).toEqual(['2026-09-05', '2026-09-09'])
+  })
+
+  it('has nothing to say before the first plank', () => {
+    expect(streakInfo(set(), today)).toMatchObject({ current: 0, best: 0, atRisk: false, lastChance: false, freezesLeft: 3 })
   })
 })
 
