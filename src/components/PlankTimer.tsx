@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { ALBUMS, LADDER, formatDuration, type Song } from '../data/songs'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
+import { ALBUMS, LADDER, formatDuration, type Album, type Song } from '../data/songs'
 import { useWakeLock } from '../lib/hooks'
 import type { Completion, Pause, PlankResult, Prefs } from '../lib/progress'
 import type { PlayerRank } from '../lib/ranks'
 import { pausedSeconds, plankHeadline } from '../lib/share'
 import { beginAttempt, endAttempt, getAttempts, ghostFor, saveAttemptProgress, type AttemptKind, type AttemptOutcome } from '../lib/attempts'
+import { LIGHT_SHOW_MS, LIGHT_SIZE, lightTimes, placeLight, type Box } from '../lib/lights'
 import { sounds, unlockAudio } from '../lib/sound'
 import { getData } from '../lib/store'
-import { MARATHON_SECONDS, type XpAward } from '../lib/xp'
+import { LIGHT_XP, MARATHON_SECONDS, type XpAward } from '../lib/xp'
 import { youtubeUrl } from '../lib/youtube'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Confetti } from './Confetti'
@@ -53,6 +54,9 @@ export interface FinishXp {
   kind: PlankResult['kind']
   /** Holding this song with no breaks would still earn the no-break bonus. */
   bonusLeft: boolean
+  /** Aurora lights caught, and the part of the XP they paid (or would have, signed out). */
+  lights: number
+  lightXp: number
   /** Your rank before and after this plank: a climb can move it as well as XP. */
   rankBefore: PlayerRank
   rankAfter: PlayerRank
@@ -63,12 +67,16 @@ export interface PlankShare {
   song: Song
   pauses: Pause[]
   counted: Completion[]
+  /** Aurora lights caught. */
+  lights: number
 }
 
 interface Props {
   session: PlankSession
   prefs: Prefs
-  onFinish: (song: Song, pauses: Pause[]) => FinishSummary
+  /** Signed in: planks earn XP, lights included. */
+  earningXp: boolean
+  onFinish: (song: Song, pauses: Pause[], lights: number) => FinishSummary
   onShare: (plank: PlankShare) => void
   onClose: () => void
   /** Set when accounts are on and nobody's signed in. */
@@ -124,7 +132,7 @@ function coachLine(elapsed: number, total: number): string {
   return 'Elbows under shoulders. Squeeze everything.'
 }
 
-export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignIn, onNext }: Props) {
+export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClose, onSignIn, onNext }: Props) {
   const { song } = session
   const album = ALBUMS[song.album]
   const total = song.seconds * 1000
@@ -167,6 +175,27 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
   const passedGhostRef = useRef(false)
   /** "Past your best!" in place of the coach line, for a moment. */
   const [cheering, setCheering] = useState(false)
+  // Aurora lights: when each one appears (song time), the one showing, and how many have been caught.
+  const lightPlan = useRef<number[]>([])
+  const nextLight = useRef(0)
+  const [light, setLightState] = useState<ShownLight | null>(null)
+  const lightRef = useRef<ShownLight | null>(null)
+  const showLight = (next: ShownLight | null) => {
+    lightRef.current = next
+    setLightState(next)
+  }
+  const [caught, setCaught] = useState(0)
+  const caughtRef = useRef(0)
+  /** "+5 ✨" rising from where each light was caught. */
+  const [sparks, setSparks] = useState<ShownLight[]>([])
+  const root = useRef<HTMLDivElement>(null)
+  // Lights pay only on a plank that pays XP anyway: today's song, or a ladder level the first time.
+  const [lightsPay] = useState(
+    () =>
+      earningXp &&
+      (session.kind === 'daily' ||
+        (session.kind === 'ladder' && !getData().completions.some((c) => c.mode === 'ladder' && c.songId === song.id))),
+  )
   /** Why a plank ended early: shown on the quit screen. */
   const [endReason, setEndReason] = useState<'gave-up' | 'offline' | 'left'>('gave-up')
   /** The attempt on the record, from the moment the plank begins until it ends, however it ends. */
@@ -250,6 +279,12 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
     passedGhostRef.current = false
     setPassedGhost(false)
     setCheering(false)
+    lightPlan.current = prefs.lights ? lightTimes(total) : []
+    nextLight.current = 0
+    showLight(null)
+    caughtRef.current = 0
+    setCaught(0)
+    setSparks([])
     anchor.current = { pos: 0, at: performance.now() }
     clock.current = { startedAt: performance.now(), banked: 0 }
     setElapsed(0)
@@ -266,8 +301,44 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
     setPhase('done')
     if (prefs.sounds) sounds.finish()
     navigator.vibrate?.([200, 100, 200])
-    setSummary(onFinish(song, pausesRef.current))
+    setSummary(onFinish(song, pausesRef.current, caughtRef.current))
   }, [onFinish, prefs.sounds, song, total, setPhase])
+
+  /**
+   * Each frame of song: a light that's glowed long enough goes, and the next one comes when its time
+   * does. One whose moment passed unseen (a background tab) is skipped, and so is one with nowhere to go.
+   */
+  const lightTick = (ms: number) => {
+    const shown = lightRef.current
+    if (shown && ms > shown.at + LIGHT_SHOW_MS) showLight(null)
+    const plan = lightPlan.current
+    if (lightRef.current || nextLight.current >= plan.length || ms < plan[nextLight.current]) return
+    while (nextLight.current < plan.length && ms > plan[nextLight.current] + LIGHT_SHOW_MS) nextLight.current++
+    if (nextLight.current >= plan.length || ms < plan[nextLight.current]) return
+    const at = plan[nextLight.current++]
+    const spot = findLightSpot(root.current)
+    if (!spot) return
+    showLight({ id: at, at, ...spot })
+    if (prefs.sounds) sounds.light()
+  }
+  const lightTickRef = useRef(lightTick)
+  lightTickRef.current = lightTick
+
+  const catchLight = () => {
+    const shown = lightRef.current
+    if (!shown) return
+    caughtRef.current++
+    setCaught(caughtRef.current)
+    setSparks((all) => [...all, shown])
+    setTimeout(() => setSparks((all) => all.filter((s) => s.id !== shown.id)), 1400)
+    showLight(null)
+    navigator.vibrate?.(30)
+  }
+
+  // A light only shows while the song plays: a break (or the end) and it's gone.
+  useEffect(() => {
+    if (phase !== 'running') showLight(null)
+  }, [phase])
 
   // The song drives the timer: playing, pausing (even from the video itself) and ending all carry over.
   events.current = {
@@ -358,6 +429,7 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
         setCheering(true)
         if (prefs.sounds) sounds.pastBest()
       }
+      lightTickRef.current(ms)
       const secondsLeft = Math.ceil((total - ms) / 1000)
       if (secondsLeft <= 3 && secondsLeft < lastBeep.current) {
         lastBeep.current = secondsLeft
@@ -545,7 +617,8 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
   }[phase]
 
   return (
-    <div className="plank" role="dialog" aria-modal="true" aria-label={`Plank to ${song.title}`}>
+    <div ref={root} className="plank" role="dialog" aria-modal="true" aria-label={`Plank to ${song.title}`}>
+      {prefs.lights && <Aurora album={album} on={phase === 'running'} />}
       <div className="plank-inner">
         <div className="plank-top">
           <p className="plank-label">{session.label}</p>
@@ -555,7 +628,7 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
         </div>
 
         {phase === 'done' && summary ? (
-          <DoneView song={song} summary={summary} pauses={pauses} onSignIn={onSignIn} onNext={onNext} />
+          <DoneView song={song} summary={summary} pauses={pauses} lights={caught} onSignIn={onSignIn} onNext={onNext} />
         ) : (
           <div className="plank-body">
             <div className="plank-song">
@@ -599,6 +672,17 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
             <p className="plank-coach" aria-live="polite">
               {coach}
             </p>
+            {prefs.lights && phase === 'ready' && (
+              <p className="plank-lights-note">
+                ✨ Lights will appear as you plank: tap one to catch it. Put your phone at least an arm's length away, so
+                catching one means lifting an arm.
+              </p>
+            )}
+            {prefs.lights && caught > 0 && phase !== 'ready' && (
+              <p className="plank-lights-caught" aria-live="polite">
+                ✨ {caught}
+              </p>
+            )}
           </div>
         )}
 
@@ -653,7 +737,7 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
           )}
           {phase === 'done' && summary && (
             <>
-              <button type="button" className="btn btn-secondary btn-lg" onClick={() => onShare({ song, pauses, counted: summary.counted })}>
+              <button type="button" className="btn btn-secondary btn-lg" onClick={() => onShare({ song, pauses, counted: summary.counted, lights: caught })}>
                 Share
               </button>
               <button type="button" className="btn btn-primary btn-lg" onClick={onClose} autoFocus>
@@ -679,6 +763,26 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
           plank history.
         </p>
       </ConfirmDialog>
+
+      {light && (
+        <button
+          type="button"
+          className="aurora-light"
+          style={{ left: light.x, top: light.y, '--glow': album.color, '--glow-ink': album.ink } as CSSProperties}
+          // The tap is the light's alone: it never reaches the video or anything under it.
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation()
+            catchLight()
+          }}
+          aria-label="Catch the light"
+        />
+      )}
+      {sparks.map((spark) => (
+        <span key={spark.id} className="aurora-spark" style={{ left: spark.x, top: spark.y }} aria-hidden="true">
+          {lightsPay ? `+${LIGHT_XP} ✨` : '✨'}
+        </span>
+      ))}
     </div>
   )
 }
@@ -687,12 +791,15 @@ function DoneView({
   song,
   summary,
   pauses,
+  lights,
   onSignIn,
   onNext,
 }: {
   song: Song
   summary: FinishSummary
   pauses: Pause[]
+  /** Aurora lights caught. Only ever shown when there were some. */
+  lights: number
   onSignIn?: () => void
   onNext: (session: PlankSession) => void
 }) {
@@ -742,12 +849,17 @@ function DoneView({
       <p className="done-text">{text}</p>
 
       <PlankReceipt seconds={song.seconds} pauses={pauses} />
+      {lights > 0 && (
+        <p className="done-lights">
+          ✨ {lights} {lights === 1 ? 'light' : 'lights'} caught
+        </p>
+      )}
 
       {xp?.earned ? (
         <XpEarned xp={xp} seconds={song.seconds} rankedUp={rankedUp} />
       ) : xp?.kind === 'new' && onSignIn ? (
         <p className="save-note done-save">
-          This plank would have earned {xp.award.total.toLocaleString()} XP.{' '}
+          This plank would have earned {(xp.award.total + xp.lightXp).toLocaleString()} XP.{' '}
           <button type="button" className="text-btn" onClick={onSignIn}>
             Sign in
           </button>{' '}
@@ -797,7 +909,8 @@ function XpEarned({ xp, seconds, rankedUp }: { xp: FinishXp; seconds: number; ra
         : award.kind === 'clean'
           ? `+${award.bonus.toLocaleString()} no-break bonus`
           : `Go again with no breaks for the ${bonusName}.`
-    detail = `${award.base.toLocaleString()} for ${formatDuration(seconds)} of song · ${how}`
+    const lit = xp.lightXp > 0 ? ` · +${xp.lightXp.toLocaleString()} for ${xp.lights} ${xp.lights === 1 ? 'light' : 'lights'} ✨` : ''
+    detail = `${award.base.toLocaleString()} for ${formatDuration(seconds)} of song · ${how}${lit}`
   }
   return (
     <section className="done-xp" aria-label="XP earned">
@@ -812,6 +925,40 @@ function XpEarned({ xp, seconds, rankedUp }: { xp: FinishXp; seconds: number; ra
       )}
       <RankBar rank={rank} />
     </section>
+  )
+}
+
+interface ShownLight {
+  id: number
+  /** When it appeared, in ms of song. */
+  at: number
+  x: number
+  y: number
+}
+
+/**
+ * Somewhere for a light on screen: within the plank's column, clear of the top bar, the timer, the
+ * video and the buttons.
+ */
+function findLightSpot(plank: HTMLElement | null): { x: number; y: number } | null {
+  const column = plank?.querySelector('.plank-inner')?.getBoundingClientRect()
+  if (!plank || !column) return null
+  const margin = 12
+  const area: Box = { left: column.left + margin, top: margin, right: column.right - margin, bottom: window.innerHeight - margin }
+  const avoid: Box[] = [...plank.querySelectorAll('.plank-top, .plank-clock, .plank-music, .plank-actions')]
+    .map((el) => el.getBoundingClientRect())
+    .filter((r) => r.width > 0 && r.height > 0)
+  return placeLight(area, avoid, LIGHT_SIZE)
+}
+
+/** The aurora: soft light in the album's colour drifting behind the plank while the song plays. */
+function Aurora({ album, on }: { album: Album; on: boolean }) {
+  return (
+    <div className={`aurora${on ? ' on' : ''}`} style={{ '--aurora': album.color, '--aurora-ink': album.ink } as CSSProperties} aria-hidden="true">
+      <span />
+      <span />
+      <span />
+    </div>
   )
 }
 

@@ -73,6 +73,8 @@ export async function renderShareCard(share: ShareInput): Promise<Blob> {
   }
 
   text(ctx, plankHeadline(share.daily, share.level), left, 628, `600 76px ${DISPLAY}`, COLOR.ink)
+  // Aurora lights caught, beside the headline. Never the ones missed.
+  if (share.lights) text(ctx, `✨ ${share.lights}`, right, 624, `600 44px ${SANS}`, COLOR.ink2, 'right')
 
   // The song, as a tracklist row: sleeve, title over album, length on the right.
   const rowTop = 690

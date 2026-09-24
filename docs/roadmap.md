@@ -50,33 +50,6 @@ How everyone did today (the stats on the daily card once you've planked today's 
 
 **Size:** Discord level 2 is medium.
 
-## 6. Aurora lights
-
-The bridge-challenge idea without the leg lifts, which nobody can check. Tapping the screen is something the site can actually see.
-
-**How it plays:**
-
-- While the song plays (not during the countdown or a break), a soft aurora drifts behind the plank screen in the song's album colors. Under reduced motion it's a still glow.
-- Every so often a light appears: first after 30 seconds, then every 40–70 seconds at random. It shows up at a random spot away from the video and the buttons, glows for about 6 seconds, and plays a soft chime so you know to look.
-- Tap it to catch it: "+5 ✨". A 3½-minute song has about 3; All Too Well (10 Minute Version) about 12. Maximum 12 per plank.
-- **Rule on the screen and in the help:** put your phone at least an arm's length away, so catching a light means lifting an arm off the floor. People who put it right next to them get a few extra XP, which doesn't matter.
-- Missing a light costs nothing and is never shown anywhere. Only lights you caught appear, for example "✨ 3" on the finished screen and share card.
-- Settings → Plank: a switch for lights, on by default. With it off, no lights appear and no light XP is earned.
-
-**XP:**
-
-- 5 per light (`LIGHT_XP` in [xp.ts](../src/lib/xp.ts)). That's about 5% of a plank, so it stays a small extra.
-- Only paid on a plank that pays XP anyway (today's song each day, a ladder level the first time) and only if it's finished. Practice goes still show lights, just for fun, so nobody can farm them.
-- Signed out: the finished screen says what they would have earned, as it does now.
-
-**Build notes:**
-
-- Tapping a light must not pause the video or count as a break: stop the tap from reaching the video, and keep lights well away from it. Make each light at least 64px.
-- Add `lights int` (0–50) to `plank_completions`.
-- The current limit `xp <= 2 * seconds` refuses a no-break 6-minute-plus plank with any lights. Change it to `xp <= 2 * seconds + 5 * lights` and keep the 5 in step with `LIGHT_XP`.
-
-**Size:** medium.
-
 ## 7. Year in review
 
 Like Spotify Wrapped: slides you tap through, each with its own share card.
@@ -130,7 +103,6 @@ The biggest gap: right now nobody on the site can see anyone else.
 
 | # | Feature | Size | Notes |
 | --- | --- | --- | --- |
-| 6 | Aurora lights | Medium | Schema change |
 | 7 | Year in review | Medium | Ready by 30 November |
 | 4b | Daily reminders | Medium | First server-side code |
 | 5 | Discord daily post | Medium | Uses the same server setup as 4b |

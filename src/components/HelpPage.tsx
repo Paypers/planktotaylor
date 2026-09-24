@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { LADDER } from '../data/songs'
 import { accountsEnabled } from '../lib/account'
 import { followLink, hashFor, RANKS } from '../lib/route'
+import { LIGHT_XP } from '../lib/xp'
 import { PageTop } from './PageTop'
 
 /** One topic: its name in the left column on wide screens, the rules beside it. */
@@ -56,6 +57,28 @@ export function HelpPage() {
         </dd>
       </Topic>
 
+      <Topic id="lights" title="Aurora lights">
+        <dt>Catching them</dt>
+        <dd>
+          While the song plays, soft light drifts behind the timer, and every so often a light appears with a soft chime.
+          Tap it to catch it. Put your phone at least an arm's length away, so catching one means lifting an arm off the
+          floor.
+        </dd>
+        {accountsEnabled && (
+          <>
+            <dt>What they're worth</dt>
+            <dd>
+              {LIGHT_XP} XP each, on a plank that earns XP: today's song, or a ladder level the first time, once you've
+              held it to the end. Practice and extra goes have lights too, just for fun.
+            </dd>
+          </>
+        )}
+        <dt>Missing one</dt>
+        <dd>Costs nothing, and is never shown anywhere. Only the lights you catch are counted.</dd>
+        <dt>Turning them off</dt>
+        <dd>In Settings, under Plank. Off, there are no lights and no light XP.</dd>
+      </Topic>
+
       <Topic id="daily" title="Today's song">
         <dt>The same for everyone</dt>
         <dd>Everyone gets the same song each day, by their own calendar. New releases take the spot on their release day.</dd>
@@ -106,7 +129,7 @@ export function HelpPage() {
             <dt>XP</dt>
             <dd>
               Signed in, every plank earns XP: a point for every second of song, with a bonus for holding it with no
-              breaks. Today's song pays every day, a ladder level the first time you climb it. Going again pays nothing,
+              breaks, and {LIGHT_XP} for each aurora light you catch. Today's song pays every day, a ladder level the first time you climb it. Going again pays nothing,
               unless it's your first go with no breaks after goes with breaks: that earns the bonus.
             </dd>
             <dt>Ranks</dt>

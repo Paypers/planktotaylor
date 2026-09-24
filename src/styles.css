@@ -2500,6 +2500,8 @@ a {
 }
 
 .plank-inner {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   max-width: 560px;
@@ -2696,6 +2698,172 @@ a {
   gap: 12px;
   margin-top: auto;
   padding-top: 24px;
+}
+
+/* Aurora lights: soft light in the album's colour drifting behind the plank while the song plays, and
+   now and then a light to catch. Faint enough that the timer always reads first. */
+
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1.2s ease;
+}
+
+.aurora.on {
+  opacity: 1;
+}
+
+.aurora > span {
+  position: absolute;
+  width: 110vmax;
+  height: 70vmax;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--aurora) 44%, transparent), transparent);
+  animation: aurora-drift 28s ease-in-out infinite alternate;
+}
+
+/* A deeper band, so pale album colours still show on a pale page. */
+.aurora > span:nth-child(2) {
+  background: radial-gradient(closest-side, color-mix(in srgb, color-mix(in srgb, var(--aurora), var(--aurora-ink) 22%) 40%, transparent), transparent);
+}
+
+.aurora > span:nth-child(1) {
+  top: -35vmax;
+  left: -40vmax;
+}
+
+.aurora > span:nth-child(2) {
+  top: 5vmax;
+  right: -55vmax;
+  opacity: 0.75;
+  animation-duration: 36s;
+  animation-delay: -12s;
+}
+
+.aurora > span:nth-child(3) {
+  bottom: -45vmax;
+  left: -20vmax;
+  opacity: 0.6;
+  animation-duration: 44s;
+  animation-delay: -20s;
+}
+
+@keyframes aurora-drift {
+  to {
+    transform: translate3d(14vmax, 9vmax, 0) rotate(16deg) scale(1.15);
+  }
+}
+
+.aurora-light {
+  position: fixed;
+  z-index: 3;
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  animation:
+    light-in 0.6s ease-out,
+    light-glow 1.4s ease-in-out 0.6s infinite alternate;
+}
+
+/* The light itself, inside its 72px target: the album's colour with a bright centre, a thin ring in the
+   album's text colour (so it shows on any page, pale album or dark), and a glow around it. */
+.aurora-light::before {
+  content: '';
+  position: absolute;
+  inset: 10px;
+  border: 2px solid color-mix(in srgb, var(--glow-ink) 50%, transparent);
+  border-radius: 50%;
+  background: radial-gradient(circle at 42% 40%, #fff 0 16%, color-mix(in srgb, var(--glow) 50%, #fff) 34%, var(--glow) 72%);
+  box-shadow:
+    0 0 20px 6px color-mix(in srgb, var(--glow) 60%, transparent),
+    0 0 44px 16px color-mix(in srgb, var(--glow) 28%, transparent);
+}
+
+@keyframes light-in {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+
+@keyframes light-glow {
+  to {
+    transform: scale(1.08);
+  }
+}
+
+/* "+5 ✨" rising from a caught light. */
+.aurora-spark {
+  position: fixed;
+  z-index: 3;
+  width: 72px;
+  pointer-events: none;
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 72px;
+  color: var(--ink);
+  text-align: center;
+  white-space: nowrap;
+  animation: spark-rise 1.4s ease-out forwards;
+}
+
+@keyframes spark-rise {
+  to {
+    opacity: 0;
+    transform: translateY(-56px);
+  }
+}
+
+.plank-lights-note {
+  margin-top: 12px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-2);
+}
+
+.plank-lights-caught {
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--ink-2);
+}
+
+.done-lights {
+  margin-top: 12px;
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--ink-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora > span,
+  .aurora-light {
+    animation: none;
+  }
+  .aurora-spark {
+    animation: spark-fade 1.4s ease-out forwards;
+  }
+}
+
+@keyframes spark-fade {
+  to {
+    opacity: 0;
+  }
 }
 
 /* The plank receipt: the song to scale, broken where you paused */

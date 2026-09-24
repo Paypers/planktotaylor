@@ -103,7 +103,7 @@ export function App() {
   }, [today])
 
   // Opens the share box for one plank: what it counted for, how it went, and the streak.
-  const sharePlank = ({ song, pauses, counted }: PlankShare, day = today) => {
+  const sharePlank = ({ song, pauses, counted, lights }: PlankShare, day = today) => {
     setSharing({
       dailyNumber: dailyNumber(day),
       day,
@@ -113,6 +113,7 @@ export function App() {
       daily: counted.some((c) => c.mode === 'daily'),
       level: counted.find((c) => c.mode === 'ladder')?.level,
       pauses,
+      lights: lights || undefined,
     })
   }
 
@@ -121,17 +122,18 @@ export function App() {
     const song = songFor(completion)
     if (!song) return
     const counted = getData().completions.filter((c) => c.day === completion.day && c.at === completion.at)
-    sharePlank({ song, pauses: completion.pauses ?? [], counted }, completion.day)
+    const lights = counted.reduce((sum, c) => sum + (c.lights ?? 0), 0)
+    sharePlank({ song, pauses: completion.pauses ?? [], counted, lights }, completion.day)
   }
 
   const dailyDone = data.completions.find((c) => c.mode === 'daily' && c.day === today)
 
   const finish = useCallback(
-    (song: Song, pauses: Pause[]): FinishSummary => {
+    (song: Song, pauses: Pause[], lights: number): FinishSummary => {
       const rankBefore = playerRank(getData().completions)
       // Any plank of your ladder level moves you up, a redone one included.
       const climbing = ladderView(getData(), today).song?.id === song.id
-      const result = recordPlank(song, pauses, earningXp)
+      const result = recordPlank(song, pauses, earningXp, lights)
       const counted = result.added
       if (counted.some((c) => c.mode === 'daily')) {
         void bumpDailyStats(today, song.seconds, breakSlots(pauses, song.seconds)).then((stats) => stats && setDailyStats(stats))
@@ -152,6 +154,8 @@ export function App() {
             gained: result.gained,
             kind: result.kind,
             bonusLeft: result.bonusLeft,
+            lights,
+            lightXp: result.lightXp,
             rankBefore,
             rankAfter: playerRank(now.completions),
           }
@@ -381,6 +385,7 @@ export function App() {
           key={`${session.song.id}-${session.label}`}
           session={session}
           prefs={data.prefs}
+          earningXp={earningXp}
           onFinish={finish}
           onShare={(plank) => sharePlank(plank)}
           onClose={() => setSession(null)}

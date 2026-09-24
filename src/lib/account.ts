@@ -89,6 +89,7 @@ interface CompletionRow {
   completed_at: string
   pauses: Pause[] | null
   xp: number | null
+  lights?: number | null
 }
 
 const toRow = (userId: string, c: Completion): CompletionRow => ({
@@ -101,6 +102,8 @@ const toRow = (userId: string, c: Completion): CompletionRow => ({
   completed_at: c.at,
   pauses: c.pauses ?? null,
   xp: c.xp ?? null,
+  // Left off when there are none, so planks still save to a database that hasn't had the column added.
+  ...(c.lights ? { lights: c.lights } : {}),
 })
 
 const fromRow = (row: CompletionRow): Completion => ({
@@ -113,6 +116,7 @@ const fromRow = (row: CompletionRow): Completion => ({
   at: new Date(row.completed_at).toISOString(),
   ...(row.pauses?.length ? { pauses: row.pauses } : {}),
   ...(row.xp != null ? { xp: row.xp } : {}),
+  ...(row.lights ? { lights: row.lights } : {}),
 })
 
 async function fetchAllCompletions(supabase: SupabaseClient): Promise<Completion[]> {
@@ -121,7 +125,7 @@ async function fetchAllCompletions(supabase: SupabaseClient): Promise<Completion
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabase
       .from('plank_completions')
-      .select('user_id, day, mode, song_id, level, seconds, completed_at, pauses, xp')
+      .select('*')
       .order('day')
       .range(from, from + pageSize - 1)
     if (error) throw error
@@ -177,6 +181,7 @@ function readPrefs(value: unknown, fallback: Prefs): Prefs | null {
   return {
     music: typeof v.music === 'boolean' ? v.music : fallback.music,
     sounds: typeof v.sounds === 'boolean' ? v.sounds : fallback.sounds,
+    lights: typeof v.lights === 'boolean' ? v.lights : fallback.lights,
     ...(typeof v.updatedAt === 'string' ? { updatedAt: v.updatedAt } : {}),
   }
 }

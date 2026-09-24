@@ -1,7 +1,7 @@
 import { LADDER, SONG_BY_ID, type Song } from '../data/songs'
 import { dailyNumber, dailySong } from './daily'
 import type { DayKey } from './dates'
-import { plankXp, totalXp, type XpAward } from './xp'
+import { LIGHT_XP, plankXp, totalXp, type XpAward } from './xp'
 
 export type Mode = 'daily' | 'ladder'
 
@@ -28,6 +28,8 @@ export interface Completion {
    * carries its XP on the first record only.
    */
   xp?: number
+  /** Aurora lights caught, on the same record as the XP. Absent when none were. */
+  lights?: number
 }
 
 export interface LadderCursor {
@@ -39,6 +41,8 @@ export interface LadderCursor {
 export interface Prefs {
   music: boolean
   sounds: boolean
+  /** Aurora lights on the plank screen. Settings saved before there were lights don't have it: on. */
+  lights: boolean
   /** When they were last changed, on any device. Absent until they are: the account's copy wins. */
   updatedAt?: string
 }
@@ -55,7 +59,7 @@ export function emptyData(): AppData {
     v: 1,
     completions: [],
     ladder: { level: 1, updatedAt: new Date(0).toISOString() },
-    prefs: { music: true, sounds: true },
+    prefs: { music: true, sounds: true, lights: true },
   }
 }
 
@@ -112,6 +116,8 @@ export interface PlankResult {
   updated: Completion[]
   /** XP this plank actually earned: 0 signed out, and 0 for a replay with nothing left to earn. */
   gained: number
+  /** The part of it for aurora lights, or what they would have earned signed out. */
+  lightXp: number
   /**
    * new      counted for something (today's song, or a ladder level)
    * upgrade  a replay held straight through after a go with breaks: earns the no-break bonus
@@ -130,6 +136,9 @@ export interface PlankResult {
  * earns it the first time it's climbed. Doing either again earns nothing, with one exception: if
  * every earlier go had breaks, holding it straight through earns the no-break bonus, once.
  * A two-for-one carries its XP on the first record only.
+ *
+ * Aurora lights caught (`lights`) pay LIGHT_XP each, but only where the plank pays in full: today's
+ * song, or a ladder level the first time it's climbed. Never on a replay, so nobody can farm them.
  */
 export function applyPlank(
   data: AppData,
@@ -138,6 +147,7 @@ export function applyPlank(
   at: string,
   pauses: Pause[] = [],
   earnXp = false,
+  lights = 0,
 ): PlankResult {
   const award = plankXp(song.seconds, pauses)
   const daily = dailyView(data, today)
@@ -159,13 +169,16 @@ export function applyPlank(
     const left = added.some((c) => c.mode === 'daily')
       ? { xp: award.total, bonusLeft: award.kind === 'held' }
       : ladderXpLeft(data.completions, song.id, award)
-    const gained = earnXp ? left.xp : 0
-    if (gained > 0) added[0] = { ...added[0], xp: gained }
+    const firstTime = added.some((c) => c.mode === 'daily') || !data.completions.some((c) => c.mode === 'ladder' && c.songId === song.id)
+    const lightXp = firstTime ? lights * LIGHT_XP : 0
+    const gained = earnXp ? left.xp + lightXp : 0
+    added[0] = { ...added[0], ...(gained > 0 ? { xp: gained } : {}), ...(lights > 0 ? { lights } : {}) }
     return {
       data: { ...next, completions: [...data.completions, ...added] },
       added,
       updated: [],
       gained,
+      lightXp,
       kind: 'new',
       bonusLeft: left.bonusLeft,
     }
@@ -174,7 +187,7 @@ export function applyPlank(
   // A go that counts for nothing new: today's song again, or practice on a ladder level already climbed.
   const target = upgradeTarget(data.completions, song.id, today)
   const gain = target && earnXp && award.kind !== 'held' ? award.total - totalXp(target) : 0
-  if (gain <= 0) return { data: next, added: [], updated: [], gained: 0, kind: 'repeat', bonusLeft: target !== null }
+  if (gain <= 0) return { data: next, added: [], updated: [], gained: 0, lightXp: 0, kind: 'repeat', bonusLeft: target !== null }
 
   // Held straight through this time: that earlier plank becomes the clean one, with the bonus added
   // to whichever of its records carries the XP.
@@ -190,6 +203,7 @@ export function applyPlank(
     added: [],
     updated,
     gained: gain,
+    lightXp: 0,
     kind: 'upgrade',
     bonusLeft: false,
   }

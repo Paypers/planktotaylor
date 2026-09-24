@@ -6,7 +6,7 @@ import { applyPlank, emptyData, ladderRecords, ladderView, mergeCompletions, new
 import { isVideoId, normalizeTitle, parseIsoDuration, pickVideo, videoSongName, type VideoCandidate } from './match'
 import { pauseLabel, plankBar, plankHeadline, plankSegments, plankSummary } from './share'
 import { streakInfo, streakRuns } from './streaks'
-import { plankXp, rankFor, totalXp } from './xp'
+import { LIGHT_XP, plankXp, rankFor, totalXp } from './xp'
 
 describe('catalog', () => {
   it('has unique ids and sane lengths', () => {
@@ -302,6 +302,43 @@ describe('replays and XP', () => {
     const [merged] = mergeCompletions(first.data.completions, straight.data.completions)
     expect(merged).toMatchObject({ xp: clean.total })
     expect(merged.pauses).toBeUndefined()
+  })
+})
+
+describe('aurora lights', () => {
+  const today = '2026-09-22'
+  const t = (n: number) => `2026-09-22T12:0${n}:00.000Z`
+  const daily = dailySong(today)
+  const clean = plankXp(daily.seconds, [])
+
+  it("pay 5 XP each on today's song, on the record that carries the XP", () => {
+    const first = applyPlank(emptyData(), daily, today, t(0), [], true, 3)
+    expect(first).toMatchObject({ kind: 'new', gained: clean.total + 3 * LIGHT_XP, lightXp: 3 * LIGHT_XP })
+    expect(first.added[0]).toMatchObject({ xp: clean.total + 15, lights: 3 })
+    // Within the database's limit: 2 × seconds, plus 5 a light.
+    expect(first.added[0].xp!).toBeLessThanOrEqual(2 * daily.seconds + LIGHT_XP * 3)
+  })
+
+  it('pay on a ladder level the first time, and never on a later go or a replay', () => {
+    const song = LADDER[0]
+    const first = applyPlank(emptyData(), song, today, t(0), [], true, 2)
+    expect(first.lightXp).toBe(2 * LIGHT_XP)
+    // Back from the top of the ladder: level 1 again, but it's paid for already.
+    const restarted = { ...first.data, ladder: { level: 1, updatedAt: t(1) } }
+    const second = applyPlank(restarted, song, '2026-09-23', t(2), [], true, 4)
+    expect(second.lightXp).toBe(0)
+    expect(second.added[0].lights).toBe(4)
+    // Today's song again: nothing for lights either.
+    const once = applyPlank(emptyData(), daily, today, t(3), [], true)
+    expect(applyPlank(once.data, daily, today, t(4), [], true, 5)).toMatchObject({ kind: 'repeat', gained: 0, lightXp: 0 })
+  })
+
+  it('say what they would have earned signed out, and leave no trace when none were caught', () => {
+    const signedOut = applyPlank(emptyData(), daily, today, t(0), [], false, 2)
+    expect(signedOut).toMatchObject({ gained: 0, lightXp: 2 * LIGHT_XP })
+    expect(signedOut.added[0].xp).toBeUndefined()
+    expect(signedOut.added[0].lights).toBe(2)
+    expect(applyPlank(emptyData(), daily, today, t(0), [], true).added[0]).not.toHaveProperty('lights')
   })
 })
 

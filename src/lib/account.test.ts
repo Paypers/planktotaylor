@@ -145,6 +145,8 @@ describe('account sync', () => {
     await vi.waitFor(() => expect(theme.getTheme().themes).toMatchObject([{ id: 'midnight', name: 'Midnight' }]))
     expect(theme.getTheme().selected).toBe('system')
     expect(store.getData().prefs.music).toBe(false)
+    // Saved before there were aurora lights: they're on.
+    expect(store.getData().prefs.lights).toBe(true)
   })
 
   it('saves settings changed while signed in to the account, and sends nothing while signed out', async () => {

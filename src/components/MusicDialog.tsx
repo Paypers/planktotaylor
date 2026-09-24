@@ -14,7 +14,7 @@ export function MusicDialog({ open, prefs, onClose }: { open: boolean; prefs: Pr
       </label>
       <label className="switch-row">
         <input type="checkbox" checked={prefs.sounds} onChange={(e) => setPrefs({ sounds: e.target.checked })} />
-        <span>Countdown and finish beeps</span>
+        <span>Beeps and chimes: the countdown, halfway, the last 30 seconds and the finish</span>
       </label>
 
       <div className="dialog-section">

@@ -9,6 +9,11 @@ export const CLEAN_BONUS = 0.5
 /** Without a break on a song this long or longer (Dear John, Last Kiss, All Too Well (10 Minute Version)): double. */
 export const MARATHON_SECONDS = 6 * 60
 export const MARATHON_BONUS = 1
+/**
+ * Each aurora light caught, on a plank that pays XP anyway: about 5% of a plank, a small extra.
+ * schema.sql's limit on a plank's XP allows for it (xp <= 2 * seconds + 5 * lights): keep the two in step.
+ */
+export const LIGHT_XP = 5
 /** Getting from rank n to n + 1 takes this × n XP: rank 2 at 500, rank 3 at 1,500, rank 5 at 5,000, rank 10 at 22,500. */
 export const RANK_STEP = 500
 

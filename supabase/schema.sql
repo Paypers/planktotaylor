@@ -15,11 +15,14 @@ create table if not exists public.plank_completions (
   pauses jsonb,
   -- XP the plank earned. A plank that counted twice carries it on one row only.
   xp int check (xp is null or xp >= 0),
+  -- Aurora lights caught, on the same row as the XP. Null = none.
+  lights int check (lights is null or lights between 0 and 50),
   primary key (user_id, day, mode, song_id)
 );
--- For databases created before pauses, XP, and more than one ladder level a day.
+-- For databases created before pauses, XP, more than one ladder level a day, and aurora lights.
 alter table public.plank_completions add column if not exists pauses jsonb;
 alter table public.plank_completions add column if not exists xp int check (xp is null or xp >= 0);
+alter table public.plank_completions add column if not exists lights int check (lights is null or lights between 0 and 50);
 alter table public.plank_completions drop constraint if exists plank_completions_pkey;
 alter table public.plank_completions add primary key (user_id, day, mode, song_id);
 
@@ -201,11 +204,13 @@ grant execute on function public.bump_daily(date, int, int[]) to anon, authentic
 
 -- Limits on what a player can store, so nobody can fill the database through their own rows.
 -- "not valid" checks new and changed rows only, so older rows never stop this script.
+-- The most a plank can earn is double its seconds (no breaks on a 6-minute-plus song), plus 5 for each
+-- aurora light caught: that 5 is LIGHT_XP in src/lib/xp.ts, so keep the two in step.
 alter table public.plank_completions drop constraint if exists plank_completions_limits;
 alter table public.plank_completions add constraint plank_completions_limits check (
   char_length(song_id) <= 100
   and seconds <= 3600
-  and (xp is null or xp <= 2 * seconds)
+  and (xp is null or xp <= 2 * seconds + 5 * coalesce(lights, 0))
   and (pauses is null or (jsonb_typeof(pauses) = 'array' and octet_length(pauses::text) <= 20000))
 ) not valid;
 
