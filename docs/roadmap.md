@@ -14,63 +14,13 @@ To build them, use [the roadmap in parts](roadmap-parts/README.md): the same fea
 
 ---
 
-## 1. Chimes at halfway and 30 seconds left (quick win)
+## 4. Daily reminders, then an app
 
-The plank screen already shows "Past halfway. Breathe." and "Last 30 seconds!", but your face is to the floor, so you can't see them.
-
-- Add two tones to [sound.ts](../src/lib/sound.ts), `halfway` and `lastThirty`. They should sound different from the countdown `tick`.
-- In the plank screen's tick loop ([PlankTimer.tsx](../src/components/PlankTimer.tsx), next to the final-3-seconds beeps), play each tone once per plank, the first time it's crossed. Only when `prefs.sounds` is on.
-
-**Size:** small.
-
-## 2. Streak freezes
-
-Right now a single missed day ends a streak. Freezes make it a little more forgiving without letting people coast.
-
-**Rules** (constants, so they're easy to tune, the way [xp.ts](../src/lib/xp.ts) works):
-
-- **3 freezes each calendar month.** They refill on the 1st, and unused ones don't carry over.
-- **Used automatically.** Missing today's song on a day while a streak is alive uses one freeze, charged to the month of the missed day.
-- **At most 2 missed days in a row.** A third missed day in a row ends the streak, even with freezes left. A weekend away is fine; a week off isn't.
-- **Frozen days keep the streak but don't add to it.** A 10-day streak, then a frozen day, then a plank makes 11.
-- Ladder-only days count as missed days, the same as now: only today's song keeps the streak.
-- Freezes can't be bought with XP. Spending XP would lower someone's rank, which would be confusing.
-
-**How to build it:**
-
-- Freezes can be worked out entirely from the list of planked days, so there's nothing new to store or sync. Rewrite `streakInfo` and `runLengths` in [streaks.ts](../src/lib/streaks.ts) to go through the days in order, from the first plank to yesterday. Keep each month's freezes left and the count of missed days in a row. Return the current streak, best streak, frozen days, and freezes left this month.
-- Today isn't missed until it's over. So the streak shows as "at risk" (grey 🔥) the same as now, and the header can add "❄️ 2 left".
-- On the calendar, a frozen day shows ❄️. The morning after a freeze is used, show a quiet note: "A freeze saved your streak yesterday."
-- The streak number in the share card and text includes frozen days the same way (they keep it alive, they don't add to it).
-- The site launched on 2026-09-22, so working freezes into older history changes almost nothing.
-- Add tests next to the current streak tests in [logic.test.ts](../src/lib/logic.test.ts): the monthly refill, the 2-in-a-row limit, a month boundary in the middle of a gap, and the best streak with freezes.
-
-**Size:** small.
-
-## 3. Your ghost
-
-Every attempt already records how far it got (`reached` in [attempts.ts](../src/lib/attempts.ts), in the browser and in the account). Use that to show your own best on a song you haven't finished yet.
-
-- On the plank screen, put a small marker on the progress bar at the furthest point from earlier attempts on this song that you ended yourself (`gave-up` or `stopped`). Skip `left` and `offline`, since those weren't your choice. Label it "Your best: 1:48".
-- When you pass it, play a chime and show "Past your best!" for a moment.
-- Once you've finished the song, stop showing the ghost for it.
-- The daily song only comes round again after 243 days, so this mostly helps with ladder levels and retries of today's song. Beginners stuck on level 1 (2:11) get the most out of it: a failed attempt now counts as progress.
-- No schema change.
-
-**Size:** small.
-
-## 4. Add to home screen, then daily reminders, then an app
-
-### 4a. Installable (do first)
-
-- Add `public/manifest.webmanifest`. It needs the name, `short_name`, `start_url: "/"`, `display: "standalone"`, theme and background colors matching the light theme, and icons at 192, 512 and a 512 maskable. Also add `apple-touch-icon` and the `apple-mobile-web-app-*` meta tags in [index.html](../index.html).
-- Add a small service worker. Load the page itself fresh from the network first so new deploys show up straight away, and cache the built assets. In [_headers](../public/_headers), set `Cache-Control: no-cache` on `sw.js`.
-- Add an "Add to home screen" prompt. Android/Chrome: catch `beforeinstallprompt` and show our own button. iPhone: show "Share → Add to Home Screen" steps. Show it after someone's second or third plank, not on their first visit.
-- **Test on a real iPhone once installed.** YouTube playback, the tap-to-play fallback, and keeping the screen awake all need checking in home-screen mode, since older iOS versions had bugs there.
+Adding the site to the home screen (4a) is built: a manifest, icons and a service worker.
 
 ### 4b. Daily reminder
 
-- Uses Web Push. On iPhone it only works once the site is added to the home screen (iOS 16.4 and later), which is another reason to do 4a first.
+- Uses Web Push. On iPhone it only works once the site is added to the home screen (iOS 16.4 and later).
 - **Settings → Reminders:** a switch and a time. Optional second switch: an evening nudge on days you haven't planked yet, only when your streak is 3 or more. Default is one reminder a day. Nagging makes people turn notifications off.
 - **Start with signed-in players only.** The server can then skip anyone who has already planked today's song. Reminders also give people a reason to sign in.
 - **Pieces:**
@@ -86,7 +36,7 @@ Every attempt already records how far it got (`reached` in [attempts.ts](../src/
 - **Capacitor** wraps this same site as an iOS and Android app with real push notifications. It also makes a home-screen widget possible (today's song and your streak), which is native code. Android alone could go out sooner as a TWA through Bubblewrap.
 - **Check before building:** Apple's rules on using someone else's name and work (guideline 5.2). An app with "Taylor" in the name that's built around her songs could be rejected, and Google has similar rules. Apple also rejects apps that are only a website in a wrapper (4.2), so push and widgets help there. Apple's developer account is $99 a year, Google's is $25 once.
 
-**Size:** 4a small, 4b medium (the first server-side code), 4c large.
+**Size:** 4b medium (the first server-side code), 4c large.
 
 ## 5. How everyone did today (+ Discord)
 
@@ -196,10 +146,6 @@ The biggest gap: right now nobody on the site can see anyone else.
 
 | # | Feature | Size | Notes |
 | --- | --- | --- | --- |
-| 1 | Halfway and 30-second chimes | Small | |
-| 2 | Streak freezes | Small | Nothing new to store |
-| 3 | Your ghost | Small | Nothing new to store |
-| 4a | Add to home screen | Small | Test on a real iPhone |
 | 5 | How everyone did today | Medium | Schema change |
 | 6 | Aurora lights | Medium | Schema change |
 | 7 | Year in review | Medium | Ready by 30 November |

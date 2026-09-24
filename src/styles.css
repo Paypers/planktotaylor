@@ -946,6 +946,52 @@ a {
   color: var(--signal);
 }
 
+/* Keep it on your home screen: a quiet row under today's songs, from the second plank on */
+
+.install-row {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.install-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.install-title {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.install-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+}
+
+.inline-icon {
+  vertical-align: -3px;
+}
+
+@media (min-width: 760px) {
+  .install-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 24px 0;
+  }
+  .install-actions {
+    flex-shrink: 0;
+  }
+}
+
 @media (min-width: 760px) {
   .song-row {
     grid-template-columns: 72px minmax(0, 1fr) 72px 148px;

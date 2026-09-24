@@ -4,6 +4,7 @@ import { Avatar } from './components/Avatar'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { HistoryDialog } from './components/HistoryDialog'
 import { HelpPage } from './components/HelpPage'
+import { InstallNote } from './components/InstallNote'
 import { Flame, Icon, StarMark } from './components/Icon'
 import { LevelDialog } from './components/LevelDialog'
 import { MusicDialog } from './components/MusicDialog'
@@ -313,6 +314,7 @@ export function App() {
                   )}
                 </SongRow>
               )}
+              <InstallNote completions={data.completions} />
             </div>
           </section>
 

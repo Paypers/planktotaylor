@@ -7,6 +7,7 @@ Hold a plank for one Taylor Swift song a day.
 - **Streaks**: planking today's song keeps your streak. Ladder levels don't count towards it. Miss a day and a streak freeze covers it (3 a month, used automatically). You get a 🔥 streak, a calendar where each planked day is colored by that song's album, and your best streak, total planks and total time.
 - **Music**: the song's album track (Taylor's Version where there is one) plays from YouTube on the plank screen, starting when the countdown hits zero.
 - **No sign-up needed**: progress is saved in the browser. Signing in (optional) syncs it across devices.
+- **On your home screen**: add it to a phone's home screen and it opens full screen, like an app. From the second plank on, the home page offers it: a button on Android (and Chrome or Edge on a computer), the Share steps on iPhone and iPad.
 - **Themes**: System (follows the device), Light and Dark, plus your own. The ⚙ in the header opens Settings → Appearance, where you can make and save as many color themes as you like.
 
 It's a static single-page app (Vite + React + TypeScript). With no configuration at all it runs fully: progress saved in the browser, and each song's album track from YouTube on the plank screen. Accounts are the one optional extra.
@@ -68,7 +69,7 @@ This adds:
 Security, in short:
 - Every table has row-level security: players read and write only their own rows, attempts can't be changed or removed, and the daily counter only moves up by one through `bump_daily`. The counter is open to anyone by design, so treat it as a fun number, not a tamper-proof one.
 - The site ships only the publishable key. Keep the secret key out of `.env`.
-- [public/_headers](public/_headers) sets security headers on Cloudflare Pages: no framing by other sites, no MIME sniffing, and no camera, microphone or location access.
+- [public/_headers](public/_headers) sets security headers on Cloudflare Pages: no framing by other sites, no MIME sniffing, and no camera, microphone or location access. It also has `sw.js` checked on every visit (`Cache-Control: no-cache`), so a changed service worker takes effect straight away.
 
 ## How it works
 
@@ -86,9 +87,11 @@ Security, in short:
 | Settings page and its sections | [src/components/settings/](src/components/settings/) |
 | Theme colors, saving and applying themes | [src/lib/palette.ts](src/lib/palette.ts), [src/lib/theme.ts](src/lib/theme.ts) |
 | Page addresses (`#settings/…`, `#ranks`, `#help`) | [src/lib/route.ts](src/lib/route.ts) |
+| Home screen: app manifest, icons, service worker, the install offer | [public/manifest.webmanifest](public/manifest.webmanifest), [public/sw.js](public/sw.js), [src/lib/install.ts](src/lib/install.ts) |
 
 Rules worth knowing:
 - Days are the visitor's **local** calendar day, for the daily song and for streaks.
+- **The service worker** ([public/sw.js](public/sw.js), production builds only) loads the page from the network first, so a new deploy shows up on the next visit, and falls back to the last copy offline. The built files under `/assets/` have hashed names, so they come from its cache. It never touches YouTube, Supabase, fonts or anything else. Change how it caches and bump `VERSION` in it, which clears the old caches. The home-screen icons in `public/` are drawn from the favicon's star: cream fills the whole square on the maskable and Apple icons, since the phone rounds the corners itself.
 - Today only counts as missed once it's over: the 🔥 in the header is grey until you've planked today's song.
 - **Streak freezes** (in [src/lib/streaks.ts](src/lib/streaks.ts)): 3 each calendar month, refilled on the 1st, unused ones don't carry over. A missed day uses one automatically while a streak is alive, charged to the month of that day. They cover at most 2 missed days in a row: a third ends the streak, freezes left or not. A frozen day keeps the streak but doesn't add to it (10 days, a frozen day, then a plank makes 11). They're worked out from the planked days alone, so nothing extra is stored or synced. The calendar marks frozen days with a snowflake, the Streak section shows how many are left, and the morning after one's used it says so. Freezes can't be bought with XP.
 - Climb as many ladder levels a day as you like (each song once a day). Only today's song keeps the streak; the calendar fills in those days and marks ladder-only days with a small ring. If today's song happens to be your ladder level, one plank counts for both.

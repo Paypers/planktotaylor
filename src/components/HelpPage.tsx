@@ -125,6 +125,15 @@ export function HelpPage() {
         </>
       )}
 
+      <Topic id="home-screen" title="On your phone">
+        <dt>Home screen</dt>
+        <dd>
+          Add Plank to Taylor to your home screen and it opens full screen, like an app. On iPhone or iPad, tap Share,
+          then Add to Home Screen. On Android, use the button the site offers after a couple of planks, or Add to Home
+          screen in the browser's menu.
+        </dd>
+      </Topic>
+
       <Topic id="share" title="Sharing">
         <dt>After a plank</dt>
         <dd>
