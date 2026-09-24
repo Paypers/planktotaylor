@@ -25,17 +25,13 @@ Adding the site to the home screen (4a) and daily reminders (4b) are built.
 
 **Size:** large.
 
-## 5. Discord
+## 5. Discord Activity
 
-How everyone did today (the stats on the daily card once you've planked today's song) is built. They're what the Discord posts share.
+Sharing a result (level 1) and the daily post in a server (level 2) are built.
 
-**Discord**, three levels. Level 2 is next ([Part 6](roadmap-parts/part-06-discord-daily-post.md)); level 3 is still open:
+**A Discord Activity** (level 3): the site running inside a voice channel so a group planks to the same song together. This is the big one, and it overlaps with Friends and groups (9). YouTube playing inside Discord is a risk to check first. [Part 11](roadmap-parts/part-11-discord-activity.md) plans it.
 
-1. **Sharing a result**: works now. The text share and the link preview card both show up fine in Discord.
-2. **A daily post in a server** (recommended first). A server admin pastes a Discord webhook URL into the site. Each morning a scheduled function posts "Today's song: Style (3:51) · Plank along: link", and each night today's stats, the friendly version from the daily card. There's no bot to host. It uses the same scheduled-function setup as the daily reminders, and the sign-up form needs rate limits.
-3. **A Discord Activity**: the site running inside a voice channel so a group planks to the same song together. This is the big one, and it overlaps with Friends and groups (9). YouTube playing inside Discord is a risk to check first.
-
-**Size:** Discord level 2 is medium.
+**Size:** large.
 
 ## 8. Later: Collect the eras
 
@@ -69,7 +65,7 @@ The biggest gap: right now nobody on the site can see anyone else.
 
 | # | Feature | Size | Notes |
 | --- | --- | --- | --- |
-| 5 | Discord daily post | Medium | Uses the same server setup as 4b |
 | 8 | Collect the eras | Medium | |
 | 9 | Friends and groups | Large | |
 | 4c | Native app | Large | Check the store rules first |
+| 5 | Discord Activity | Large | After groups; plan first |

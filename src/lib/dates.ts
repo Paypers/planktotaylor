@@ -39,3 +39,9 @@ export function daysBetween(a: DayKey, b: DayKey): number {
 export function formatShortDate(key: DayKey): string {
   return fromDayKey(key).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
+
+/** "09:00" as this device writes times: "9:00 AM", "09:00". */
+export function clockTime(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map(Number)
+  return new Date(2026, 0, 1, h, m).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+}

@@ -1,4 +1,4 @@
--- Plank to Taylor: accounts, sync, the global daily counter, and daily reminders.
+-- Plank to Taylor: accounts, sync, the global daily counter, daily reminders, and the Discord daily post.
 -- Paste into Supabase → SQL Editor → Run. Safe to run more than once.
 
 -- One row per finished plank: today's song once a day, and any number of ladder levels a day
@@ -254,10 +254,85 @@ drop trigger if exists push_subscriptions_limit on public.push_subscriptions;
 create trigger push_subscriptions_limit before insert on public.push_subscriptions
   for each row execute function public.push_subscriptions_limit();
 
--- The schedule: every 15 minutes, call the send-reminders function (only when anyone has reminders on).
--- It needs the pg_cron and pg_net extensions (Database → Extensions) and two secrets in Vault,
--- reminders_url and reminders_secret (`npm run vapid` prints the lines). Until the extensions are on,
--- this does nothing, so the rest of the script still runs. Scheduling again by the same name updates it.
+-- The Discord daily post: channels whose webhook a signed-in player added (Settings → Discord). Each gets
+-- today's song at 8:00 and how everyone did at 21:00 in its time zone, from the discord-post Edge
+-- Function. A webhook's address is a secret (anyone who has it can post in that channel), so only the
+-- discord-add function writes one, after checking it with Discord, and nobody can read one back through
+-- the API: players see and change only the other columns of their own, and can remove them.
+create table if not exists public.discord_webhooks (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  -- Only Discord webhooks, in one form: the same pattern is DISCORD_WEBHOOK in src/lib/discord.ts, so keep
+  -- the two in step.
+  url text not null unique check (url ~ '^https://discord\.com/api/webhooks/[0-9]{17,20}/[A-Za-z0-9_-]{50,100}$'),
+  -- One post a day per channel, whoever added it.
+  channel_id text not null unique check (channel_id ~ '^[0-9]{17,20}$'),
+  label text not null check (char_length(label) between 1 and 60),
+  time_zone text not null check (char_length(time_zone) between 1 and 64),
+  last_morning date,
+  last_night date,
+  created_at timestamptz not null default now()
+);
+
+alter table public.discord_webhooks enable row level security;
+drop policy if exists "read own webhooks" on public.discord_webhooks;
+drop policy if exists "change own webhooks" on public.discord_webhooks;
+drop policy if exists "remove own webhooks" on public.discord_webhooks;
+create policy "read own webhooks" on public.discord_webhooks for select to authenticated using (auth.uid() = user_id);
+create policy "change own webhooks" on public.discord_webhooks for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "remove own webhooks" on public.discord_webhooks for delete to authenticated using (auth.uid() = user_id);
+-- Column by column: never the address, never who added it or when it last posted.
+revoke all on public.discord_webhooks from anon, authenticated;
+grant select (id, label, time_zone, created_at) on public.discord_webhooks to authenticated;
+grant update (time_zone) on public.discord_webhooks to authenticated;
+grant delete on public.discord_webhooks to authenticated;
+
+-- Every webhook added, kept a day, for the limits below. Removing a webhook doesn't take its sign-up back.
+create table if not exists public.discord_signups (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  at timestamptz not null default now()
+);
+create index if not exists discord_signups_at on public.discord_signups (at);
+alter table public.discord_signups enable row level security;
+revoke all on public.discord_signups from anon, authenticated;
+
+-- The limits, whoever adds the row: 3 webhooks each at once (WEBHOOKS_EACH in src/lib/discord.ts), 10
+-- sign-ups each a day, and 30 across the whole site an hour, so nobody can fill the table or use the
+-- site to post in a lot of channels. The discord-add function tells players which one they hit.
+create or replace function public.discord_webhooks_limit()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- One sign-up at a time, so two at once can't both squeeze under a limit.
+  perform pg_advisory_xact_lock(hashtext('discord_webhooks_limit'));
+  if (select count(*) from public.discord_webhooks where user_id = new.user_id) >= 3 then
+    raise exception 'too many discord webhooks';
+  end if;
+  if (select count(*) from public.discord_signups where user_id = new.user_id and at > now() - interval '1 day') >= 10 then
+    raise exception 'too many discord sign-ups today';
+  end if;
+  if (select count(*) from public.discord_signups where at > now() - interval '1 hour') >= 30 then
+    raise exception 'too many discord sign-ups this hour';
+  end if;
+  delete from public.discord_signups where at < now() - interval '1 day';
+  insert into public.discord_signups (user_id) values (new.user_id);
+  return new;
+end;
+$$;
+revoke all on function public.discord_webhooks_limit() from public;
+drop trigger if exists discord_webhooks_limit on public.discord_webhooks;
+create trigger discord_webhooks_limit before insert on public.discord_webhooks
+  for each row execute function public.discord_webhooks_limit();
+
+-- The schedules: every 15 minutes, call the send-reminders function (only when anyone has reminders on)
+-- and the discord-post function (only when any channel has the daily post). They need the pg_cron and
+-- pg_net extensions (Database → Extensions) and two secrets in Vault, reminders_url and reminders_secret
+-- (`npm run vapid` prints the lines). The Discord one is called at the same address with its own name on
+-- the end, and with the same secret. Until the extensions are on, this does nothing, so the rest of the
+-- script still runs. Scheduling again by the same name updates it.
 do $schedule$
 begin
   if exists (select 1 from pg_extension where extname = 'pg_cron') and exists (select 1 from pg_extension where extname = 'pg_net') then
@@ -272,6 +347,18 @@ begin
         timeout_milliseconds := 60000
       )
       where exists (select 1 from public.push_subscriptions)
+    $job$);
+    perform cron.schedule('discord-post', '*/15 * * * *', $job$
+      select net.http_post(
+        url := regexp_replace((select decrypted_secret from vault.decrypted_secrets where name = 'reminders_url'), 'send-reminders/?$', 'discord-post'),
+        headers := jsonb_build_object(
+          'Content-Type', 'application/json',
+          'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'reminders_secret')
+        ),
+        body := '{}'::jsonb,
+        timeout_milliseconds := 60000
+      )
+      where exists (select 1 from public.discord_webhooks)
     $job$);
   end if;
 end

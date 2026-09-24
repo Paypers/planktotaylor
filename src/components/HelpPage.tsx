@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
 import { LADDER } from '../data/songs'
 import { accountsEnabled } from '../lib/account'
-import { followLink, hashFor, RANKS } from '../lib/route'
+import { clockTime } from '../lib/dates'
+import { MORNING_POST, NIGHT_POST, WEBHOOKS_EACH } from '../lib/discord'
+import { DISCORD, followLink, hashFor, RANKS } from '../lib/route'
 import { remindersAvailable } from '../lib/push'
 import { LIGHT_XP } from '../lib/xp'
 import { PageTop } from './PageTop'
@@ -181,6 +183,32 @@ export function HelpPage() {
             Reminders come to the device you turned them on, at its time. On iPhone and iPad, add the site to your home
             screen first. Signing out turns them off there.
           </dd>
+        </Topic>
+      )}
+
+      {accountsEnabled && (
+        <Topic id="discord" title="Discord">
+          <dt>Daily post</dt>
+          <dd>
+            Add Plank to Taylor to a Discord server and it posts in a channel every day: today's song at{' '}
+            {clockTime(MORNING_POST)}, and how everyone did at {clockTime(NIGHT_POST)}, in the server's time zone.
+          </dd>
+          <dt>Adding it</dt>
+          <dd>
+            Signed in, go to{' '}
+            <a href={hashFor(DISCORD)} onClick={(e) => followLink(e, DISCORD)}>
+              Settings → Discord
+            </a>
+            . In Discord, open the server's settings, then Integrations → Webhooks → New Webhook, pick the channel and
+            Copy Webhook URL. Paste it in, and a hello appears in the channel. Up to {WEBHOOKS_EACH} channels each.
+          </dd>
+          <dt>What it shares</dt>
+          <dd>
+            What the daily card shows once you've planked: how many planked, the time held together, how many held it
+            all the way through, and where the song gets toughest. Never anyone's name, and never breaks.
+          </dd>
+          <dt>Stopping it</dt>
+          <dd>Remove it in Settings → Discord, or delete the webhook in Discord.</dd>
         </Topic>
       )}
 

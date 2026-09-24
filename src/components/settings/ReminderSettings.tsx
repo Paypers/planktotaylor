@@ -1,13 +1,8 @@
 import { useEffect, useState } from 'react'
 import { askToSignIn, useAccount, type DeviceReminder } from '../../lib/account'
 import { changeReminder, reminderSupport, thisDeviceReminder, turnOffReminders, turnOnReminders, type ReminderSupport } from '../../lib/push'
+import { clockTime } from '../../lib/dates'
 import { DEFAULT_REMINDER, EVENING_NUDGE, NUDGE_STREAK, STEP_MINUTES } from '../../lib/reminders'
-
-/** "09:00" as this device writes times: "9:00 AM", "09:00". */
-function clockTime(hhmm: string): string {
-  const [h, m] = hhmm.split(':').map(Number)
-  return new Date(2026, 0, 1, h, m).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
-}
 
 /** Every time a reminder can be set to: a quarter hour apart, all day. */
 const TIMES = Array.from({ length: (24 * 60) / STEP_MINUTES }, (_, i) => {

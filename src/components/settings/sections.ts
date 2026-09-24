@@ -1,7 +1,9 @@
 import type { ComponentType } from 'react'
 import type { IconName } from '../Icon'
-import { AppearanceSettings } from './AppearanceSettings'
+import { accountsEnabled } from '../../lib/account'
 import { remindersAvailable } from '../../lib/push'
+import { AppearanceSettings } from './AppearanceSettings'
+import { DiscordSettings } from './DiscordSettings'
 import { PlankSettings } from './PlankSettings'
 import { ReminderSettings } from './ReminderSettings'
 
@@ -23,5 +25,9 @@ export const SECTIONS: SettingsSection[] = [
   // Only on a site with reminders set up (see "Daily reminders" in the README).
   ...(remindersAvailable
     ? [{ id: 'reminders', label: 'Reminders', summary: 'A nudge to plank each day', icon: 'bell' as const, Content: ReminderSettings }]
+    : []),
+  // Only on a site with accounts (see "The Discord daily post" in the README). #discord opens it too.
+  ...(accountsEnabled
+    ? [{ id: 'discord', label: 'Discord', summary: 'A daily post in your server', icon: 'message' as const, Content: DiscordSettings }]
     : []),
 ]

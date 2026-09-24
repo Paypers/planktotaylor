@@ -18,6 +18,7 @@ import { forgetAttempts, getAttempts, mergeAttempts, onAttemptEnded, type Attemp
 import { applyPrefs, getData, onPlankRecorded, onPrefsChanged, replaceProgress } from './store'
 import { accountThemes, applyAccountThemes, onThemeSaved, readSaved, type AccountThemes } from './theme'
 import { readStats, type DailyStats } from './together'
+import type { AddProblem } from './discord'
 
 // The project address, without the /rest/v1/ the dashboard shows on the end (it breaks sign-in).
 const url = (import.meta.env.VITE_SUPABASE_URL as string | undefined)
@@ -530,6 +531,72 @@ export async function refreshReminderZone() {
     .from('push_subscriptions')
     .update({ time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone })
     .eq('endpoint', push.endpoint)
+  if (error) throw error
+}
+
+/** A Discord channel's daily post, as the player who added it sees it: never the webhook's address. */
+export interface DiscordWebhook {
+  id: string
+  /** Its name in the site's list. */
+  label: string
+  time_zone: string
+  created_at: string
+}
+
+// Until schema.sql has been run for the Discord post, there's no table: these errors mean "not there yet".
+const MISSING_TABLE = new Set(['42P01', 'PGRST205'])
+
+/** The player's channels with the daily post, oldest first. Null when the site doesn't have the post yet. */
+export async function loadDiscordWebhooks(): Promise<DiscordWebhook[] | null> {
+  if (!accountsEnabled || !state.user) return []
+  const { data, error } = await (await client())
+    .from('discord_webhooks')
+    .select('id, label, time_zone, created_at')
+    .order('created_at')
+  if (error && MISSING_TABLE.has(error.code)) return null
+  if (error) throw error
+  return data as DiscordWebhook[]
+}
+
+const ADD_PROBLEMS: ReadonlySet<string> = new Set<AddProblem>([
+  'sign-in',
+  'bad-address',
+  'bad-zone',
+  'not-found',
+  'channel-taken',
+  'too-many',
+  'too-many-today',
+  'busy',
+  'discord-down',
+])
+
+/** Why a webhook wasn't added: what the discord-add function said, or 'unavailable' when it couldn't be reached. */
+export class DiscordAddError extends Error {
+  constructor(readonly problem: AddProblem | 'unavailable') {
+    super(`Couldn't add the webhook: ${problem}`)
+  }
+}
+
+/**
+ * Adds a channel's daily post. The discord-add function checks the webhook with Discord and posts a
+ * welcome there; the address goes no further than that, and never comes back.
+ */
+export async function addDiscordWebhook(url: string, timeZone: string, label: string): Promise<DiscordWebhook> {
+  const { data, error } = await (await client()).functions.invoke('discord-add', { body: { url, timeZone, label } })
+  if (!error) return (data as { webhook: DiscordWebhook }).webhook
+  const context: unknown = error.context
+  const answer = context instanceof Response ? ((await context.json().catch(() => null)) as { problem?: unknown } | null) : null
+  const problem = answer?.problem
+  throw new DiscordAddError(typeof problem === 'string' && ADD_PROBLEMS.has(problem) ? (problem as AddProblem) : 'unavailable')
+}
+
+export async function changeDiscordZone(id: string, timeZone: string) {
+  const { error } = await (await client()).from('discord_webhooks').update({ time_zone: timeZone }).eq('id', id)
+  if (error) throw error
+}
+
+export async function removeDiscordWebhook(id: string) {
+  const { error } = await (await client()).from('discord_webhooks').delete().eq('id', id)
   if (error) throw error
 }
 

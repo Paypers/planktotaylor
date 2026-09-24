@@ -10,11 +10,15 @@ export const RANKS: Route = { page: 'ranks' }
 export const HELP: Route = { page: 'help' }
 /** Your Plank Year: the year in slides. */
 export const YEAR: Route = { page: 'year' }
+/** Settings → Discord: the daily post in a server. */
+export const DISCORD: Route = { page: 'settings', section: 'discord' }
 
 export function parseRoute(hash: string): Route {
   if (/^#ranks\/?$/i.test(hash)) return RANKS
   if (/^#help\/?$/i.test(hash)) return HELP
   if (/^#year\/?$/i.test(hash)) return YEAR
+  // A short address to give server admins: Settings → Discord.
+  if (/^#discord\/?$/i.test(hash)) return DISCORD
   const match = /^#settings(?:\/([a-z0-9-]+))?\/?$/i.exec(hash)
   return match ? { page: 'settings', section: match[1]?.toLowerCase() ?? null } : HOME
 }

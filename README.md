@@ -10,6 +10,7 @@ Hold a plank for one Taylor Swift song a day.
 - **Your Plank Year**: from 1 December to the end of January, your year in planks as slides you tap through, like Spotify Wrapped, with a card to share for each.
 - **No sign-up needed**: progress is saved in the browser. Signing in (optional) syncs it across devices.
 - **Daily reminders**: a push notification at the time you pick, with today's song and your streak, never once today's song is done (signed-in players; see below).
+- **Discord**: a daily post in a Discord server, with today's song each morning and how everyone did each night (signed-in players; see below).
 - **On your home screen**: add it to a phone's home screen and it opens full screen, like an app. From the second plank on, the home page offers it: a button on Android (and Chrome or Edge on a computer), the Share steps on iPhone and iPad.
 - **Themes**: System (follows the device), Light and Dark, plus your own. The ⚙ in the header opens Settings → Appearance, where you can make and save as many color themes as you like.
 
@@ -71,7 +72,7 @@ This adds:
 - **How everyone did today** ([src/lib/together.ts](src/lib/together.ts)): once you've planked today's song, the card shows how many planked it, the time held together ("Together: 26 hours of planking"), how many held it all the way through 🟩, and, once 20 people have planked, the song's toughest stretch ("around 2:40") with a faint heat strip of where breaks bunched up. Planks with no breaks are a count, never a percentage; there are no break counts and nothing that ranks anyone. Like the counter, these are fun numbers, not tamper-proof ones.
 
 Security, in short:
-- Every table has row-level security: players read and write only their own rows (reminder subscriptions too), attempts can't be changed or removed, and the daily counter and its stats only move through `bump_daily`, one plank at a time, which refuses anything out of range (a song over an hour, more than 20 breaks). The counter is open to anyone by design, so treat it as a fun number, not a tamper-proof one.
+- Every table has row-level security: players read and write only their own rows (reminder subscriptions and Discord channels too, where a webhook's address can't be read back at all), attempts can't be changed or removed, and the daily counter and its stats only move through `bump_daily`, one plank at a time, which refuses anything out of range (a song over an hour, more than 20 breaks). The counter is open to anyone by design, so treat it as a fun number, not a tamper-proof one.
 - The site ships only the publishable key. Keep the secret key out of `.env`.
 - [public/_headers](public/_headers) sets security headers on Cloudflare Pages: no framing by other sites, no MIME sniffing, and no camera, microphone or location access. It also has `sw.js` checked on every visit (`Cache-Control: no-cache`), so a changed service worker takes effect straight away.
 
@@ -85,7 +86,7 @@ It needs the Supabase setup above, and then, once:
 2. **The site.** Add the printed `VITE_VAPID_PUBLIC_KEY=…` to `.env` and to the host's build settings (Cloudflare Pages → Settings → Variables and secrets), then deploy the site. Settings → Reminders only appears once it's there.
 3. **The Supabase CLI**, logged in and linked to the project: `npx supabase@2 login`, then `npx supabase@2 link --project-ref <ref>` (the ref is the start of the project's URL).
 4. **The function's secrets:** `npx supabase@2 secrets set --env-file supabase/functions.env`.
-5. **The function:** `npm run functions:deploy`. It first builds `supabase/functions/_shared/site.js` from the site's own code (who's due, what the message says, streaks and freezes), so the function never keeps a copy of its own; run it again whenever those change.
+5. **The functions:** `npm run functions:deploy`. It first builds `supabase/functions/_shared/site.js` from the site's own code (who's due, what the messages say, streaks and freezes), so the functions never keep a copy of their own. Then it deploys `send-reminders` and the Discord post's two functions. Run it again whenever those change.
 6. **The schedule:** Database → Extensions, turn on `pg_cron` and `pg_net`. Then in the SQL Editor, run the two `vault.create_secret` lines `npm run vapid` printed (with your project's ref in the address), and run [supabase/schema.sql](supabase/schema.sql) again: once the extensions are on, it calls the function every 15 minutes.
 7. **Try it:** Settings → Reminders on a phone, and set the time to the next quarter hour.
 
@@ -93,6 +94,26 @@ How it works:
 - **The browser's side** ([src/lib/push.ts](src/lib/push.ts), [public/sw.js](public/sw.js)): turning reminders on asks for permission, subscribes to the browser's push service, and saves that subscription with the time and time zone to `push_subscriptions`, one row per device. Opening the site updates the time zone, so a player who travels gets them at their time where they are. Signing out removes this device's. The service worker shows each push as a notification; tapping it opens the site.
 - **The server's side** ([supabase/functions/send-reminders](supabase/functions/send-reminders)): every 15 minutes the schedule calls the function with a secret (anyone else is turned away). It finds the devices whose time has come (within the hour, in case a check was missed, and each at most once a day), skips any whose player has planked today's song, works out the streak with the site's own streak code (freezes included), and sends through [`@negrel/webpush`](https://jsr.io/@negrel/webpush). Today's song comes from `daily.json`, which every build of the site publishes from [src/lib/daily.ts](src/lib/daily.ts), so a new release is named the day it's out without redeploying the function. Subscriptions a push service says are gone are deleted.
 - **What's stored:** each device's push address and keys, the reminder time, the time zone, and when each reminder last went. Pushes only ever go to the browsers' own push services (Google, Mozilla, Apple, Microsoft): the table refuses anything else, and so does the function.
+
+## Optional: the Discord daily post
+
+Signed-in players can add Plank to Taylor to a Discord server in Settings → Discord (`/#discord` is a short link to it). They make a webhook for a channel in Discord (Server Settings → Integrations → Webhooks → New Webhook → Copy Webhook URL) and paste it in. Every day at 8:00 the channel gets today's song, and at 21:00 how everyone did, in the time zone picked for the server. There's no bot to host.
+
+It uses the daily reminders' setup above (the Supabase CLI, the functions' secrets, `pg_cron` and `pg_net`, and the two Vault secrets): the same schedule secret, and no new keys. Then:
+
+1. Run [supabase/schema.sql](supabase/schema.sql) again. It adds the `discord_webhooks` table and a second job, `discord-post`, every 15 minutes (only when a channel has the post). It calls the address in `reminders_url` with `discord-post` in place of `send-reminders`.
+2. `npm run functions:deploy`. It deploys `discord-add` (adding a channel) and `discord-post` (the daily posts) along with `send-reminders`.
+3. Try it: add a webhook for a test server in Settings → Discord. A hello appears in the channel straight away, and the daily posts come at 8:00 and 21:00 in the time zone you picked.
+
+How it works:
+- **Adding one** ([supabase/functions/discord-add](supabase/functions/discord-add)): the site sends the address to the function with the player's sign-in. Only `https://discord.com/api/webhooks/<id>/<token>` is taken (`discordapp.com`, `ptb.`, `canary.` and `/api/v10/` addresses are tidied to that form). The function asks Discord about the webhook, so a deleted one is refused, saves it, and posts a hello in the channel. If the hello fails, the webhook is taken back out. Each channel gets one daily post, whoever added it. A channel whose webhook was deleted in Discord can be added again with a new one.
+- **The limits** are in the database, so they hold whoever adds the row: 3 channels each at once, 10 sign-ups each a day, and 30 across the site an hour. Removing a channel doesn't give its sign-up back. The function tells the player which limit they hit.
+- **A webhook's address is a secret**: anyone who has it can post in the channel. Only the function writes one, and nobody can read one back through the API, not even the player who added it. Column by column, players can see their own channels' names, time zones and when they were added, change the time zone, and remove them. The functions' logs never show a webhook's token.
+- **The posts** ([supabase/functions/discord-post](supabase/functions/discord-post); what they say is in [src/lib/discord.ts](src/lib/discord.ts)): every 15 minutes the schedule calls the function with the reminders' secret. Channels whose 8:00 or 21:00 has come (within the hour, each post once a day) get their post, five at a time.
+  - The morning post: "**Today's song:** Style (3:51), from 1989 (Taylor's Version) · Daily No. 3", and the link.
+  - The night post is the daily card's stats: how many have planked, the time held together, how many held it all the way through 🟩 and, after 20 planks, the toughest stretch. It never has break counts or percentages, and there's no night post on a day nobody's planked.
+  - Posts come as "Plank to Taylor" with the site's icon, and can't ping anyone.
+- **When Discord says no:** a deleted webhook (404) or a changed token (401) is deleted here too. On a rate limit (429) the function waits as long as Discord says (up to 10 seconds; anything longer waits for the next check). Anything else is tried again on the next check.
 
 ## How it works
 
@@ -111,8 +132,9 @@ How it works:
 | Aurora lights: timing and placing them | [src/lib/lights.ts](src/lib/lights.ts) |
 | Settings page and its sections | [src/components/settings/](src/components/settings/) |
 | Theme colors, saving and applying themes | [src/lib/palette.ts](src/lib/palette.ts), [src/lib/theme.ts](src/lib/theme.ts) |
-| Page addresses (`#settings/…`, `#ranks`, `#help`, `#year`) | [src/lib/route.ts](src/lib/route.ts) |
+| Page addresses (`#settings/…`, `#ranks`, `#help`, `#year`, and `#discord` for Settings → Discord) | [src/lib/route.ts](src/lib/route.ts) |
 | Daily reminders: who's due and what it says; the browser's side; the function | [src/lib/reminders.ts](src/lib/reminders.ts), [src/lib/push.ts](src/lib/push.ts), [supabase/functions/send-reminders](supabase/functions/send-reminders) |
+| The Discord daily post: the address check, when posts go, what they say; Settings → Discord; the functions | [src/lib/discord.ts](src/lib/discord.ts), [src/components/settings/DiscordSettings.tsx](src/components/settings/DiscordSettings.tsx), [supabase/functions/discord-add](supabase/functions/discord-add), [supabase/functions/discord-post](supabase/functions/discord-post) |
 | How everyone did today | [src/lib/together.ts](src/lib/together.ts), [src/components/Together.tsx](src/components/Together.tsx) |
 | Your Plank Year: the numbers, the slides, the cards | [src/lib/yearInReview.ts](src/lib/yearInReview.ts), [src/components/YearReview.tsx](src/components/YearReview.tsx), [src/lib/yearCard.ts](src/lib/yearCard.ts) |
 | Home screen: app manifest, icons, service worker, the install offer | [public/manifest.webmanifest](public/manifest.webmanifest), [public/sw.js](public/sw.js), [src/lib/install.ts](src/lib/install.ts) |
@@ -143,7 +165,7 @@ Rules worth knowing:
 
 ## Settings and themes
 
-Settings has its own address (`#settings/appearance`, `#settings/plank`), so Back, bookmarks and links work. **Appearance** has the themes; **Plank** has the aurora lights switch. On a computer the sections are listed down the left; on a phone the list comes first and each section opens on its own.
+Settings has its own address (`#settings/appearance`, `#settings/plank`), so Back, bookmarks and links work. **Appearance** has the themes; **Plank** has the aurora lights switch. **Reminders** and **Discord** show once they're set up (see above). On a computer the sections are listed down the left; on a phone the list comes first and each section opens on its own.
 
 - **Adding a section** (or moving one): add an entry to `SECTIONS` in [src/components/settings/sections.ts](src/components/settings/sections.ts) with a component for its content. It gets a menu entry and its own address.
 - **Themes** are saved in the browser, separate from progress. Signed-in players' custom themes are kept in their account too, ready to pick on every device, but which theme shows is each device's own choice and never leaves it: System until one's picked there. Picking System, Light, Dark or a saved theme applies it straight away. Editing a custom theme shows each change live across the site; **Save theme** keeps it, and leaving with unsaved edits asks first. A color that gets hard to read against its background (below WCAG AA) shows a warning.

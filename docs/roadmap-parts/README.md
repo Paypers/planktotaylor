@@ -13,7 +13,7 @@ To build one, hand Claude the file: *"Build docs/roadmap-parts/part-01-quick-win
 | [3](part-03-aurora-lights.md) | Aurora lights | Medium | 1 | Yes | | ✓ |
 | [4](part-04-year-in-review.md) | Year in review | Medium | 1, 3 | No | **Ready by 30 November** | ✓ |
 | [5](part-05-daily-reminders.md) | Daily reminders | Medium | 1 | Yes | First server code; two checks before building | ✓ |
-| [6](part-06-discord-daily-post.md) | Discord daily post | Medium | 2, 5 | Yes | | |
+| [6](part-06-discord-daily-post.md) | Discord daily post | Medium | 2, 5 | Yes | | ✓ |
 | [7](part-07-collect-the-eras.md) | Collect the eras | Medium | | No | Settle the release badges first | |
 | [8](part-08-groups-database.md) | Groups: the database and joining | Large, first half | 1 | Yes | Settle public groups first | |
 | [9](part-09-groups-page.md) | Groups: the group page | Large, second half | 8 | Maybe | | |

@@ -1,4 +1,4 @@
-import { LAUNCH_SONGS, SONG_BY_ID, formatDuration, type Song } from '../data/songs'
+import { ALBUMS, LAUNCH_SONGS, SONG_BY_ID, formatDuration, type Song } from '../data/songs'
 import { addDays, daysBetween, type DayKey } from './dates'
 
 /** Daily #1. Everyone on the same calendar date gets the same song, like Wordle. */
@@ -96,6 +96,10 @@ export interface ScheduledSong {
   seconds: number
   /** "3:51" */
   length: string
+  /** The album's full title. */
+  album: string
+  /** Daily No. */
+  number: number
 }
 
 /**
@@ -107,7 +111,14 @@ export function dailySchedule(from: DayKey, count: number): Record<DayKey, Sched
   for (let i = 0; i < count; i++) {
     const day = addDays(from, i)
     const song = dailySong(day)
-    days[day] = { id: song.id, title: song.title, seconds: song.seconds, length: formatDuration(song.seconds) }
+    days[day] = {
+      id: song.id,
+      title: song.title,
+      seconds: song.seconds,
+      length: formatDuration(song.seconds),
+      album: ALBUMS[song.album].title,
+      number: dailyNumber(day),
+    }
   }
   return days
 }

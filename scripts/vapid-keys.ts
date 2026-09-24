@@ -1,5 +1,6 @@
 // Makes everything daily reminders need to be sent: the key pair that signs them (VAPID), and a secret
-// the schedule uses to call the send-reminders function. Run once: `npm run vapid`.
+// the schedule uses to call the send-reminders function (and the Discord post's discord-post function).
+// Run once: `npm run vapid`.
 //
 // Writes supabase/functions.env (kept out of git) for `npx supabase@2 secrets set --env-file supabase/functions.env`,
 // and prints the public key for the site (VITE_VAPID_PUBLIC_KEY) and the lines for Supabase's Vault.

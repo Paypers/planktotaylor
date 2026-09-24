@@ -93,6 +93,7 @@ const PATHS: Record<IconName, ReactNode> = {
       <path d="M12 8h.01" />
     </>
   ),
+  message: <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />,
 }
 
 export type IconName =
@@ -112,6 +113,7 @@ export type IconName =
   | 'share'
   | 'plus'
   | 'info'
+  | 'message'
 
 interface Props {
   name: IconName

@@ -61,16 +61,17 @@ export function localClock(now: Date, timeZone: string): { day: DayKey; minute: 
   }
 }
 
-const minuteOf = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5))
+/** "HH:MM" has come by `minute` of the day, within the last CATCH_UP_MINUTES. */
+export function timeHasCome(minute: number, hhmm: string): boolean {
+  const at = Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5))
+  return minute >= at && minute < at + CATCH_UP_MINUTES
+}
 
 /** The reminder due for this device now, if any: its time has come (within the last hour) and it hasn't gone today. */
 export function dueReminder(row: ReminderRow, now: Date): { kind: ReminderKind; day: DayKey } | null {
   const clock = localClock(now, row.time_zone)
   if (!clock) return null
-  const due = (hhmm: string) => {
-    const at = minuteOf(hhmm)
-    return clock.minute >= at && clock.minute < at + CATCH_UP_MINUTES
-  }
+  const due = (hhmm: string) => timeHasCome(clock.minute, hhmm)
   if (due(row.remind_at) && row.last_morning !== clock.day) return { kind: 'morning', day: clock.day }
   if (row.evening && due(EVENING_NUDGE) && row.last_evening !== clock.day) return { kind: 'evening', day: clock.day }
   return null

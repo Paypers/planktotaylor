@@ -9,6 +9,9 @@ A server admin pastes a Discord webhook into the site. Each morning it posts tod
 - **Build it.** Level 1, sharing a result, already works: the text share and the link preview card both show up fine in Discord. This part is level 2. Level 3, the Activity, is [Part 11](part-11-discord-activity.md).
 - **When posts go out:** each server picks a time zone when it signs up (the admin's browser zone to start with). The morning post goes at 8:00 and the stats at 21:00, local to that zone.
 - **Who can add one:** signed-in players only, at most 3 webhooks each. That's the first rate limit.
+- **The other limits,** chosen while building: 10 sign-ups each a day (so one account can't use up the site's hour by adding and removing), and 30 across the site an hour. Removing a webhook doesn't give its sign-up back. All three are in the database (schema.sql).
+- **Where it lives:** Settings → Discord, beside Reminders, with `#discord` as a short link to it. One daily post per channel, whoever added it. The player can change a channel's time zone later.
+- **The posts:** plain messages as "Plank to Taylor" with the site's icon, with mentions turned off. No night post on a day nobody's planked.
 
 ---
 

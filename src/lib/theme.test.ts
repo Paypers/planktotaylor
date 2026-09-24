@@ -202,6 +202,12 @@ describe('routes', () => {
     expect(parseRoute('#Help/')).toEqual({ page: 'help' })
   })
 
+  it('takes #discord to Settings → Discord', () => {
+    expect(parseRoute('#discord')).toEqual({ page: 'settings', section: 'discord' })
+    expect(parseRoute('#Discord/')).toEqual({ page: 'settings', section: 'discord' })
+    expect(parseRoute('#discord/x')).toEqual({ page: 'home' })
+  })
+
   it('leaves sign-in links alone', () => {
     expect(parseRoute('#access_token=abc&type=magiclink')).toEqual({ page: 'home' })
   })

@@ -102,7 +102,14 @@ describe('daily.json', () => {
     expect(Object.keys(days)).toHaveLength(400)
     for (const day of ['2026-09-22', '2026-09-25', '2027-02-14', addDays('2026-09-22', 399)]) {
       const song = dailySong(day)
-      expect(days[day]).toEqual({ id: song.id, title: song.title, seconds: song.seconds, length: formatDuration(song.seconds) })
+      expect(days[day]).toEqual({
+        id: song.id,
+        title: song.title,
+        seconds: song.seconds,
+        length: formatDuration(song.seconds),
+        album: ALBUMS[song.album].title,
+        number: dailyNumber(day),
+      })
     }
   })
 })

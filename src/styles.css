@@ -2548,6 +2548,70 @@ a {
   max-width: 220px;
 }
 
+/* Discord: the channels with the daily post, and how to add one */
+
+.webhooks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.webhook {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.webhook:first-child {
+  padding-top: 4px;
+}
+
+.webhook:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.webhook-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.webhook-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.webhook-name {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 22px;
+  overflow-wrap: anywhere;
+}
+
+.webhook-text .fine {
+  margin-top: 0;
+}
+
+.webhook-zone {
+  max-width: 360px;
+}
+
+.webhook .field {
+  margin-bottom: 0;
+}
+
+.steps {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 22px;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--ink-2);
+}
+
 .settings-group > .fine {
   margin-top: 0;
 }

@@ -19,6 +19,9 @@ export interface ReminderRow {
 }
 
 type Kind = 'morning' | 'evening'
+
+/** The most rows the API sends in one go. */
+const PAGE_SIZE = 1000
 type Message = { title: string; body: string }
 type Schedule = Record<string, { title: string; length: string }>
 
@@ -98,13 +101,18 @@ export async function liveDeps(env: (name: string) => string | undefined): Promi
 
   return {
     async subscriptions() {
-      const { data, error } = await db.from('push_subscriptions').select('*')
-      if (error) throw error
-      return data as ReminderRow[]
+      // A page at a time: the API sends at most 1000 rows per request.
+      const rows: ReminderRow[] = []
+      for (let from = 0; ; from += PAGE_SIZE) {
+        const { data, error } = await db.from('push_subscriptions').select('*').order('endpoint').range(from, from + PAGE_SIZE - 1)
+        if (error) throw error
+        rows.push(...(data as ReminderRow[]))
+        if (data.length < PAGE_SIZE) return rows
+      }
     },
     async dailyDays(userIds) {
       const days = new Map<string, Set<string>>()
-      const pageSize = 1000
+      const pageSize = PAGE_SIZE
       // A hundred players at a time keeps each request's address short.
       for (let i = 0; i < userIds.length; i += 100) {
         for (let from = 0; ; from += pageSize) {
