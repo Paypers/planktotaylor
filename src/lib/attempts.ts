@@ -149,6 +149,25 @@ export function mergeAttempts(fromAccount: readonly Attempt[], savedIds: readonl
   commit([...byId.values()])
 }
 
+/** A best shorter than this isn't worth a marker. */
+const GHOST_MIN_SECONDS = 5
+
+/**
+ * Your ghost on a song you haven't finished: the furthest you got on a go you ended yourself (gave up
+ * or stopped). Leaving and losing the connection weren't your choice, so they don't count. Null once
+ * the song's finished (`finished`: there's a plank of it on record) or with nothing worth showing.
+ */
+export function ghostFor(songId: string, attempts: readonly Attempt[], finished: boolean): number | null {
+  if (finished) return null
+  let best = 0
+  for (const a of attempts) {
+    if (a.songId !== songId) continue
+    if (a.outcome === 'finished') return null
+    if (a.outcome === 'gave-up' || a.outcome === 'stopped') best = Math.max(best, a.reached)
+  }
+  return best >= GHOST_MIN_SECONDS ? best : null
+}
+
 /** Someone else signed in on this browser: the log here was the last account's, so it goes. */
 export function forgetAttempts() {
   commit([])

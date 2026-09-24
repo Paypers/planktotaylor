@@ -2497,6 +2497,43 @@ a {
   color: var(--paused-ink);
 }
 
+/* Your ghost: your best so far on a song you haven't finished, marked on the bar */
+
+.plank-progress.has-ghost {
+  padding-top: 20px;
+}
+
+.plank-bar {
+  position: relative;
+}
+
+.ghost {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--ink);
+}
+
+/* Past it: a notch in the filled bar. */
+.ghost.passed {
+  background: var(--paper);
+}
+
+.ghost-label {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 14px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
 .plank-coach {
   margin-top: 20px;
   font-size: 18px;

@@ -4,8 +4,9 @@ import { useWakeLock } from '../lib/hooks'
 import type { Completion, Pause, PlankResult, Prefs } from '../lib/progress'
 import type { PlayerRank } from '../lib/ranks'
 import { pausedSeconds, plankHeadline } from '../lib/share'
-import { beginAttempt, endAttempt, saveAttemptProgress, type AttemptKind, type AttemptOutcome } from '../lib/attempts'
+import { beginAttempt, endAttempt, getAttempts, ghostFor, saveAttemptProgress, type AttemptKind, type AttemptOutcome } from '../lib/attempts'
 import { sounds, unlockAudio } from '../lib/sound'
+import { getData } from '../lib/store'
 import { MARATHON_SECONDS, type XpAward } from '../lib/xp'
 import { youtubeUrl } from '../lib/youtube'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -158,6 +159,14 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
   const [pauses, setPauses] = useState<Pause[]>([])
   const [summary, setSummary] = useState<FinishSummary | null>(null)
   const [askingToStop, setAskingToStop] = useState(false)
+  /** Your ghost: your best on this song so far, in seconds (null once it's finished). Worked out as each go starts. */
+  const findGhost = () => ghostFor(song.id, getAttempts(), getData().completions.some((c) => c.songId === song.id))
+  const [ghost, setGhost] = useState(findGhost)
+  const ghostRef = useRef(ghost)
+  const [passedGhost, setPassedGhost] = useState(false)
+  const passedGhostRef = useRef(false)
+  /** "Past your best!" in place of the coach line, for a moment. */
+  const [cheering, setCheering] = useState(false)
   /** Why a plank ended early: shown on the quit screen. */
   const [endReason, setEndReason] = useState<'gave-up' | 'offline' | 'left'>('gave-up')
   /** The attempt on the record, from the moment the plank begins until it ends, however it ends. */
@@ -235,6 +244,12 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
     finished.current = false
     lastBeep.current = Infinity
     chimed.current = { halfway: false, lastThirty: false }
+    // Before this go is on the record, so it never counts towards its own ghost.
+    ghostRef.current = findGhost()
+    setGhost(ghostRef.current)
+    passedGhostRef.current = false
+    setPassedGhost(false)
+    setCheering(false)
     anchor.current = { pos: 0, at: performance.now() }
     clock.current = { startedAt: performance.now(), banked: 0 }
     setElapsed(0)
@@ -337,6 +352,12 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
         chimed.current.halfway = true
         if (prefs.sounds) sounds.halfway()
       }
+      if (ghostRef.current !== null && !passedGhostRef.current && ms > ghostRef.current * 1000) {
+        passedGhostRef.current = true
+        setPassedGhost(true)
+        setCheering(true)
+        if (prefs.sounds) sounds.pastBest()
+      }
       const secondsLeft = Math.ceil((total - ms) / 1000)
       if (secondsLeft <= 3 && secondsLeft < lastBeep.current) {
         lastBeep.current = secondsLeft
@@ -353,6 +374,12 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
       clearInterval(backup)
     }
   }, [phase, total, finish, readElapsed, prefs.sounds])
+
+  useEffect(() => {
+    if (!cheering) return
+    const timer = setTimeout(() => setCheering(false), 4000)
+    return () => clearTimeout(timer)
+  }, [cheering])
 
   const start = () => {
     unlockAudio()
@@ -501,7 +528,13 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
       : "Get into position, then press Start. You'll get a 3-second countdown.",
     countdown: 'Get into position.',
     waiting: music.hint ?? 'Starting the song…',
-    running: stalled ? (playing.current ? 'Waiting for the song…' : 'Tap ▶ on the video to carry on.') : coachLine(elapsed, total),
+    running: stalled
+      ? playing.current
+        ? 'Waiting for the song…'
+        : 'Tap ▶ on the video to carry on.'
+      : cheering
+        ? 'Past your best!'
+        : coachLine(elapsed, total),
     paused: synced ? 'Paused. The song waits with you.' : 'Paused. Take a breath.',
     quit: {
       'gave-up': `of ${formatDuration(song.seconds)}. Every second counts. It's in your plank history. Go again when you're ready.`,
@@ -545,9 +578,12 @@ export function PlankTimer({ session, prefs, onFinish, onShare, onClose, onSignI
               </p>
             </div>
 
-            <div className="plank-progress">
-              <div className="bar">
-                <span style={{ width: `${Math.min(1, elapsed / total) * 100}%`, background: album.color }} />
+            <div className={`plank-progress${ghost !== null ? ' has-ghost' : ''}`}>
+              <div className="plank-bar">
+                <div className="bar">
+                  <span style={{ width: `${Math.min(1, elapsed / total) * 100}%`, background: album.color }} />
+                </div>
+                {ghost !== null && <GhostMarker at={ghost} length={song.seconds} passed={passedGhost} />}
               </div>
               <div className="plank-progress-times">
                 <span>{formatDuration(elapsed / 1000)}</span>
@@ -776,6 +812,22 @@ function XpEarned({ xp, seconds, rankedUp }: { xp: FinishXp; seconds: number; ra
       )}
       <RankBar rank={rank} />
     </section>
+  )
+}
+
+/** Your best so far on the progress bar. Once you're past it, it stays as a notch, without its label. */
+function GhostMarker({ at, length, passed }: { at: number; length: number; passed: boolean }) {
+  const percent = Math.min(100, (at / length) * 100)
+  // Near either end the label leans inwards, so it never runs off the screen.
+  const lean = percent < 15 ? '0' : percent > 85 ? '-100%' : '-50%'
+  return (
+    <span className={`ghost${passed ? ' passed' : ''}`} style={{ left: `${percent}%` }}>
+      {!passed && (
+        <span className="ghost-label" style={{ translate: `${lean} 0` }}>
+          Your best: {formatDuration(at)}
+        </span>
+      )}
+    </span>
   )
 }
 

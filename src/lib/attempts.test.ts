@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ghostFor, type Attempt, type AttemptOutcome } from './attempts'
 
 // The attempt log lives in localStorage; tests get a fresh in-memory one and a fresh copy of the module,
 // which is what a new visit to the site looks like.
@@ -74,5 +75,35 @@ describe('attempt history', () => {
       ['from-my-phone', true],
       [id, true],
     ])
+  })
+})
+
+describe('your ghost', () => {
+  const go = (songId: string, outcome: AttemptOutcome, reached: number): Attempt => ({
+    id: `${songId}-${outcome}-${reached}`,
+    songId,
+    kind: 'ladder',
+    startedAt: '2026-09-22T12:00:00.000Z',
+    reached,
+    pauses: 0,
+    endedAt: '2026-09-22T12:05:00.000Z',
+    outcome,
+  })
+
+  it('is the furthest go you ended yourself', () => {
+    const log = [go('style', 'gave-up', 60), go('style', 'stopped', 75.5), go('style', 'left', 120), go('style', 'offline', 110)]
+    expect(ghostFor('style', log, false)).toBe(75.5)
+  })
+
+  it("is gone once you've finished the song", () => {
+    expect(ghostFor('style', [go('style', 'gave-up', 60), go('style', 'finished', 231)], false)).toBeNull()
+    // Planked before attempts were recorded: a completion, but no finished attempt.
+    expect(ghostFor('style', [go('style', 'gave-up', 60)], true)).toBeNull()
+  })
+
+  it('ignores other songs, and goes too short to show', () => {
+    expect(ghostFor('style', [go('cancelled', 'gave-up', 100)], false)).toBeNull()
+    expect(ghostFor('style', [go('style', 'gave-up', 3)], false)).toBeNull()
+    expect(ghostFor('style', [], false)).toBeNull()
   })
 })

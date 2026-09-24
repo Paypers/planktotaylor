@@ -39,6 +39,16 @@ export function HelpPage() {
           Give up, close the plank, leave the page or lose your connection, and that attempt ends there. It's kept in
           your plank history, and you can go again as often as you like.
         </dd>
+        <dt>Your best</dt>
+        <dd>
+          Until you've finished a song, a mark on the progress bar shows the furthest you've held it before. Pass it
+          and you'll hear a chime.
+        </dd>
+        <dt>Chimes</dt>
+        <dd>
+          With sounds on, a chime plays at halfway and another with 30 seconds left, so you know where you are with
+          your face to the floor.
+        </dd>
         <dt>Music</dt>
         <dd>
           Each song plays as its album track from YouTube. Some phones only start it from a tap on the video. Turn
