@@ -80,3 +80,32 @@ async function trim(cache) {
   const keys = await cache.keys()
   await Promise.all(keys.slice(0, Math.max(0, keys.length - MAX_ASSETS)).map((key) => cache.delete(key)))
 }
+
+// Daily reminders: the push carries the words (see supabase/functions/send-reminders), this shows them.
+self.addEventListener('push', (event) => {
+  let message = { title: 'Plank to Taylor', body: "Today's song is waiting." }
+  try {
+    message = { ...message, ...event.data.json() }
+  } catch {
+    // An empty or unreadable push still reminds.
+  }
+  event.waitUntil(
+    self.registration.showNotification(message.title, {
+      body: message.body,
+      icon: `${BASE}icon-192.png`,
+      // One at a time: a later reminder replaces an earlier one still showing.
+      tag: 'today',
+    }),
+  )
+})
+
+// Tapping it opens the site: the tab that's already open if there is one, a new one if not.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
+      const open = windows.find((client) => new URL(client.url).origin === self.location.origin)
+      return open ? open.focus() : self.clients.openWindow(BASE)
+    }),
+  )
+})

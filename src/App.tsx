@@ -19,7 +19,17 @@ import { StreakPanel } from './components/StreakPanel'
 import { Together } from './components/Together'
 import { YearReview } from './components/YearReview'
 import { LADDER, type Song } from './data/songs'
-import { accountsEnabled, bumpDailyStats, displayName, fetchDailyStats, saveLadderCursor, useAccount } from './lib/account'
+import {
+  accountsEnabled,
+  bumpDailyStats,
+  displayName,
+  fetchDailyStats,
+  onSignInAsked,
+  refreshReminderZone,
+  saveLadderCursor,
+  useAccount,
+} from './lib/account'
+import { remindersAvailable } from './lib/push'
 import { fromDayKey } from './lib/dates'
 import { useToday } from './lib/hooks'
 import { dailyView, ladderView, songFor, streakDays, type Completion, type Pause } from './lib/progress'
@@ -89,6 +99,15 @@ export function App() {
   const climbed = ladder.climbedToday.length
   const lastClimb = ladder.climbedToday.at(-1)
   const climbedXp = totalXp(data.completions.filter((c) => c.day === today && ladder.climbedToday.some((l) => l.at === c.at)))
+
+  // Settings asks for the sign-in box (reminders are for signed-in players).
+  useEffect(() => onSignInAsked(() => setDialog('account')), [])
+
+  // A player who's travelled gets reminders at their time where they are now.
+  const userId = user?.id
+  useEffect(() => {
+    if (remindersAvailable && userId) void refreshReminderZone().catch(() => {})
+  }, [userId])
 
   // The numbers move all day: fetched on load, and again on coming back to the site a while later.
   useEffect(() => {

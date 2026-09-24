@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { LADDER } from '../data/songs'
 import { accountsEnabled } from '../lib/account'
 import { followLink, hashFor, RANKS } from '../lib/route'
+import { remindersAvailable } from '../lib/push'
 import { LIGHT_XP } from '../lib/xp'
 import { PageTop } from './PageTop'
 
@@ -162,6 +163,25 @@ export function HelpPage() {
             </dd>
           </Topic>
         </>
+      )}
+
+      {remindersAvailable && (
+        <Topic id="reminders" title="Reminders">
+          <dt>Daily</dt>
+          <dd>
+            Signed in, turn on a daily reminder in Settings: today's song and your streak, at the time you pick. It never
+            comes once today's song is done.
+          </dd>
+          <dt>Evening</dt>
+          <dd>
+            Add a nudge at 8 pm on days you haven't planked yet. It only comes when you have a streak of 3 days or more.
+          </dd>
+          <dt>Each device</dt>
+          <dd>
+            Reminders come to the device you turned them on, at its time. On iPhone and iPad, add the site to your home
+            screen first. Signing out turns them off there.
+          </dd>
+        </Topic>
       )}
 
       <Topic id="home-screen" title="On your phone">

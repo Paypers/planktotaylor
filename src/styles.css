@@ -2241,6 +2241,7 @@ a {
 }
 
 .switch-row input {
+  flex-shrink: 0;
   width: 20px;
   height: 20px;
   accent-color: var(--ink);
@@ -2532,6 +2533,19 @@ a {
   font-size: 15px;
   line-height: 22px;
   color: var(--ink-2);
+}
+
+/* A situation to sort out before a setting can be used: add to home screen, allow notifications. */
+.settings-note {
+  padding: 12px 14px;
+  border-radius: 4px;
+  background: var(--well);
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.reminder-time {
+  max-width: 220px;
 }
 
 .settings-group > .fine {

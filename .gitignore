@@ -3,3 +3,9 @@ dist
 .env
 .env.local
 *.log
+# Built from src/server/functions.ts by `npm run functions:build`.
+supabase/functions/_shared/site.js
+# The send-reminders function's secrets, made by `npm run vapid`.
+supabase/functions.env
+# The Supabase CLI keeps its own notes here.
+supabase/.temp/

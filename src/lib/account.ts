@@ -446,7 +446,91 @@ export async function verifySignInCode(email: string, token: string) {
 }
 
 export async function signOut() {
-  if (accountsEnabled) await (await client()).auth.signOut()
+  if (!accountsEnabled) return
+  // Reminders on this device were this account's: they stop here, before the sign-in goes.
+  await forgetDeviceReminder().catch((error) => console.error('Could not turn reminders off', error))
+  await (await client()).auth.signOut()
+}
+
+const signInAsks = new Set<() => void>()
+
+/** Somewhere without the header's Sign in button (Settings, say) asks for the sign-in box. */
+export function askToSignIn() {
+  signInAsks.forEach((fn) => fn())
+}
+
+export function onSignInAsked(fn: () => void): () => void {
+  signInAsks.add(fn)
+  return () => signInAsks.delete(fn)
+}
+
+/** One device's daily reminder, as its player set it. */
+export interface DeviceReminder {
+  /** "HH:MM", in STEP_MINUTES steps (src/lib/reminders.ts). */
+  remind_at: string
+  evening: boolean
+}
+
+/** This device's reminder in the account, if it has one. */
+export async function loadReminder(endpoint: string): Promise<DeviceReminder | null> {
+  if (!accountsEnabled || !state.user) return null
+  const { data, error } = await (await client())
+    .from('push_subscriptions')
+    .select('remind_at, evening')
+    .eq('endpoint', endpoint)
+    .maybeSingle()
+  if (error) throw error
+  return data as DeviceReminder | null
+}
+
+/** Saves this device's reminder: where to send it (the browser's push subscription), when, and the time zone it's in. */
+export async function saveReminder(subscription: PushSubscriptionJSON, reminder: DeviceReminder) {
+  const user = state.user
+  if (!accountsEnabled || !user || !subscription.endpoint || !subscription.keys) throw new Error('Not signed in')
+  const { error } = await (await client()).from('push_subscriptions').upsert(
+    {
+      endpoint: subscription.endpoint,
+      user_id: user.id,
+      p256dh: subscription.keys.p256dh,
+      auth: subscription.keys.auth,
+      remind_at: reminder.remind_at,
+      evening: reminder.evening,
+      time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    },
+    { onConflict: 'endpoint' },
+  )
+  if (error) throw error
+}
+
+export async function removeReminder(endpoint: string) {
+  if (!accountsEnabled || !state.user) return
+  const { error } = await (await client()).from('push_subscriptions').delete().eq('endpoint', endpoint)
+  if (error) throw error
+}
+
+/** This browser's push subscription, if it has one. Only the live site has a service worker. */
+export async function devicePush(): Promise<PushSubscription | null> {
+  if (!('serviceWorker' in navigator)) return null
+  const registration = await navigator.serviceWorker.getRegistration()
+  return (await registration?.pushManager.getSubscription()) ?? null
+}
+
+async function forgetDeviceReminder() {
+  const push = await devicePush()
+  if (!push) return
+  await removeReminder(push.endpoint)
+  await push.unsubscribe()
+}
+
+/** Someone who's travelled gets reminders at their time where they are now. */
+export async function refreshReminderZone() {
+  const push = await devicePush()
+  if (!push || !state.user) return
+  const { error } = await (await client())
+    .from('push_subscriptions')
+    .update({ time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone })
+    .eq('endpoint', push.endpoint)
+  if (error) throw error
 }
 
 /** The name to show: the one they chose, or the start of their email. */

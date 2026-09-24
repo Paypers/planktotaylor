@@ -1,4 +1,4 @@
--- Plank to Taylor: accounts, sync and the global daily counter.
+-- Plank to Taylor: accounts, sync, the global daily counter, and daily reminders.
 -- Paste into Supabase → SQL Editor → Run. Safe to run more than once.
 
 -- One row per finished plank: today's song once a day, and any number of ladder levels a day
@@ -201,6 +201,81 @@ $$;
 
 revoke all on function public.bump_daily(date, int, int[]) from public;
 grant execute on function public.bump_daily(date, int, int[]) to anon, authenticated;
+
+-- Daily reminders (Web Push), for signed-in players: one row per device that turned them on, with when to
+-- send (a quarter hour, in the player's time zone) and when each last went. The send-reminders Edge
+-- Function reads and updates these with the service key; players see and change only their own.
+create table if not exists public.push_subscriptions (
+  -- Where the browser's push service takes it. Only the browsers' own push services: the same list is
+  -- PUSH_SERVICE in src/lib/reminders.ts, so keep the two in step.
+  endpoint text primary key check (
+    char_length(endpoint) <= 1000
+    and endpoint ~ '^https://(fcm\.googleapis\.com|updates\.push\.services\.mozilla\.com|[a-z0-9-]+\.push\.apple\.com|[a-z0-9-]+\.notify\.windows\.com)/'
+  ),
+  user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  p256dh text not null check (char_length(p256dh) <= 200),
+  auth text not null check (char_length(auth) <= 100),
+  remind_at text not null default '09:00' check (remind_at ~ '^([01][0-9]|2[0-3]):(00|15|30|45)$'),
+  time_zone text not null check (char_length(time_zone) between 1 and 64),
+  evening boolean not null default false,
+  last_morning date,
+  last_evening date,
+  created_at timestamptz not null default now()
+);
+
+alter table public.push_subscriptions enable row level security;
+drop policy if exists "read own reminders" on public.push_subscriptions;
+drop policy if exists "add own reminders" on public.push_subscriptions;
+drop policy if exists "change own reminders" on public.push_subscriptions;
+drop policy if exists "remove own reminders" on public.push_subscriptions;
+create policy "read own reminders" on public.push_subscriptions for select to authenticated using (auth.uid() = user_id);
+create policy "add own reminders" on public.push_subscriptions for insert to authenticated with check (auth.uid() = user_id);
+create policy "change own reminders" on public.push_subscriptions for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "remove own reminders" on public.push_subscriptions for delete to authenticated using (auth.uid() = user_id);
+grant select, insert, update, delete on public.push_subscriptions to authenticated;
+revoke all on public.push_subscriptions from anon;
+
+-- At most 10 devices each, so nobody can fill the table.
+create or replace function public.push_subscriptions_limit()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if (select count(*) from public.push_subscriptions where user_id = new.user_id) >= 10 then
+    raise exception 'too many devices with reminders';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.push_subscriptions_limit() from public;
+drop trigger if exists push_subscriptions_limit on public.push_subscriptions;
+create trigger push_subscriptions_limit before insert on public.push_subscriptions
+  for each row execute function public.push_subscriptions_limit();
+
+-- The schedule: every 15 minutes, call the send-reminders function (only when anyone has reminders on).
+-- It needs the pg_cron and pg_net extensions (Database → Extensions) and two secrets in Vault,
+-- reminders_url and reminders_secret (`npm run vapid` prints the lines). Until the extensions are on,
+-- this does nothing, so the rest of the script still runs. Scheduling again by the same name updates it.
+do $schedule$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') and exists (select 1 from pg_extension where extname = 'pg_net') then
+    perform cron.schedule('send-reminders', '*/15 * * * *', $job$
+      select net.http_post(
+        url := (select decrypted_secret from vault.decrypted_secrets where name = 'reminders_url'),
+        headers := jsonb_build_object(
+          'Content-Type', 'application/json',
+          'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'reminders_secret')
+        ),
+        body := '{}'::jsonb,
+        timeout_milliseconds := 60000
+      )
+      where exists (select 1 from public.push_subscriptions)
+    $job$);
+  end if;
+end
+$schedule$;
 
 -- Limits on what a player can store, so nobody can fill the database through their own rows.
 -- "not valid" checks new and changed rows only, so older rows never stop this script.

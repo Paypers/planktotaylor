@@ -9,3 +9,7 @@
 # The service worker: always checked for a new copy, so a deploy that changes it takes effect straight away.
 /sw.js
   Cache-Control: no-cache
+
+# Today's song for the year ahead (made by the build): checked on every read, so a new release shows the same day.
+/daily.json
+  Cache-Control: no-cache

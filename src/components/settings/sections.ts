@@ -1,7 +1,9 @@
 import type { ComponentType } from 'react'
 import type { IconName } from '../Icon'
 import { AppearanceSettings } from './AppearanceSettings'
+import { remindersAvailable } from '../../lib/push'
 import { PlankSettings } from './PlankSettings'
+import { ReminderSettings } from './ReminderSettings'
 
 export interface SettingsSection {
   /** Its address: #settings/<id>. Keep it once shipped, since people bookmark and share them. */
@@ -18,4 +20,8 @@ export interface SettingsSection {
 export const SECTIONS: SettingsSection[] = [
   { id: 'appearance', label: 'Appearance', summary: 'Theme and colors', icon: 'palette', Content: AppearanceSettings },
   { id: 'plank', label: 'Plank', summary: 'Aurora lights', icon: 'sparkles', Content: PlankSettings },
+  // Only on a site with reminders set up (see "Daily reminders" in the README).
+  ...(remindersAvailable
+    ? [{ id: 'reminders', label: 'Reminders', summary: 'A nudge to plank each day', icon: 'bell' as const, Content: ReminderSettings }]
+    : []),
 ]

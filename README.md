@@ -9,6 +9,7 @@ Hold a plank for one Taylor Swift song a day.
 - **Aurora lights**: while the song plays, a soft aurora in the album's colors drifts behind the timer, and every so often a light appears. Tap it to catch it, with your phone at least an arm's length away so it means lifting an arm. Each is a few XP on a plank that earns XP. Settings → Plank turns them off.
 - **Your Plank Year**: from 1 December to the end of January, your year in planks as slides you tap through, like Spotify Wrapped, with a card to share for each.
 - **No sign-up needed**: progress is saved in the browser. Signing in (optional) syncs it across devices.
+- **Daily reminders**: a push notification at the time you pick, with today's song and your streak, never once today's song is done (signed-in players; see below).
 - **On your home screen**: add it to a phone's home screen and it opens full screen, like an app. From the second plank on, the home page offers it: a button on Android (and Chrome or Edge on a computer), the Share steps on iPhone and iPad.
 - **Themes**: System (follows the device), Light and Dark, plus your own. The ⚙ in the header opens Settings → Appearance, where you can make and save as many color themes as you like.
 
@@ -70,9 +71,28 @@ This adds:
 - **How everyone did today** ([src/lib/together.ts](src/lib/together.ts)): once you've planked today's song, the card shows how many planked it, the time held together ("Together: 26 hours of planking"), how many held it all the way through 🟩, and, once 20 people have planked, the song's toughest stretch ("around 2:40") with a faint heat strip of where breaks bunched up. Planks with no breaks are a count, never a percentage; there are no break counts and nothing that ranks anyone. Like the counter, these are fun numbers, not tamper-proof ones.
 
 Security, in short:
-- Every table has row-level security: players read and write only their own rows, attempts can't be changed or removed, and the daily counter and its stats only move through `bump_daily`, one plank at a time, which refuses anything out of range (a song over an hour, more than 20 breaks). The counter is open to anyone by design, so treat it as a fun number, not a tamper-proof one.
+- Every table has row-level security: players read and write only their own rows (reminder subscriptions too), attempts can't be changed or removed, and the daily counter and its stats only move through `bump_daily`, one plank at a time, which refuses anything out of range (a song over an hour, more than 20 breaks). The counter is open to anyone by design, so treat it as a fun number, not a tamper-proof one.
 - The site ships only the publishable key. Keep the secret key out of `.env`.
 - [public/_headers](public/_headers) sets security headers on Cloudflare Pages: no framing by other sites, no MIME sniffing, and no camera, microphone or location access. It also has `sw.js` checked on every visit (`Cache-Control: no-cache`), so a changed service worker takes effect straight away.
+
+## Optional: daily reminders (push notifications)
+
+Signed-in players can have a reminder on each of their devices: "Today's song is Style (3:51). Your 12-day streak is on the line." It comes at a time they pick (Settings → Reminders), in their own time zone, and never once today's song is done. They can add an 8 pm nudge on days they haven't planked yet, which only comes with a streak of 3 or more. On iPhone and iPad (iOS 16.4 and later) reminders only come to the site on the home screen, and Settings says so.
+
+It needs the Supabase setup above, and then, once:
+
+1. **Keys.** `npm run vapid` makes the key pair reminders are signed with and a secret for the schedule. It writes `supabase/functions.env` (kept out of git; don't lose it, since new keys stop every reminder until each device turns them on again) and prints the lines for the next steps.
+2. **The site.** Add the printed `VITE_VAPID_PUBLIC_KEY=…` to `.env` and to the host's build settings (Cloudflare Pages → Settings → Variables and secrets), then deploy the site. Settings → Reminders only appears once it's there.
+3. **The Supabase CLI**, logged in and linked to the project: `npx supabase@2 login`, then `npx supabase@2 link --project-ref <ref>` (the ref is the start of the project's URL).
+4. **The function's secrets:** `npx supabase@2 secrets set --env-file supabase/functions.env`.
+5. **The function:** `npm run functions:deploy`. It first builds `supabase/functions/_shared/site.js` from the site's own code (who's due, what the message says, streaks and freezes), so the function never keeps a copy of its own; run it again whenever those change.
+6. **The schedule:** Database → Extensions, turn on `pg_cron` and `pg_net`. Then in the SQL Editor, run the two `vault.create_secret` lines `npm run vapid` printed (with your project's ref in the address), and run [supabase/schema.sql](supabase/schema.sql) again: once the extensions are on, it calls the function every 15 minutes.
+7. **Try it:** Settings → Reminders on a phone, and set the time to the next quarter hour.
+
+How it works:
+- **The browser's side** ([src/lib/push.ts](src/lib/push.ts), [public/sw.js](public/sw.js)): turning reminders on asks for permission, subscribes to the browser's push service, and saves that subscription with the time and time zone to `push_subscriptions`, one row per device. Opening the site updates the time zone, so a player who travels gets them at their time where they are. Signing out removes this device's. The service worker shows each push as a notification; tapping it opens the site.
+- **The server's side** ([supabase/functions/send-reminders](supabase/functions/send-reminders)): every 15 minutes the schedule calls the function with a secret (anyone else is turned away). It finds the devices whose time has come (within the hour, in case a check was missed, and each at most once a day), skips any whose player has planked today's song, works out the streak with the site's own streak code (freezes included), and sends through [`@negrel/webpush`](https://jsr.io/@negrel/webpush). Today's song comes from `daily.json`, which every build of the site publishes from [src/lib/daily.ts](src/lib/daily.ts), so a new release is named the day it's out without redeploying the function. Subscriptions a push service says are gone are deleted.
+- **What's stored:** each device's push address and keys, the reminder time, the time zone, and when each reminder last went. Pushes only ever go to the browsers' own push services (Google, Mozilla, Apple, Microsoft): the table refuses anything else, and so does the function.
 
 ## How it works
 
@@ -92,6 +112,7 @@ Security, in short:
 | Settings page and its sections | [src/components/settings/](src/components/settings/) |
 | Theme colors, saving and applying themes | [src/lib/palette.ts](src/lib/palette.ts), [src/lib/theme.ts](src/lib/theme.ts) |
 | Page addresses (`#settings/…`, `#ranks`, `#help`, `#year`) | [src/lib/route.ts](src/lib/route.ts) |
+| Daily reminders: who's due and what it says; the browser's side; the function | [src/lib/reminders.ts](src/lib/reminders.ts), [src/lib/push.ts](src/lib/push.ts), [supabase/functions/send-reminders](supabase/functions/send-reminders) |
 | How everyone did today | [src/lib/together.ts](src/lib/together.ts), [src/components/Together.tsx](src/components/Together.tsx) |
 | Your Plank Year: the numbers, the slides, the cards | [src/lib/yearInReview.ts](src/lib/yearInReview.ts), [src/components/YearReview.tsx](src/components/YearReview.tsx), [src/lib/yearCard.ts](src/lib/yearCard.ts) |
 | Home screen: app manifest, icons, service worker, the install offer | [public/manifest.webmanifest](public/manifest.webmanifest), [public/sw.js](public/sw.js), [src/lib/install.ts](src/lib/install.ts) |

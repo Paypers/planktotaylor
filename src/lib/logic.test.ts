@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ALBUMS, LADDER, LAUNCH_SONGS, SONG_BY_ID, SONGS, UPCOMING, formatDuration, slugify } from '../data/songs'
-import { DAILY_EPOCH, PREMIERES, dailyNumber, dailySong, songOfTheDay } from './daily'
+import { DAILY_EPOCH, PREMIERES, dailyNumber, dailySchedule, dailySong, songOfTheDay } from './daily'
 import { addDays, daysBetween } from './dates'
 import { applyPlank, emptyData, ladderRecords, ladderView, mergeCompletions, newerCursor, newerSettings, streakDays, type Completion } from './progress'
 import { isVideoId, normalizeTitle, parseIsoDuration, pickVideo, videoSongName, type VideoCandidate } from './match'
@@ -93,6 +93,17 @@ describe('daily song', () => {
       expect(LADDER).not.toContain(song)
     }
     expect(LADDER.length).toBe(LAUNCH_SONGS.length)
+  })
+})
+
+describe('daily.json', () => {
+  it('lists the song of the day, day by day, as the site shows it', () => {
+    const days = dailySchedule('2026-09-22', 400)
+    expect(Object.keys(days)).toHaveLength(400)
+    for (const day of ['2026-09-22', '2026-09-25', '2027-02-14', addDays('2026-09-22', 399)]) {
+      const song = dailySong(day)
+      expect(days[day]).toEqual({ id: song.id, title: song.title, seconds: song.seconds, length: formatDuration(song.seconds) })
+    }
   })
 })
 

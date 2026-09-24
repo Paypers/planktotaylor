@@ -1,4 +1,4 @@
-import { LAUNCH_SONGS, SONG_BY_ID, type Song } from '../data/songs'
+import { LAUNCH_SONGS, SONG_BY_ID, formatDuration, type Song } from '../data/songs'
 import { addDays, daysBetween, type DayKey } from './dates'
 
 /** Daily #1. Everyone on the same calendar date gets the same song, like Wordle. */
@@ -87,4 +87,27 @@ export function songOfTheDay(day: DayKey, premieres: ReadonlyMap<DayKey, Song | 
 /** The global song of the day. */
 export function dailySong(day: DayKey): Song {
   return songOfTheDay(day, PREMIERE_SONGS)
+}
+
+/** One day's song, as the site publishes it in daily.json. */
+export interface ScheduledSong {
+  id: string
+  title: string
+  seconds: number
+  /** "3:51" */
+  length: string
+}
+
+/**
+ * The song of the day for `count` days from `from`, published with every build as daily.json, so the
+ * server (daily reminders, the Discord post) always names the same song as the site, new releases and all.
+ */
+export function dailySchedule(from: DayKey, count: number): Record<DayKey, ScheduledSong> {
+  const days: Record<DayKey, ScheduledSong> = {}
+  for (let i = 0; i < count; i++) {
+    const day = addDays(from, i)
+    const song = dailySong(day)
+    days[day] = { id: song.id, title: song.title, seconds: song.seconds, length: formatDuration(song.seconds) }
+  }
+  return days
 }

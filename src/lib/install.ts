@@ -34,12 +34,12 @@ function readDismissed(): boolean {
 }
 
 /** Opened from the home screen, or as an installed app. */
-function isStandalone(): boolean {
+export function isStandalone(): boolean {
   return matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true
 }
 
 /** iPhone or iPad. iPads report themselves as Macs, but Macs have no touch screen. */
-function isIos(): boolean {
+export function isIos(): boolean {
   return /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 }
 

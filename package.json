@@ -10,7 +10,10 @@
     "preview": "vite preview",
     "test": "vitest run",
     "sync:youtube": "node --env-file-if-exists=.env scripts/sync-youtube.ts",
-    "watch:release": "node --env-file-if-exists=.env scripts/watch-release.ts"
+    "watch:release": "node --env-file-if-exists=.env scripts/watch-release.ts",
+    "vapid": "node scripts/vapid-keys.ts",
+    "functions:build": "vite build --config vite.functions.config.ts",
+    "functions:deploy": "npm run functions:build && npx supabase@2 functions deploy send-reminders --no-verify-jwt --use-api"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.0",
