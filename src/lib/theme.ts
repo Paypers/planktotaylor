@@ -1,9 +1,10 @@
 import { useSyncExternalStore } from 'react'
 import { BUILT_IN, completePalette, LIGHT, schemeFor, TOKENS, type Palette, type Scheme } from './palette'
 
-// The theme lives in this browser, apart from progress, and for signed-in players in their account
-// too (see account.ts). index.html reads the same key before the first paint (so the page never
-// flashes the wrong colours): keep its format in step.
+// The theme lives in this browser, apart from progress. Signed-in players' custom themes are kept in
+// their account too (see account.ts), so they can pick them on any device, but which theme shows is
+// each device's own choice: System until one is picked there. index.html reads the same key before the
+// first paint (so the page never flashes the wrong colours): keep its format in step.
 const STORAGE_KEY = 'plank-to-taylor:theme:v1'
 
 export type BuiltInTheme = 'system' | 'light' | 'dark'
@@ -18,10 +19,17 @@ export interface CustomTheme {
 
 export interface SavedTheme {
   v: 1
-  /** A built-in theme, or a custom theme's id. */
+  /** A built-in theme, or a custom theme's id. This device's choice: never sent to the account. */
   selected: string
   themes: CustomTheme[]
-  /** When the player last changed their themes, on any device. Absent until they do. */
+  /** When the player last changed their custom themes, on any device. Absent until they do. */
+  updatedAt?: string
+}
+
+/** The custom themes, as the account keeps them: which one shows is up to each device. */
+export interface AccountThemes {
+  v: 1
+  themes: CustomTheme[]
   updatedAt?: string
 }
 
@@ -84,15 +92,17 @@ function load(): Saved {
 
 let state: ThemeState = { ...load(), draft: null }
 const listeners = new Set<() => void>()
-const savedListeners = new Set<(saved: Saved) => void>()
+const savedListeners = new Set<(themes: AccountThemes) => void>()
 
 const savedPart = ({ v, selected, themes, updatedAt }: Saved): Saved => ({ v, selected, themes, ...(updatedAt ? { updatedAt } : {}) })
+const accountPart = ({ v, themes, updatedAt }: Saved): AccountThemes => ({ v, themes, ...(updatedAt ? { updatedAt } : {}) })
 
 /**
- * `save`: 'change' for the player's own change (stored with the time, and sent to the account),
- * 'account' for the account's copy (stored as it came), false for what's only shown.
+ * `save`: 'change' for a change to the custom themes (stored with the time, and sent to the account),
+ * 'choice' for picking which theme shows (stored here only), 'account' for the account's copy (stored
+ * as it came), false for what's only shown.
  */
-function set(next: ThemeState, save: 'change' | 'account' | false = 'change') {
+function set(next: ThemeState, save: 'change' | 'choice' | 'account' | false = 'change') {
   state = save === 'change' ? { ...next, updatedAt: new Date().toISOString() } : next
   if (save) {
     try {
@@ -103,7 +113,7 @@ function set(next: ThemeState, save: 'change' | 'account' | false = 'change') {
   }
   apply()
   listeners.forEach((fn) => fn())
-  if (save === 'change') savedListeners.forEach((fn) => fn(savedPart(state)))
+  if (save === 'change') savedListeners.forEach((fn) => fn(accountPart(state)))
 }
 
 /** Saved themes from elsewhere. Unsaved edits here stay, unless their theme went away or isn't showing. */
@@ -173,20 +183,26 @@ export function useTheme(): ThemeState {
   )
 }
 
-/** The saved themes and choice, as the account keeps them. */
-export function savedTheme(): SavedTheme {
-  return savedPart(state)
+/** The custom themes, as the account keeps them. */
+export function accountThemes(): AccountThemes {
+  return accountPart(state)
 }
 
-/** Fires when the player saves a change to their themes here, so the account can keep a copy. */
-export function onThemeSaved(fn: (saved: SavedTheme) => void): () => void {
+/** Fires when the player saves a change to their custom themes here, so the account can keep a copy. */
+export function onThemeSaved(fn: (themes: AccountThemes) => void): () => void {
   savedListeners.add(fn)
   return () => savedListeners.delete(fn)
 }
 
-/** Themes from the account (changed on another device). */
-export function applySavedTheme(value: unknown) {
-  set(withDraft(readSaved(value)), 'account')
+/**
+ * Custom themes from the account (changed on another device). This device keeps showing what it was,
+ * unless that was a custom theme that's since been deleted. Copies saved before the choice stayed on
+ * each device carry one: it's ignored.
+ */
+export function applyAccountThemes(value: unknown) {
+  const { themes, updatedAt } = readSaved(value)
+  const selected = isBuiltIn(state.selected) || themes.some((t) => t.id === state.selected) ? state.selected : 'system'
+  set(withDraft({ v: 1, selected, themes, ...(updatedAt ? { updatedAt } : {}) }), 'account')
 }
 
 export function hasUnsavedChanges(s: ThemeState = state): boolean {
@@ -195,10 +211,10 @@ export function hasUnsavedChanges(s: ThemeState = state): boolean {
   return !saved || saved.name !== s.draft.name || TOKENS.some((token) => saved.colors[token] !== s.draft!.colors[token])
 }
 
-/** Switches theme. Unsaved edits are dropped: ask first (see hasUnsavedChanges). */
+/** Switches theme, on this device only. Unsaved edits are dropped: ask first (see hasUnsavedChanges). */
 export function selectTheme(id: string) {
   if (!isBuiltIn(id) && !state.themes.some((t) => t.id === id)) return
-  set({ ...state, selected: id, draft: null })
+  set({ ...state, selected: id, draft: null }, 'choice')
 }
 
 function uniqueName(base: string): string {

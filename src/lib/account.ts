@@ -16,7 +16,7 @@ import {
 } from './progress'
 import { forgetAttempts, getAttempts, mergeAttempts, onAttemptEnded, type AttemptKind, type AttemptOutcome } from './attempts'
 import { applyPrefs, getData, onPlankRecorded, onPrefsChanged, replaceProgress } from './store'
-import { applySavedTheme, onThemeSaved, readSaved, savedTheme, type SavedTheme } from './theme'
+import { accountThemes, applyAccountThemes, onThemeSaved, readSaved, type AccountThemes } from './theme'
 
 // The project address, without the /rest/v1/ the dashboard shows on the end (it breaks sign-in).
 const url = (import.meta.env.VITE_SUPABASE_URL as string | undefined)
@@ -165,7 +165,8 @@ interface ProfileRow {
 /** Settings the account keeps a copy of. */
 interface SettingsFields {
   prefs?: Prefs
-  theme?: SavedTheme
+  /** Custom themes. Which one shows is each device's own choice, so that stays in the browser. */
+  theme?: AccountThemes
 }
 
 /** The account's sound settings, or null if it has none. */
@@ -179,7 +180,7 @@ function readPrefs(value: unknown, fallback: Prefs): Prefs | null {
   }
 }
 
-/** Sound and themes: whichever copy was changed last, here or in the account, wins. */
+/** Sound and custom themes: whichever copy was changed last, here or in the account, wins. */
 async function syncSettings(supabase: SupabaseClient, userId: string, row: ProfileRow | null) {
   const push: SettingsFields = {}
   const prefs = getData().prefs
@@ -188,11 +189,11 @@ async function syncSettings(supabase: SupabaseClient, userId: string, row: Profi
   if (prefsWinner === 'remote') applyPrefs(theirPrefs!)
   if (prefsWinner === 'local') push.prefs = prefs
 
-  const theme = savedTheme()
-  const theirTheme = row?.theme ? readSaved(row.theme) : null
-  const themeWinner = newerSettings(theme, theirTheme)
-  if (themeWinner === 'remote') applySavedTheme(theirTheme)
-  if (themeWinner === 'local') push.theme = theme
+  const themes = accountThemes()
+  const theirThemes = row?.theme ? readSaved(row.theme) : null
+  const themeWinner = newerSettings(themes, theirThemes)
+  if (themeWinner === 'remote') applyAccountThemes(theirThemes)
+  if (themeWinner === 'local') push.theme = themes
 
   if (push.prefs || push.theme) await saveProfileRow(supabase, userId, push)
 }
@@ -215,8 +216,8 @@ function claimBrowser(userId: string) {
     // Their settings stay on screen until this account's arrive, but never count as newer.
     const { updatedAt: _prefsAt, ...prefs } = getData().prefs
     applyPrefs(prefs)
-    const { updatedAt: _themeAt, ...theme } = savedTheme()
-    applySavedTheme(theme)
+    const { updatedAt: _themeAt, ...themes } = accountThemes()
+    applyAccountThemes(themes)
   }
 }
 

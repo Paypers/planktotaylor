@@ -37,7 +37,7 @@ export function AppearanceSettings() {
     <>
       <section className="settings-group" aria-labelledby="theme-heading">
         <h3 id="theme-heading">Theme</h3>
-        <p>System matches your device's light or dark setting.</p>
+        <p>System matches your device's light or dark setting. The theme you pick here is for this device only.</p>
         <div role="radiogroup" aria-labelledby="theme-heading" className="theme-choices">
           <div className="theme-grid">
             {BUILT_IN_THEMES.map((t) => (
@@ -89,7 +89,9 @@ export function AppearanceSettings() {
         </div>
         <p className="fine">
           A new theme starts from the colors showing now.{' '}
-          {user ? 'Your themes are saved to your account, on every device you sign in on.' : 'Your themes are saved in this browser.'}
+          {user
+            ? 'Your themes are saved to your account, ready to pick on every device you sign in on.'
+            : 'Your themes are saved in this browser.'}
         </p>
       </section>
 

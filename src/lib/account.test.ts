@@ -126,7 +126,8 @@ describe('account sync', () => {
     vi.unstubAllGlobals()
   })
 
-  it('brings the settings chosen on another device to a new one', async () => {
+  it('brings sound settings and custom themes to a new device, which keeps its own choice of theme', async () => {
+    const midnight = { id: 'midnight', name: 'Midnight', colors: { paper: '#000000' } }
     fake.state.users.set('ana', {
       completions: [],
       profile: {
@@ -135,30 +136,34 @@ describe('account sync', () => {
         display_name: 'Ana',
         avatar_url: 'https://example.supabase.co/avatar.jpg',
         prefs: { music: false, sounds: true, updatedAt: '2026-09-20T00:00:00.000Z' },
-        theme: { v: 1, selected: 'dark', themes: [], updatedAt: '2026-09-20T00:00:00.000Z' },
+        // Saved before the choice stayed on each device: its "selected" is ignored.
+        theme: { v: 1, selected: 'midnight', themes: [midnight], updatedAt: '2026-09-20T00:00:00.000Z' },
       },
     })
     const { store, theme } = await visit()
     signIn('ana')
-    await vi.waitFor(() => expect(theme.getTheme().selected).toBe('dark'))
+    await vi.waitFor(() => expect(theme.getTheme().themes).toMatchObject([{ id: 'midnight', name: 'Midnight' }]))
+    expect(theme.getTheme().selected).toBe('system')
     expect(store.getData().prefs.music).toBe(false)
   })
 
   it('saves settings changed while signed in to the account, and sends nothing while signed out', async () => {
     const { store, theme } = await visit()
     store.setPrefs({ sounds: false })
-    theme.selectTheme('light')
+    const first = theme.createTheme()
     expect(fake.state.requests).toBe(0)
 
     // Signing in takes them along: the account had none.
     signIn('ana')
     await vi.waitFor(() => expect(account('ana')?.profile?.prefs).toMatchObject({ sounds: false }))
-    await vi.waitFor(() => expect(account('ana')?.profile?.theme).toMatchObject({ selected: 'light' }))
+    await vi.waitFor(() => expect(account('ana')?.profile?.theme).toMatchObject({ themes: [{ id: first }] }))
 
     store.setPrefs({ music: false })
     await vi.waitFor(() => expect(account('ana')?.profile?.prefs).toMatchObject({ music: false, sounds: false }))
     const id = theme.createTheme()
-    await vi.waitFor(() => expect(account('ana')?.profile?.theme).toMatchObject({ selected: id, themes: [{ id }] }))
+    await vi.waitFor(() => expect(account('ana')?.profile?.theme).toMatchObject({ themes: [{ id: first }, { id }] }))
+    // Which theme shows is this device's own business.
+    expect(account('ana')?.profile?.theme).not.toHaveProperty('selected')
 
     signOut()
     const before = fake.state.requests

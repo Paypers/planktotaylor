@@ -99,6 +99,33 @@ describe('themes', () => {
     expect(saved.themes[0]).toMatchObject({ id, name: 'Midnight', scheme: 'dark', colors: { ...DARK, signal: '#3366ff' } })
   })
 
+  it("keep each device's choice to itself, and only a change to the themes counts as one for the account", async () => {
+    const theme = await visit()
+    const saved: unknown[] = []
+    theme.onThemeSaved((themes) => saved.push(themes))
+    theme.selectTheme('dark')
+    expect(saved).toEqual([])
+    expect(theme.accountThemes()).toEqual({ v: 1, themes: [] })
+    const id = theme.createTheme()
+    expect(saved).toHaveLength(1)
+    expect(saved[0]).not.toHaveProperty('selected')
+    expect(theme.accountThemes()).toMatchObject({ themes: [{ id }], updatedAt: expect.any(String) })
+  })
+
+  it("take the account's themes but keep showing this device's choice, unless it was deleted", async () => {
+    const theme = await visit()
+    const mine = theme.createTheme()
+    const theirs = { id: 'theirs', name: 'Theirs', colors: DARK }
+    theme.selectTheme('dark')
+    theme.applyAccountThemes({ v: 1, selected: 'theirs', themes: [theirs], updatedAt: '2026-09-24T00:00:00.000Z' })
+    expect(theme.getTheme()).toMatchObject({ selected: 'dark', themes: [{ id: 'theirs' }], updatedAt: '2026-09-24T00:00:00.000Z' })
+
+    theme.applyAccountThemes({ v: 1, themes: [theirs, { ...theirs, id: mine, name: 'Mine' }] })
+    theme.selectTheme(mine)
+    theme.applyAccountThemes({ v: 1, themes: [theirs] })
+    expect(theme.getTheme().selected).toBe('system')
+  })
+
   it('drop edits on discard', async () => {
     const theme = await visit()
     theme.createTheme()

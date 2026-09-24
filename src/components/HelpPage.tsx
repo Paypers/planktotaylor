@@ -118,8 +118,9 @@ export function HelpPage() {
             </dd>
             <dt>Signed in</dt>
             <dd>
-              Your streak, ladder, XP, plank history, name, photo and settings follow you to every device you sign in on.
-              Progress from before you signed in comes along too.
+              Your streak, ladder, XP, plank history, name, photo, sound settings and color themes follow you to every
+              device you sign in on. Which theme shows is up to each device. Progress from before you signed in comes
+              along too.
             </dd>
           </Topic>
         </>
