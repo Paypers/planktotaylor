@@ -1,6 +1,7 @@
-import { useId, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { COLOR_GROUPS, COLOR_LABELS, contrast, CONTRAST_CHECKS, normalizeHex, type ColorOption, type Palette, type Token } from '../../lib/palette'
 import { discardChanges, duplicateTheme, editTheme, saveTheme, type CustomTheme } from '../../lib/theme'
+import { ColorPicker, type ReadCheck } from './ColorPicker'
 
 /** Where a colour gets hard to read against what it sits on. */
 function readabilityWarnings(colors: Palette): Map<Token, string> {
@@ -25,6 +26,8 @@ interface Props {
 export function ThemeEditor({ theme, unsaved, onDelete }: Props) {
   const headingId = useId()
   const warnings = readabilityWarnings(theme.colors)
+  // The colour whose picker is open: one at a time.
+  const [picking, setPicking] = useState<Token | null>(null)
 
   return (
     <section className="settings-group theme-editor" aria-labelledby={headingId}>
@@ -43,7 +46,14 @@ export function ThemeEditor({ theme, unsaved, onDelete }: Props) {
       {COLOR_GROUPS.map((group) => (
         <ColorGroup key={group.title} title={group.title}>
           {group.colors.map((option) => (
-            <ColorRow key={option.token} option={option} value={theme.colors[option.token]} warning={warnings.get(option.token)} />
+            <ColorRow
+              key={option.token}
+              option={option}
+              palette={theme.colors}
+              warning={warnings.get(option.token)}
+              picking={picking === option.token}
+              onPicking={(open) => setPicking(open ? option.token : null)}
+            />
           ))}
         </ColorGroup>
       ))}
@@ -85,23 +95,59 @@ function ColorGroup({ title, children }: { title: string; children: ReactNode })
   )
 }
 
-/** A colour: the picker, what it paints, and its hex code to type or copy. */
-function ColorRow({ option, value, warning }: { option: ColorOption; value: string; warning?: string }) {
+interface RowProps {
+  option: ColorOption
+  palette: Palette
+  warning?: string
+  /** Its picker is open. */
+  picking: boolean
+  onPicking: (open: boolean) => void
+}
+
+/** What a colour has to stay readable on, if anything: the first contrast check it's the text of. */
+function readCheck(token: Token, palette: Palette): ReadCheck | undefined {
+  const found = CONTRAST_CHECKS.find((c) => c.fg === token)
+  return found && { on: COLOR_LABELS[found.bg], onHex: palette[found.bg], min: found.min }
+}
+
+/** A colour: its swatch (which opens the picker), what it paints, and its hex code to type or copy. */
+function ColorRow({ option, palette, warning, picking, onPicking }: RowProps) {
   const id = useId()
+  const value = palette[option.token]
   // What's being typed in the hex box, until it's left. Otherwise the box shows the colour.
   const [typed, setTyped] = useState<string | null>(null)
   const set = (hex: string) => editTheme({ colors: { [option.token]: hex } })
   const describedBy = warning ? `${id}-hint ${id}-warn` : `${id}-hint`
+  const row = useRef<HTMLDivElement>(null)
+  const swatch = useRef<HTMLButtonElement>(null)
+
+  // A click anywhere else closes the picker (on a phone, the backdrop does).
+  useEffect(() => {
+    if (!picking) return
+    const away = (event: PointerEvent) => {
+      if (!row.current?.contains(event.target as Node)) onPicking(false)
+    }
+    document.addEventListener('pointerdown', away)
+    return () => document.removeEventListener('pointerdown', away)
+  }, [picking, onPicking])
+
+  const close = () => {
+    onPicking(false)
+    swatch.current?.focus({ preventScroll: true })
+  }
 
   return (
-    <div className="color-row">
-      <input
+    <div ref={row} className={picking ? 'color-row picking' : 'color-row'}>
+      <button
+        ref={swatch}
         id={id}
-        type="color"
+        type="button"
         className="color-swatch"
-        value={value}
-        onChange={(e) => set(e.target.value)}
+        style={{ background: value }}
+        aria-haspopup="dialog"
+        aria-expanded={picking}
         aria-describedby={describedBy}
+        onClick={() => onPicking(!picking)}
       />
       <div className="color-text">
         <label htmlFor={id} className="color-label">
@@ -138,6 +184,17 @@ function ColorRow({ option, value, warning }: { option: ColorOption; value: stri
         }}
         onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
       />
+      {picking && (
+        <ColorPicker
+          label={option.label}
+          hint={option.hint}
+          value={value}
+          palette={palette}
+          check={readCheck(option.token, palette)}
+          onChange={set}
+          onClose={close}
+        />
+      )}
     </div>
   )
 }

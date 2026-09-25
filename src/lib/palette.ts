@@ -142,6 +142,37 @@ export function contrast(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05)
 }
 
+/** A colour as the picker holds it: hue (0 to 360), how much colour and how bright (each 0 to 1). */
+export interface Hsv {
+  h: number
+  s: number
+  v: number
+}
+
+/** A `#rrggbb` colour as hue, saturation and brightness. Greys have hue 0. */
+export function hexToHsv(hex: string): Hsv {
+  const n = parseInt(hex.slice(1), 16)
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => c / 255)
+  const max = Math.max(r, g, b)
+  const range = max - Math.min(r, g, b)
+  let h = 0
+  if (range > 0) {
+    if (max === r) h = ((g - b) / range + 6) % 6
+    else if (max === g) h = (b - r) / range + 2
+    else h = (r - g) / range + 4
+  }
+  return { h: h * 60, s: max === 0 ? 0 : range / max, v: max }
+}
+
+/** Hue, saturation and brightness as `#rrggbb`. */
+export function hsvToHex({ h, s, v }: Hsv): string {
+  const f = (k: number) => {
+    const at = (k + h / 60) % 6
+    return v - v * s * Math.max(0, Math.min(at, 4 - at, 1))
+  }
+  return `#${[f(5), f(3), f(1)].map((c) => Math.round(c * 255).toString(16).padStart(2, '0')).join('')}`
+}
+
 /** A dark background makes a dark theme: form controls, scrollbars and the video backdrop follow it. */
 export function schemeFor(colors: Palette): Scheme {
   // 0.18 is where black and white text contrast equally.

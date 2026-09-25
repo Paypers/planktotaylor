@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import css from '../styles.css?raw'
-import { contrast, CONTRAST_CHECKS, DARK, LIGHT, normalizeHex, schemeFor, TOKENS, type Palette } from './palette'
+import { contrast, CONTRAST_CHECKS, DARK, hexToHsv, hsvToHex, LIGHT, normalizeHex, schemeFor, TOKENS, type Palette } from './palette'
 import { hashFor, parseRoute } from './route'
 
 function memoryStorage(): Storage {
@@ -29,6 +29,29 @@ function cssBlock(selector: string): Record<string, string> {
   const body = css.slice(start, css.indexOf('}', start))
   return Object.fromEntries([...body.matchAll(/--([\w-]+):\s*(#[0-9a-f]{6})/gi)].map((m) => [m[1], m[2].toLowerCase()]))
 }
+
+describe("the colour picker's colours", () => {
+  it('reads a colour as hue, how much colour and how bright', () => {
+    expect(hexToHsv('#ff0000')).toEqual({ h: 0, s: 1, v: 1 })
+    expect(hexToHsv('#00ff00')).toEqual({ h: 120, s: 1, v: 1 })
+    expect(hexToHsv('#0000ff')).toEqual({ h: 240, s: 1, v: 1 })
+    expect(hexToHsv('#000000')).toEqual({ h: 0, s: 0, v: 0 })
+    expect(hexToHsv('#ffffff')).toEqual({ h: 0, s: 0, v: 1 })
+    expect(hexToHsv('#808080').s).toBe(0)
+  })
+
+  it('writes them back as the same hex, for every colour in both palettes', () => {
+    for (const hex of [...Object.values(LIGHT), ...Object.values(DARK), '#ff00ff', '#00ffff', '#123456', '#fedcba']) {
+      expect(hsvToHex(hexToHsv(hex))).toBe(hex)
+    }
+  })
+
+  it('keeps to the edges of the box', () => {
+    expect(hsvToHex({ h: 200, s: 0, v: 1 })).toBe('#ffffff')
+    expect(hsvToHex({ h: 200, s: 1, v: 0 })).toBe('#000000')
+    expect(hsvToHex({ h: 359.9, s: 1, v: 1 })).toBe('#ff0000')
+  })
+})
 
 describe('palettes', () => {
   it('match the Light and Dark colours in styles.css', () => {
