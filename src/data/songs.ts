@@ -342,7 +342,7 @@ const CATALOG: Record<AlbumId, string> = {
   // The Encore's new songs. The rest of its tracklist is Showgirl's, above.
   encore: `
     Patient Zero | ?
-    Cleveland! | ?
+    Cleveland! | 3:27
     Pink Clouding | ?
     Babylon | ?`,
 }
