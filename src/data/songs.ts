@@ -341,10 +341,10 @@ const CATALOG: Record<AlbumId, string> = {
     The Life of a Showgirl | 4:01`,
   // The Encore's new songs. The rest of its tracklist is Showgirl's, above.
   encore: `
-    Patient Zero | ?
+    Patient Zero | 3:46
     Cleveland! | 3:27
     Pink Clouding | ?
-    Babylon | ?`,
+    Babylon | 3:40`,
 }
 
 export function slugify(title: string): string {
