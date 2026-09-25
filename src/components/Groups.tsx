@@ -331,7 +331,7 @@ function WhatTheySee() {
         <dt>Your planks</dt>
         <dd>
           The days you planked today's song, for your streak and the group's, and whether today's was held with no breaks
-          (🟩). Never your breaks, your XP, your ladder or your plank history.
+          (a green tick). Never your breaks, your XP, your ladder or your plank history.
         </dd>
         <dt>Public groups</dt>
         <dd>

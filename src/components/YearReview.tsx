@@ -7,9 +7,9 @@ import { HOME, navigate } from '../lib/route'
 import { siteLink } from '../lib/share'
 import { CARD_WIDTH } from '../lib/shareCard'
 import { cardHeight, renderYearCard, type CardSize } from '../lib/yearCard'
-import { REVIEW_NAME, reviewSlides, reviewText, reviewYear, yearInReview, type Slide, type YearReview as Review } from '../lib/yearInReview'
+import { REVIEW_NAME, reviewSlides, reviewText, reviewYear, yearInReview, type Mark, type Slide, type YearReview as Review } from '../lib/yearInReview'
 import { Dialog } from './Dialog'
-import { Icon } from './Icon'
+import { HeldMark, Icon, LightMark } from './Icon'
 import { RankPlaque } from './Rank'
 import { RankEmblem } from './RankEmblem'
 import { ShareSheet } from './ShareDialog'
@@ -189,7 +189,12 @@ function SlideView({ slide, position }: { slide: Slide; position: string }) {
         <span className="sr-only">, {position}</span>
       </p>
       <p className={`year-big${figure ? '' : ' words'}`}>{slide.big}</p>
-      {slide.unit && <p className="year-unit">{slide.unit}</p>}
+      {slide.unit && (
+        <p className="year-unit">
+          {slide.unit}
+          {slide.mark && <SlideMark mark={slide.mark} />}
+        </p>
+      )}
       {slide.line && <p className="year-line">{slide.line}</p>}
       {slide.rank && (
         <div className="year-rank">
@@ -199,9 +204,12 @@ function SlideView({ slide, position }: { slide: Slide; position: string }) {
       )}
       {slide.rows && (
         <dl className="facts year-rows">
-          {slide.rows.map(([label, value]) => (
+          {slide.rows.map(([label, value, mark]) => (
             <Fragment key={label}>
-              <dt>{label}</dt>
+              <dt>
+                {label}
+                {mark && <SlideMark mark={mark} />}
+              </dt>
               <dd>{value}</dd>
             </Fragment>
           ))}
@@ -209,6 +217,11 @@ function SlideView({ slide, position }: { slide: Slide; position: string }) {
       )}
     </div>
   )
+}
+
+/** A mark beside a slide's words: the green tick for no breaks, or a light's star (in the accent colour). */
+function SlideMark({ mark }: { mark: Mark }) {
+  return <span className="year-mark">{mark === 'held' ? <HeldMark /> : <LightMark size={18} />}</span>
 }
 
 /** The slide as a card, a story (9:16) or a post (4:5), and the year as text. */

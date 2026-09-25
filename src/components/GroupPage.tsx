@@ -17,7 +17,7 @@ import { FREEZES_PER_MONTH, MAX_MISSED_IN_A_ROW, streakInfo, type StreakInfo } f
 import { Avatar } from './Avatar'
 import { ConfirmDialog } from './ConfirmDialog'
 import { InviteLink, problemOf } from './Groups'
-import { Flame, Icon } from './Icon'
+import { Flame, HeldMark, Icon } from './Icon'
 import { PageTop } from './PageTop'
 
 type Order = 'joined' | 'name'
@@ -252,7 +252,7 @@ function streakMessage(kind: Group['kind'], streak: StreakInfo, now: GroupToday)
   return streak.current > 0 ? `${waiting}${cantFreeze}` : `${waiting} A day everyone planks starts it.`
 }
 
-/** Who's planked today (✓, or 🟩 with no breaks) and everyone's own streak. Nothing here ranks anyone. */
+/** Who's planked today (a tick, green with no breaks) and everyone's own streak. Nothing here ranks anyone. */
 function Today({
   group,
   board,
@@ -347,8 +347,8 @@ function Member({
         {!planked ? (
           'Not yet'
         ) : member.clean_today ? (
-          <span role="img" aria-label="Planked today, no breaks" title="Planked today, no breaks">
-            🟩
+          <span title="Planked today, no breaks">
+            <HeldMark label="Planked today, no breaks" />
           </span>
         ) : (
           <span role="img" aria-label="Planked today" title="Planked today">

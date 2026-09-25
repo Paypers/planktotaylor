@@ -5,8 +5,11 @@ import {
   cardFooter,
   COLOR,
   DISPLAY,
+  heldMark,
   icon,
+  lightColor,
   MARGIN,
+  mix,
   MONO,
   newCard,
   rule,
@@ -17,7 +20,7 @@ import {
   toPng,
   wrap,
 } from './shareCard'
-import { REVIEW_NAME, type Slide } from './yearInReview'
+import { REVIEW_NAME, type Mark, type Slide } from './yearInReview'
 
 /** A post (4:5, like the plank card) or a story (9:16, for Instagram and TikTok). */
 export type CardSize = 'post' | 'story'
@@ -70,7 +73,16 @@ export async function renderYearCard(slide: Slide, year: number, size: CardSize)
         bigLines.forEach((line, i) => text(ctx, line, left - (figure ? 8 : 0), y + (i + 1) * bigStep - (figure ? 20 : 24), bigFont, ink)),
     },
   ]
-  if (slide.unit) parts.push({ height: 80, draw: (y) => text(ctx, slide.unit!, left, y + 56, `500 52px ${SANS}`, ink2) })
+  if (slide.unit)
+    parts.push({
+      height: 80,
+      draw: (y) => {
+        const font = `500 52px ${SANS}`
+        text(ctx, slide.unit!, left, y + 56, font, ink2)
+        ctx.font = font
+        if (slide.mark) drawMark(ctx, slide.mark, left + ctx.measureText(slide.unit!).width + 18, y + 20, 44)
+      },
+    })
   if (lines.length)
     parts.push({
       height: 24 + lines.length * 62,
@@ -102,12 +114,14 @@ export async function renderYearCard(slide: Slide, year: number, size: CardSize)
     parts.push({
       height: 40 + slide.rows.length * rowHeight,
       draw: (y) =>
-        slide.rows!.forEach(([label, value], i) => {
+        slide.rows!.forEach(([label, value, mark], i) => {
           const rowTop = y + 40 + i * rowHeight
           const font = Math.min(42, rowHeight - 30)
           const baseline = rowTop + rowHeight / 2 + font / 3
           rule(ctx, left, right, rowTop, 2, rules)
           text(ctx, label, left, baseline, `400 ${font}px ${SANS}`, ink2)
+          ctx.font = `400 ${font}px ${SANS}`
+          if (mark) drawMark(ctx, mark, left + ctx.measureText(label).width + 14, baseline - font * 0.82, font)
           text(ctx, value, right, baseline, `500 ${font}px ${MONO}`, ink, 'right')
         }),
     })
@@ -124,9 +138,8 @@ export async function renderYearCard(slide: Slide, year: number, size: CardSize)
   return toPng(canvas)
 }
 
-/** `a` over `b` at `amount`, for text on an album's colour: like CSS color-mix. */
-function mix(a: string, b: string, amount: number): string {
-  const channels = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
-  const [x, y] = [channels(a), channels(b)]
-  return `rgb(${x.map((v, i) => Math.round(v * amount + y[i] * (1 - amount))).join(', ')})`
+/** A mark beside a slide's words, `size` across with its top left at x, y. A light is in the accent colour. */
+function drawMark(ctx: CanvasRenderingContext2D, mark: Mark, x: number, y: number, size: number) {
+  if (mark === 'held') heldMark(ctx, x, y, size)
+  else icon(ctx, STAR, x, y, size, lightColor(COLOR.signal))
 }

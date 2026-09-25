@@ -3,7 +3,7 @@ import { ALBUMS, LADDER, formatDuration, type Song } from '../data/songs'
 import { normalizeTitle } from '../lib/match'
 import { ladderRecords, type Completion, type LevelRecord } from '../lib/progress'
 import { ERAS, followLink, hashFor } from '../lib/route'
-import { Icon } from './Icon'
+import { HeldMark, Icon } from './Icon'
 
 interface Props {
   level: number
@@ -140,13 +140,7 @@ export function Setlist({ level, completions, onOpen }: Props) {
 
 /** The status mark: a green tick, an orange count of breaks, or a faint dash for a level moved past. */
 function LevelMark({ state, breaks }: { state: TrackState; breaks?: number }) {
-  if (state === 'clean') {
-    return (
-      <span className="level-mark clean" aria-hidden="true">
-        <Icon name="check" size={12} />
-      </span>
-    )
-  }
+  if (state === 'clean') return <HeldMark />
   if (state === 'breaks') {
     return (
       <span className="level-mark breaks" aria-hidden="true">

@@ -971,6 +971,13 @@ a {
   margin-top: 10px;
 }
 
+/* "148 held it all the way through", after the green tick. */
+.together-held {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 /* The song end to end, darker where breaks bunched up. */
 .heat {
   display: grid;
@@ -1117,6 +1124,14 @@ a {
   font-weight: 500;
   line-height: 28px;
   color: var(--ink-2);
+}
+
+/* A mark after a slide's words: the green tick for no breaks, a light's star in the accent colour. */
+.year-mark {
+  display: inline-flex;
+  margin-left: 8px;
+  vertical-align: -3px;
+  --glow: var(--signal);
 }
 
 .year-line {

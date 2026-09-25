@@ -25,6 +25,7 @@ export const SANS = '"Instrument Sans", "Helvetica Neue", Arial, sans-serif'
 export const MONO = '"IBM Plex Mono", Menlo, monospace'
 
 export const STAR = 'M12 1.5 14.2 9.8 22.5 12 14.2 14.2 12 22.5 9.8 14.2 1.5 12 9.8 9.8Z'
+const CHECK = 'M20 6 9 17l-5-5'
 const FLAME =
   'M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z'
 
@@ -66,8 +67,15 @@ export async function renderShareCard(share: ShareInput): Promise<Blob> {
   }
 
   text(ctx, plankHeadline(share.daily, share.level, share.release), left, 628, `600 76px ${DISPLAY}`, COLOR.ink)
-  // Aurora lights caught, beside the headline. Never the ones missed.
-  if (share.lights) text(ctx, `✨ ${share.lights}`, right, 624, `600 44px ${SANS}`, COLOR.ink2, 'right')
+  // Aurora lights caught, beside the headline: the light's star in the album's colour, then the count.
+  // Never the ones missed.
+  if (share.lights) {
+    const count = String(share.lights)
+    ctx.font = `600 44px ${SANS}`
+    const countWidth = ctx.measureText(count).width
+    text(ctx, count, right, 624, `600 44px ${SANS}`, COLOR.ink2, 'right')
+    icon(ctx, STAR, right - countWidth - 50, 590, 36, lightColor(album.color))
+  }
 
   // The song, as a tracklist row: sleeve, title over album, length on the right.
   const rowTop = 690
@@ -184,6 +192,34 @@ export function box(ctx: CanvasRenderingContext2D, x: number, y: number, width: 
   if (typeof ctx.roundRect === 'function') ctx.roundRect(x, y, width, height, radius)
   else ctx.rect(x, y, width, height)
   ctx.fill()
+}
+
+/** `a` over `b` at `amount`, for text on an album's colour or a light's star: like CSS color-mix. */
+export function mix(a: string, b: string, amount: number): string {
+  const channels = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+  const [x, y] = [channels(a), channels(b)]
+  return `rgb(${x.map((v, i) => Math.round(v * amount + y[i] * (1 - amount))).join(', ')})`
+}
+
+/** A light's colour on a card: the album's, pulled toward the ink as on the plank screen. */
+export const lightColor = (albumColor: string) => mix(albumColor, COLOR.ink, 0.7)
+
+/** Held with no breaks: the setlist's green tick, `size` across, with its top left at x, y. */
+export function heldMark(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
+  ctx.fillStyle = COLOR.held
+  ctx.beginPath()
+  ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2)
+  ctx.fill()
+  const tick = size * 0.64
+  ctx.save()
+  ctx.translate(x + (size - tick) / 2, y + (size - tick) / 2)
+  ctx.scale(tick / 24, tick / 24)
+  ctx.strokeStyle = COLOR.paper
+  ctx.lineWidth = 3.4
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.stroke(new Path2D(CHECK))
+  ctx.restore()
 }
 
 /** An icon from its 24×24 path, with its top left at x, y. The flame is also stroked, as the lit icon is. */

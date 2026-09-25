@@ -164,7 +164,9 @@ describe('your plank year', () => {
     expect(slides.find((s) => s.kind === 'ladder')).toMatchObject({ big: '1', unit: 'level climbed', rank })
     expect(slides.find((s) => s.kind === 'album')?.album).toBeDefined()
     const words = JSON.stringify(slides) + reviewText(review, 'https://example.com')
-    expect(words).not.toMatch(/break(?!s 🟩)|pause/i)
+    // Breaks only ever come up as "no breaks".
+    expect(words).not.toMatch(/(?<!no )break|pause/i)
+    expect(words).not.toMatch(/🟩|✨/)
   })
 
   it('leaves the rank off for signed-out players', () => {

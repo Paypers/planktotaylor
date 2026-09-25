@@ -142,19 +142,24 @@ export function reviewTime(seconds: number): { big: string; unit: string } {
 export type SlideKind = 'time' | 'planks' | 'album' | 'longest' | 'clean' | 'fought' | 'ladder' | 'lights' | 'summary'
 
 /** One slide, as the screen shows it and its card draws it. */
+/** Drawn beside words, never as an emoji in them: held with no breaks (the green tick), or a light caught (the star). */
+export type Mark = 'held' | 'light'
+
 export interface Slide {
   kind: SlideKind
   eyebrow: string
   /** The big thing: a number, or a title. */
   big: string
   unit?: string
+  /** After the unit. */
+  mark?: Mark
   line?: string
   /** Colours the slide: the top album. */
   album?: Album
   /** The rank reached, on the ladder slide (signed-in players). */
   rank?: PlayerRank
-  /** The summary's lines. */
-  rows?: [string, string][]
+  /** The summary's lines: label, value, and a mark after the label. */
+  rows?: [string, string, Mark?][]
 }
 
 const plural = (n: number, word: string) => `${n.toLocaleString()} ${word}${n === 1 ? '' : 's'}`
@@ -195,7 +200,7 @@ export function reviewSlides(review: YearReview, rank: PlayerRank | null): Slide
     slides.push({ kind: 'longest', eyebrow: 'Longest single hold', big: formatDuration(longest.seconds), line: longest.song.title })
   }
   if (noBreak > 0) {
-    slides.push({ kind: 'clean', eyebrow: 'All the way through', big: noBreak.toLocaleString(), unit: 'held with no breaks 🟩' })
+    slides.push({ kind: 'clean', eyebrow: 'All the way through', big: noBreak.toLocaleString(), unit: 'held with no breaks', mark: 'held' })
   }
   if (foughtBack) {
     slides.push({
@@ -214,15 +219,15 @@ export function reviewSlides(review: YearReview, rank: PlayerRank | null): Slide
       ...(rank ? { line: `You reached ${rankName(rank.tier, rank.division)}.`, rank } : {}),
     })
   }
-  if (lights > 0) slides.push({ kind: 'lights', eyebrow: 'Aurora lights', big: lights.toLocaleString(), unit: 'caught ✨' })
+  if (lights > 0) slides.push({ kind: 'lights', eyebrow: 'Aurora lights', big: lights.toLocaleString(), unit: 'caught', mark: 'light' })
 
-  const rows: [string, string][] = [
+  const rows: [string, string, Mark?][] = [
     ['Time planked', `${time.big} ${time.unit}`],
     ['Planks', planks.toLocaleString()],
   ]
   if (bestStreak > 1) rows.push(['Best streak', plural(bestStreak, 'day')])
   if (topAlbum && planks >= 2) rows.push(['Top album', topAlbum.album.short])
-  if (noBreak > 0) rows.push(['No breaks 🟩', noBreak.toLocaleString()])
+  if (noBreak > 0) rows.push(['No breaks', noBreak.toLocaleString(), 'held'])
   if (levels > 0) rows.push(['Ladder levels', levels.toLocaleString()])
   if (rank) rows.push(['Rank', rankName(rank.tier, rank.division)])
   if (lights > 0) rows.push(['Lights caught', lights.toLocaleString()])

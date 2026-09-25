@@ -205,7 +205,7 @@ export function HelpPage() {
           </dd>
           <dt>The group page</dt>
           <dd>
-            Who's planked today's song (✓, or 🟩 with no breaks), everyone's own streak, and the group's streak. Members are
+            Who's planked today's song (a tick, green with no breaks), everyone's own streak, and the group's streak. Members are
             in the order they joined, or by name: never by streak or breaks. Whoever made the group can rename it, make a new
             invite link (the old one stops working) and remove members.
           </dd>
@@ -223,7 +223,8 @@ export function HelpPage() {
           </dd>
           <dt>What the group sees</dt>
           <dd>
-            Your name and photo, the days you planked today's song, and whether today's was held with no breaks (🟩).
+            Your name and photo, the days you planked today's song, and whether today's was held with no breaks (a green
+            tick).
             Never your breaks, your XP, your ladder or your plank history. In a public group, anyone with its link, signed
             in or not, can see its name, its streak, and each member's name, photo and how many days they planked this
             month.

@@ -1,5 +1,6 @@
 import { formatDuration, type Song } from '../data/songs'
 import { togetherTime, toughestStretch, type DailyStats } from '../lib/together'
+import { HeldMark } from './Icon'
 
 const people = (n: number) => `${n.toLocaleString()} ${n === 1 ? 'person' : 'people'}`
 
@@ -15,7 +16,12 @@ export function Together({ stats, song }: { stats: DailyStats; song: Song }) {
         {people(stats.planks)} planked {song.title} today
       </p>
       {stats.seconds > 0 && <p className="row-note">Together: {togetherTime(stats.seconds)} of planking</p>}
-      {stats.noBreak > 0 && <p className="row-note">{stats.noBreak.toLocaleString()} held it all the way through 🟩</p>}
+      {stats.noBreak > 0 && (
+        <p className="row-note together-held">
+          <HeldMark />
+          {stats.noBreak.toLocaleString()} held it all the way through
+        </p>
+      )}
       {toughest !== null && (
         <div className="together-tough">
           <HeatStrip slices={stats.slices} />

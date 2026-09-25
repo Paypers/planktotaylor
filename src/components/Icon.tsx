@@ -167,6 +167,18 @@ export function LightStar() {
   )
 }
 
+/**
+ * Held with no breaks: the green tick the setlist uses. Never the 🟩 emoji, which is only for text that
+ * gets pasted into chats. With a `label` it's read out; without one it sits beside words that say it.
+ */
+export function HeldMark({ label }: { label?: string }) {
+  return (
+    <span className="level-mark clean" role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : true}>
+      <Icon name="check" size={12} />
+    </span>
+  )
+}
+
 /** A light caught: the star, small and filled, in the album's colour. */
 export function LightMark({ size = 14 }: { size?: number }) {
   return (

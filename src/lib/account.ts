@@ -637,7 +637,7 @@ export async function loadGroups(): Promise<Group[] | null> {
   return (groups.data as Omit<Group, 'members'>[]).map((g) => ({ ...g, members: counts.get(g.id) ?? 0 }))
 }
 
-/** A group's members as the group sees them: names, photos, the days they planked today's song, today's 🟩. */
+/** A group's members as the group sees them: names, photos, the days they planked today's song, and whether today's had no breaks. */
 export async function loadBoard(groupId: string, today: DayKey): Promise<BoardMember[]> {
   const { data, error } = await (await client()).rpc('group_board', { p_group: groupId, p_today: today })
   if (error) throw groupFailure(error)

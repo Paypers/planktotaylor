@@ -36,7 +36,7 @@ export interface BoardMember {
   joined_on: DayKey
   /** Every day they planked today's song. */
   days: DayKey[]
-  /** Today's held with no breaks (🟩); null when they haven't planked it today. */
+  /** Today's held with no breaks (the green tick); null when they haven't planked it today. */
   clean_today: boolean | null
 }
 
