@@ -17,8 +17,8 @@ To build one, hand Claude the file: *"Build docs/roadmap-parts/part-01-quick-win
 | [7](part-07-collect-the-eras.md) | Collect the eras | Medium | | Yes (small) | Settle the release badges first | ✓ |
 | [8](part-08-groups-database.md) | Groups: the database and joining | Large, first half | 1 | Yes | Settle public groups first | ✓ |
 | [9](part-09-groups-page.md) | Groups: the group page | Large, second half | 8 | No | | ✓ |
-| [10](part-10-native-app.md) | Native app | Large | 1, 5 | No | Plan and feasibility only, no code yet | |
-| [11](part-11-discord-activity.md) | Discord Activity | Large | 8, 9 | ? | Plan and feasibility only, no code yet | |
+| [10](part-10-native-app.md) | Native app | Large | 1, 5 | Yes (small, iOS push) | Planned: about 45% overall, 75% for Android alone | |
+| [11](part-11-discord-activity.md) | Discord Activity | Large | 8, 9 | No | Planned: about 80% planking together, 30% with the music inside Discord; test first | |
 
 **Why it's cut this way**
 

@@ -21,7 +21,7 @@ Adding the site to the home screen (4a) and daily reminders (4b) are built.
 ### 4c. Native app (later)
 
 - **Capacitor** wraps this same site as an iOS and Android app with real push notifications. It also makes a home-screen widget possible (today's song and your streak), which is native code. Android alone could go out sooner as a TWA through Bubblewrap.
-- **Check before building:** Apple's rules on using someone else's name and work (guideline 5.2). An app with "Taylor" in the name that's built around her songs could be rejected, and Google has similar rules. Apple also rejects apps that are only a website in a wrapper (4.2), so push and widgets help there. Apple's developer account is $99 a year, Google's is $25 once.
+- **Check before building:** Apple's rules on using someone else's name and work (guideline 5.2). An app with "Taylor" in the name that's built around her songs could be rejected, and Google has similar rules. Apple also rejects apps that are only a website in a wrapper (4.2), so push and widgets help there. Apple's developer account is $99 a year, Google's is $25 once. [Part 10](roadmap-parts/part-10-native-app.md) plans it.
 
 **Size:** large.
 
