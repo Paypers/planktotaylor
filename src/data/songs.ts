@@ -343,7 +343,7 @@ const CATALOG: Record<AlbumId, string> = {
   encore: `
     Patient Zero | 3:46
     Cleveland! | 3:27
-    Pink Clouding | ?
+    Pink Clouding | 3:11
     Babylon | 3:40`,
 }
 
