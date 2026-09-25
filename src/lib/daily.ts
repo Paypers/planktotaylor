@@ -109,6 +109,10 @@ export interface ScheduledSong {
   album: string
   /** Daily No. */
   number: number
+  /** The album's short name and colours, for the Discord cards. (A daily.json from before has none.) */
+  short?: string
+  color?: string
+  ink?: string
 }
 
 /**
@@ -127,6 +131,9 @@ export function dailySchedule(from: DayKey, count: number): Record<DayKey, Sched
       length: formatDuration(song.seconds),
       album: ALBUMS[song.album].title,
       number: dailyNumber(day),
+      short: ALBUMS[song.album].short,
+      color: ALBUMS[song.album].color,
+      ink: ALBUMS[song.album].ink,
     }
   }
   return days

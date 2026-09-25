@@ -542,6 +542,8 @@ export interface DiscordWebhook {
   label: string
   time_zone: string
   created_at: string
+  /** A group it posts at night instead of how everyone did. */
+  group_id: string | null
 }
 
 // Until schema.sql has been run for the Discord post, there's no table: these errors mean "not there yet".
@@ -550,13 +552,17 @@ const MISSING_TABLE = new Set(['42P01', 'PGRST205'])
 /** The player's channels with the daily post, oldest first. Null when the site doesn't have the post yet. */
 export async function loadDiscordWebhooks(): Promise<DiscordWebhook[] | null> {
   if (!accountsEnabled || !state.user) return []
-  const { data, error } = await (await client())
-    .from('discord_webhooks')
-    .select('id, label, time_zone, created_at')
-    .order('created_at')
-  if (error && MISSING_TABLE.has(error.code)) return null
-  if (error) throw error
-  return data as DiscordWebhook[]
+  const supabase = await client()
+  const found = await supabase.from('discord_webhooks').select('id, label, time_zone, created_at, group_id').order('created_at')
+  if (found.error && MISSING_TABLE.has(found.error.code)) return null
+  // Before schema.sql's groups-in-Discord change: no group column yet, so none posts a group.
+  if (found.error?.code === MISSING_COLUMN) {
+    const older = await supabase.from('discord_webhooks').select('id, label, time_zone, created_at').order('created_at')
+    if (older.error) throw older.error
+    return (older.data as Omit<DiscordWebhook, 'group_id'>[]).map((w) => ({ ...w, group_id: null }))
+  }
+  if (found.error) throw found.error
+  return found.data as DiscordWebhook[]
 }
 
 const ADD_PROBLEMS: ReadonlySet<string> = new Set<AddProblem>([
@@ -594,6 +600,27 @@ export async function addDiscordWebhook(url: string, timeZone: string, label: st
 export async function changeDiscordZone(id: string, timeZone: string) {
   const { error } = await (await client()).from('discord_webhooks').update({ time_zone: timeZone }).eq('id', id)
   if (error) throw error
+}
+
+/** What a channel posts at night: how everyone did (null), or one of the player's groups. */
+export async function changeDiscordGroup(id: string, groupId: string | null) {
+  const { error } = await (await client()).from('discord_webhooks').update({ group_id: groupId }).eq('id', id)
+  if (error) throw error
+}
+
+/** A channel's night card as it would look now, or null when there's nothing to show yet today. */
+export async function discordPreview(night: 'everyone' | 'group', groupId: string | null, timeZone: string): Promise<Blob | null> {
+  // Fetched directly: the functions client reads a picture as text.
+  const { data } = await (await client()).auth.getSession()
+  const token = data.session?.access_token
+  if (!token) throw new Error('Not signed in')
+  const response = await fetch(`${url}/functions/v1/discord-card`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, apikey: key!, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ night, group: groupId, timeZone }),
+  })
+  if (!response.ok) throw new Error(`discord-card: ${response.status}`)
+  return response.headers.get('content-type')?.startsWith('image/png') ? await response.blob() : null
 }
 
 export async function removeDiscordWebhook(id: string) {
@@ -676,6 +703,15 @@ export async function newGroupCode(groupId: string): Promise<string> {
 export async function removeFromGroup(groupId: string, userId: string) {
   const { error } = await (await client()).rpc('remove_from_group', { p_group: groupId, p_user: userId })
   if (error) throw groupFailure(error)
+}
+
+/** The Discord channels posting a group each night: their names, and who added them. For members. */
+export async function groupDiscord(groupId: string): Promise<{ label: string; added_by: string }[]> {
+  const { data, error } = await (await client()).rpc('group_discord', { p_group: groupId })
+  // Before schema.sql's groups-in-Discord change there's no such function: no channel posts it.
+  if (error?.code === MISSING_FUNCTION) return []
+  if (error) throw error
+  return data as { label: string; added_by: string }[]
 }
 
 /** What an invite link shows, signed in or not. Null for a link that isn't anyone's (or an old one). */

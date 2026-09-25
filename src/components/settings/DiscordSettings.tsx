@@ -1,16 +1,21 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   addDiscordWebhook,
   askToSignIn,
+  changeDiscordGroup,
   changeDiscordZone,
   DiscordAddError,
+  discordPreview,
   loadDiscordWebhooks,
   removeDiscordWebhook,
   useAccount,
   type DiscordWebhook,
+  type Group,
 } from '../../lib/account'
 import { clockTime } from '../../lib/dates'
 import { LABEL_LENGTH, MORNING_POST, NIGHT_POST, WEBHOOKS_EACH, webhookAddress, zoneName, type AddProblem } from '../../lib/discord'
+import { useToday } from '../../lib/hooks'
+import { useMyGroups } from '../../lib/myGroups'
 import { ConfirmDialog } from '../ConfirmDialog'
 
 const PROBLEMS: Record<AddProblem | 'unavailable', string> = {
@@ -56,6 +61,10 @@ export function DiscordSettings() {
   const [removing, setRemoving] = useState<DiscordWebhook | null>(null)
   const [rowError, setRowError] = useState<string | null>(null)
   const zones = useMemo(() => timeZones((webhooks ?? []).map((w) => w.time_zone)), [webhooks])
+  const today = useToday()
+  const { groups } = useMyGroups(today)
+  // The groups a channel can post: public ones the player's in, and private ones they made. Null while loading.
+  const postable = groups === undefined ? null : (groups ?? []).filter((g) => g.kind === 'public' || g.made_by === user?.id)
 
   useEffect(() => {
     if (!user) return
@@ -119,6 +128,16 @@ export function DiscordSettings() {
     })
   }
 
+  const changeGroup = (webhook: DiscordWebhook, groupId: string | null) => {
+    const before = webhooks
+    setWebhooks((list) => list?.map((w) => (w.id === webhook.id ? { ...w, group_id: groupId } : w)) ?? null)
+    setRowError(null)
+    changeDiscordGroup(webhook.id, groupId).catch(() => {
+      setWebhooks(before)
+      setRowError("Couldn't change what it posts. Try again in a moment.")
+    })
+  }
+
   const remove = () => {
     const webhook = removing
     setRemoving(null)
@@ -173,6 +192,7 @@ export function DiscordSettings() {
                       ))}
                     </select>
                   </label>
+                  {postable && <NightChoice webhook={webhook} groups={postable} onChange={(groupId) => changeGroup(webhook, groupId)} />}
                 </li>
               ))}
             </ul>
@@ -273,5 +293,105 @@ export function DiscordSettings() {
         <p>Plank to Taylor won't post there any more. You can add it again later.</p>
       </ConfirmDialog>
     </>
+  )
+}
+
+/**
+ * What a channel posts at night: how everyone did, or how one of the player's groups did (its streak, and
+ * who planked with their names and photos), with a preview of tonight's card.
+ */
+function NightChoice({ webhook, groups, onChange }: { webhook: DiscordWebhook; groups: Group[]; onChange: (groupId: string | null) => void }) {
+  const chosen = groups.find((g) => g.id === webhook.group_id) ?? null
+  // A group it posts that the player can no longer choose (they left it): shown as it is, until changed.
+  const [picked, setPicked] = useState<string>(chosen?.id ?? groups[0]?.id ?? '')
+  const [preview, setPreview] = useState<{ url: string | null; loading: boolean; failed: boolean } | null>(null)
+  const name = `night-${webhook.id}`
+  // The picture shown, let go of when it's replaced or the page closes.
+  const shown = useRef<string | null>(null)
+  const showUrl = (url: string | null) => {
+    if (shown.current) URL.revokeObjectURL(shown.current)
+    shown.current = url
+  }
+  useEffect(() => () => showUrl(null), [])
+
+  // A new choice: the preview's out of date.
+  useEffect(() => {
+    showUrl(null)
+    setPreview(null)
+  }, [webhook.group_id])
+
+  const show = () => {
+    setPreview({ url: shown.current, loading: true, failed: false })
+    discordPreview(webhook.group_id ? 'group' : 'everyone', webhook.group_id, webhook.time_zone)
+      .then((png) => {
+        const url = png && URL.createObjectURL(png)
+        showUrl(url)
+        setPreview({ url, loading: false, failed: false })
+      })
+      .catch(() => {
+        showUrl(null)
+        setPreview({ url: null, loading: false, failed: true })
+      })
+  }
+
+  return (
+    <fieldset className="kind-choice night-choice">
+      <legend>At {clockTime(NIGHT_POST)}, post</legend>
+      <label className="kind-option">
+        <input type="radio" name={name} checked={webhook.group_id === null} onChange={() => onChange(null)} />
+        <span>
+          <strong>How everyone did</strong>
+          <span className="fine">Everyone on the site: how many planked today's song, and how many held it all the way.</span>
+        </span>
+      </label>
+      <label className={groups.length === 0 ? 'kind-option off' : 'kind-option'}>
+        <input
+          type="radio"
+          name={name}
+          checked={webhook.group_id !== null}
+          disabled={groups.length === 0}
+          onChange={() => picked && onChange(picked)}
+        />
+        <span>
+          <strong>How a group did</strong>
+          <span className="fine">
+            {groups.length === 0
+              ? "One of your groups: public ones you're in, and private ones you made. You have none yet."
+              : "One of your groups: its streak, and who planked with their names and photos. Its members see on the group page that it's posted here."}
+          </span>
+          {groups.length > 0 && (
+            <select
+              className="input"
+              aria-label="Group"
+              value={webhook.group_id ?? picked}
+              onChange={(e) => {
+                setPicked(e.target.value)
+                if (webhook.group_id !== null) onChange(e.target.value)
+              }}
+            >
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </span>
+      </label>
+      <div className="night-preview">
+        {preview?.url ? (
+          <img src={preview.url} alt={`Tonight's card for ${webhook.label}`} />
+        ) : preview && !preview.loading ? (
+          <p className="fine" role="status">
+            {preview.failed ? "Couldn't draw the card just now. Try again in a moment." : "Nothing to show yet: tonight's card appears once someone's planked today."}
+          </p>
+        ) : null}
+        <div className="button-row">
+          <button type="button" className="btn btn-secondary" onClick={show} disabled={preview?.loading}>
+            {preview?.loading ? 'Drawing…' : preview ? 'Preview again' : "Preview tonight's card"}
+          </button>
+        </div>
+      </div>
+    </fieldset>
   )
 }

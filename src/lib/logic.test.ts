@@ -109,6 +109,9 @@ describe('daily.json', () => {
         length: formatDuration(song.seconds),
         album: ALBUMS[song.album].title,
         number: dailyNumber(day),
+        short: ALBUMS[song.album].short,
+        color: ALBUMS[song.album].color,
+        ink: ALBUMS[song.album].ink,
       })
     }
   })

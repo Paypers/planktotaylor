@@ -13,7 +13,7 @@
     "watch:release": "node --env-file-if-exists=.env scripts/watch-release.ts",
     "vapid": "node --env-file-if-exists=.env scripts/vapid-keys.ts",
     "functions:build": "vite build --config vite.functions.config.ts",
-    "functions:deploy": "npm run functions:build && npx supabase@2 functions deploy send-reminders discord-add discord-post --no-verify-jwt --use-api"
+    "functions:deploy": "npm run functions:build && npx supabase@2 functions deploy send-reminders discord-add discord-post discord-card --no-verify-jwt --use-api"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.0",

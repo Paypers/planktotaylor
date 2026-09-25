@@ -261,7 +261,8 @@ export function HelpPage() {
           <dt>Daily post</dt>
           <dd>
             Add Plank to Taylor to a Discord server and it posts in a channel every day: today's song at{' '}
-            {clockTime(MORNING_POST)}, and how everyone did at {clockTime(NIGHT_POST)}, in the server's time zone.
+            {clockTime(MORNING_POST)}, and how everyone did at {clockTime(NIGHT_POST)}, in the server's time zone. Each
+            post comes with a card.
           </dd>
           <dt>Adding it</dt>
           <dd>
@@ -276,6 +277,13 @@ export function HelpPage() {
           <dd>
             What the daily card shows once you've planked: how many planked, the time held together, how many held it
             all the way through, and where the song gets toughest. Never anyone's name, and never breaks.
+          </dd>
+          <dt>A group's night</dt>
+          <dd>
+            A channel can post how one of your groups did instead: its streak, and who held it all the way through or
+            planked it, with their names and photos, like Wordle's results. Never who didn't. Any member can choose a
+            public group; only whoever made a private one can. Everyone in the group sees where it's posted, and leaving
+            the group stops it. Preview tonight's card in Settings → Discord.
           </dd>
           <dt>Stopping it</dt>
           <dd>Remove it in Settings → Discord, or delete the webhook in Discord.</dd>

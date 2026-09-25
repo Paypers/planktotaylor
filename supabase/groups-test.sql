@@ -217,6 +217,59 @@ begin
 end;
 $$;
 
+-- Discord: a channel can post a group at night (names and photos). A public group: any member. A private
+-- group: only its maker. Every member can see where it's posted.
+reset role;
+insert into public.discord_webhooks (id, user_id, url, channel_id, label, time_zone) values
+  ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-00000000000a', 'https://discord.com/api/webhooks/100000000000000001/' || repeat('a', 68), '200000000000000001', 'Ana''s channel', 'UTC'),
+  ('00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-00000000000b', 'https://discord.com/api/webhooks/100000000000000002/' || repeat('b', 68), '200000000000000002', 'Ben''s channel', 'UTC'),
+  ('00000000-0000-4000-8000-0000000000c1', '00000000-0000-4000-8000-00000000000c', 'https://discord.com/api/webhooks/100000000000000003/' || repeat('c', 68), '200000000000000003', 'Cat''s channel', 'UTC');
+select public.groups_test_as('ana');
+do $$
+begin
+  update public.discord_webhooks set group_id = current_setting('test.gym')::uuid where id = '00000000-0000-4000-8000-0000000000a1';
+  assert (select group_id from public.discord_webhooks where id = '00000000-0000-4000-8000-0000000000a1') = current_setting('test.gym')::uuid, 'Ana posts her private group: she made it';
+  assert public.groups_test_refused(format($q$ update public.discord_webhooks set group_id = %L where id = '00000000-0000-4000-8000-0000000000a1' $q$, current_setting('test.club'))), 'but not a group she isn''t in';
+  update public.discord_webhooks set group_id = current_setting('test.gym')::uuid where id = '00000000-0000-4000-8000-0000000000b1';
+  assert (select count(*) from public.group_discord(current_setting('test.gym')::uuid)) = 1, 'and nobody else''s channel: Ben''s is untouched';
+end;
+$$;
+select public.groups_test_as('cat');
+do $$
+begin
+  assert public.groups_test_refused(format($q$ update public.discord_webhooks set group_id = %L where id = '00000000-0000-4000-8000-0000000000c1' $q$, current_setting('test.gym'))), 'Cat can''t post a group she isn''t in';
+  update public.discord_webhooks set group_id = current_setting('test.club')::uuid where id = '00000000-0000-4000-8000-0000000000c1';
+  assert (select group_id from public.discord_webhooks) = current_setting('test.club')::uuid, 'Cat posts the public group she''s in';
+  assert public.groups_test_refused(format($q$ select * from public.group_discord(%L) $q$, current_setting('test.gym'))), 'and can''t see where a group she isn''t in is posted';
+end;
+$$;
+-- Cat in the private group too, but she didn't make it: she can't post it.
+reset role;
+insert into public.group_members (group_id, user_id, joined_on) values (current_setting('test.gym')::uuid, '00000000-0000-4000-8000-00000000000c', current_date);
+select public.groups_test_as('cat');
+do $$
+declare
+  shown record;
+  keys text[];
+begin
+  assert public.groups_test_refused(format($q$ update public.discord_webhooks set group_id = %L $q$, current_setting('test.gym'))), 'a private group: only its maker posts it';
+  select * into shown from public.group_discord(current_setting('test.gym')::uuid);
+  assert shown.label = 'Ana''s channel' and shown.added_by = 'Ana', 'but every member sees where it''s posted, and who by';
+  select array_agg(k order by k) into keys
+    from jsonb_object_keys((select to_jsonb(r) from public.group_discord(current_setting('test.gym')::uuid) r limit 1)) k;
+  assert keys = array['added_by', 'label'], 'only the channel''s name and who added it: ' || keys::text;
+end;
+$$;
+reset role;
+delete from public.group_members where group_id = current_setting('test.gym')::uuid and user_id = '00000000-0000-4000-8000-00000000000c';
+select public.groups_test_as('ben');
+do $$
+begin
+  update public.discord_webhooks set group_id = current_setting('test.club')::uuid where id = '00000000-0000-4000-8000-0000000000b1';
+  assert (select group_id from public.discord_webhooks) = current_setting('test.club')::uuid, 'Ben posts his public group too';
+end;
+$$;
+
 -- Limits: 50 members (48 more made up here), and 10 groups each.
 reset role;
 insert into auth.users (id, email)
@@ -246,6 +299,8 @@ reset role;
 do $$
 begin
   assert (select made_by from public.groups where id = current_setting('test.club')::uuid) = '00000000-0000-4000-8000-00000000000c', 'Cat, who joined first after Ben, takes over';
+  assert (select group_id from public.discord_webhooks where id = '00000000-0000-4000-8000-0000000000b1') is null, 'Ben left: his channel stops posting the group';
+  assert (select group_id from public.discord_webhooks where id = '00000000-0000-4000-8000-0000000000c1') = current_setting('test.club')::uuid, 'Cat''s still does';
 end;
 $$;
 select public.groups_test_as('ana');
@@ -258,6 +313,7 @@ reset role;
 do $$
 begin
   assert not exists (select 1 from public.groups where id = current_setting('test.gym')::uuid), 'the last one out: the group is gone';
+  assert (select group_id from public.discord_webhooks where id = '00000000-0000-4000-8000-0000000000a1') is null, 'and no channel posts it any more';
   delete from auth.users where id = '00000000-0000-4000-8000-00000000000c';
   assert not exists (select 1 from public.group_members where user_id = '00000000-0000-4000-8000-00000000000c'), 'a deleted account leaves its groups';
   assert (select made_by from public.groups where id = current_setting('test.club')::uuid) is not null, 'and its groups get a new maker';

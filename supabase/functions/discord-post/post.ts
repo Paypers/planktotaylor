@@ -1,10 +1,24 @@
 // The Discord daily post, sent by index.ts every 15 minutes (the schedule is in supabase/schema.sql). Each
-// channel whose time has come gets today's song at 8:00, or how everyone did at 21:00, in its time zone.
-// When and what come from the site itself (../_shared/site.js, built from src/lib/discord.ts by
+// channel whose time has come gets today's song at 8:00, or at 21:00 how everyone did (or, for a channel
+// that posts a group, how the group did), in its time zone, each with a card drawn under it. When and what
+// come from the site itself (../_shared/site.js, built from src/lib/discord.ts by
 // `npm run functions:build`); today's song comes from the live site's daily.json.
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2.117.1'
+import { loadGroupBoard, type GroupBoard } from '../_shared/board.ts'
+import { drawCard, type Card } from '../_shared/cards.ts'
 import { postTo, type PostResult } from '../_shared/discord.ts'
-import { duePost, hideTokens, morningPost, nightPost, readStats } from '../_shared/site.js'
+import {
+  duePost,
+  everyoneCard,
+  groupCard,
+  groupNight,
+  groupNightPost,
+  hideTokens,
+  morningCard,
+  morningPost,
+  nightPost,
+  readStats,
+} from '../_shared/site.js'
 
 export interface WebhookRow {
   id: string
@@ -12,10 +26,12 @@ export interface WebhookRow {
   time_zone: string
   last_morning: string | null
   last_night: string | null
+  /** A group this channel posts at night, instead of how everyone did. */
+  group_id: string | null
 }
 
 type Kind = 'morning' | 'night'
-type Song = { id: string; title: string; seconds: number; length: string; album: string; number: number }
+type Song = { id: string; title: string; seconds: number; length: string; album: string; number: number; short?: string; color?: string; ink?: string }
 type Schedule = Record<string, Song>
 type Stats = ReturnType<typeof readStats>
 
@@ -27,7 +43,11 @@ export interface Deps {
   schedule(): Promise<Schedule>
   /** How everyone did on a day, from the daily counter. */
   stats(day: string): Promise<Stats>
-  post(row: WebhookRow, message: object): Promise<PostResult>
+  /** A group's board on a day; null if it's gone. */
+  group(id: string, day: string): Promise<GroupBoard | null>
+  /** A card as a PNG. */
+  draw(card: Card): Promise<Uint8Array>
+  post(row: WebhookRow, message: object, picture: Uint8Array | null): Promise<PostResult>
   markSent(row: WebhookRow, kind: Kind, day: string): Promise<void>
   remove(row: WebhookRow): Promise<void>
   wait(seconds: number): Promise<void>
@@ -46,6 +66,8 @@ export interface Report {
   failed: number
   /** Held up by Discord's rate limit, or out of time: left for the next check. */
   later: number
+  /** Sent without their card, which couldn't be drawn: the words say it all anyway. */
+  plain: number
 }
 
 /** Tries at a post held up by Discord's rate limit, and the longest wait between them within one check. */
@@ -58,7 +80,7 @@ const TIME_BUDGET_MS = 100_000
 const PAGE_SIZE = 1000
 
 export async function postDue(deps: Deps, now = new Date()): Promise<Report> {
-  const report: Report = { due: 0, sent: 0, quiet: 0, removed: 0, failed: 0, later: 0 }
+  const report: Report = { due: 0, sent: 0, quiet: 0, removed: 0, failed: 0, later: 0, plain: 0 }
   const due = (await deps.webhooks()).flatMap((row) => {
     // site.js is plain JavaScript: its types are only what Deno can guess, so say what this is.
     const post = duePost(row, now) as { kind: Kind; day: string } | null
@@ -68,11 +90,43 @@ export async function postDue(deps: Deps, now = new Date()): Promise<Report> {
   if (due.length === 0) return report
 
   const schedule = await deps.schedule()
-  // Each day's counts are read once, however many channels post them.
+  // Each day's counts, each group's board and each card are made once, however many channels post them.
+  const once = <T>(memo: Map<string, Promise<T>>, key: string, make: () => Promise<T>) => {
+    if (!memo.has(key)) memo.set(key, make())
+    return memo.get(key)!
+  }
   const stats = new Map<string, Promise<Stats>>()
-  const statsFor = (day: string) => {
-    if (!stats.has(day)) stats.set(day, deps.stats(day))
-    return stats.get(day)!
+  const groups = new Map<string, Promise<GroupBoard | null>>()
+  const pictures = new Map<string, Promise<Uint8Array | null>>()
+  const statsFor = (day: string) => once(stats, day, () => deps.stats(day))
+  const groupFor = (id: string, day: string) => once(groups, `${id} ${day}`, () => deps.group(id, day))
+  // A card that can't be drawn leaves the post with its words alone.
+  const pictureOf = (key: string, card: Card | null) =>
+    card
+      ? once(pictures, key, () =>
+          deps.draw(card).catch((error) => {
+            console.error('Discord card not drawn', key, String(error))
+            return null
+          }),
+        )
+      : Promise.resolve(null)
+
+  /** What a channel posts now: the words, and its card. Null words: nothing to say. */
+  const postFor = async (row: WebhookRow, kind: Kind, day: string): Promise<{ message: object | null; picture: Uint8Array | null; card: boolean }> => {
+    const song = schedule[day] ?? null
+    if (kind === 'morning') {
+      const card = morningCard(song, day) as Card | null
+      return { message: morningPost(deps.site, song), picture: await pictureOf(`morning ${day}`, card), card: card !== null }
+    }
+    const group = row.group_id ? await groupFor(row.group_id, day) : null
+    if (group) {
+      const night = groupNight(group, group.board, day)
+      const card = groupCard(song, night, day) as Card | null
+      return { message: groupNightPost(deps.site, night), picture: await pictureOf(`group ${row.group_id} ${day}`, card), card: card !== null }
+    }
+    const counts = await statsFor(day)
+    const card = everyoneCard(song, counts, day) as Card | null
+    return { message: nightPost(deps.site, song, counts), picture: await pictureOf(`everyone ${day}`, card), card: card !== null }
   }
 
   for (let i = 0; i < due.length; i += AT_ONCE) {
@@ -83,16 +137,16 @@ export async function postDue(deps: Deps, now = new Date()): Promise<Report> {
     await Promise.all(
       due.slice(i, i + AT_ONCE).map(async ({ row, kind, day }) => {
         try {
-          const song = schedule[day] ?? null
-          const message = kind === 'morning' ? morningPost(deps.site, song) : nightPost(deps.site, song, await statsFor(day))
+          const { message, picture, card } = await postFor(row, kind, day)
           if (!message) {
             report.quiet++
             await deps.markSent(row, kind, day)
             return
           }
-          const result = await postWithWaits(deps, row, message)
+          const result = await postWithWaits(deps, row, message, picture)
           if (result.status === 'sent') {
             report.sent++
+            if (card && !picture) report.plain++
             await deps.markSent(row, kind, day)
           } else if (result.status === 'gone') {
             report.removed++
@@ -114,9 +168,9 @@ export async function postDue(deps: Deps, now = new Date()): Promise<Report> {
 }
 
 /** Posts, waiting as long as Discord asks when it's too fast: a few times, and never long. */
-async function postWithWaits(deps: Deps, row: WebhookRow, message: object): Promise<PostResult> {
+async function postWithWaits(deps: Deps, row: WebhookRow, message: object, picture: Uint8Array | null): Promise<PostResult> {
   for (let tries = 1; ; tries++) {
-    const result = await deps.post(row, message)
+    const result = await deps.post(row, message, picture)
     if (result.status !== 'wait' || tries === TRIES || result.seconds > LONGEST_WAIT_SECONDS) return result
     await deps.wait(result.seconds)
   }
@@ -141,7 +195,7 @@ export function liveDeps(env: (name: string) => string | undefined): Deps {
       for (let from = 0; ; from += PAGE_SIZE) {
         const { data, error } = await db
           .from('discord_webhooks')
-          .select('id, url, time_zone, last_morning, last_night')
+          .select('id, url, time_zone, last_morning, last_night, group_id')
           .order('id')
           .range(from, from + PAGE_SIZE - 1)
         if (error) throw error
@@ -159,7 +213,9 @@ export function liveDeps(env: (name: string) => string | undefined): Deps {
       if (error) throw error
       return readStats(data)
     },
-    post: (row, message) => postTo(row.url, message),
+    group: (id, day) => loadGroupBoard(db, id, day),
+    draw: (card) => drawCard(card, site),
+    post: (row, message, picture) => postTo(row.url, message, fetch, picture),
     async markSent(row, kind, day) {
       const { error } = await db
         .from('discord_webhooks')

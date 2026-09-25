@@ -581,6 +581,8 @@ security definer
 set search_path = public
 as $$
 begin
+  -- Their Discord channels stop posting the group.
+  update public.discord_webhooks set group_id = null where group_id = old.group_id and user_id = old.user_id;
   if not exists (select 1 from public.group_members where group_id = old.group_id) then
     delete from public.groups where id = old.group_id;
   elsif exists (select 1 from public.groups where id = old.group_id and (made_by is null or made_by = old.user_id)) then
@@ -692,6 +694,62 @@ begin
 end;
 $$;
 
+-- A Discord channel can post a group at night, instead of how everyone did: its streak, and who planked
+-- today with their names and photos (Settings → Discord). Any member of a public group can choose that
+-- (anyone with its link can see it already); only the maker of a private one. Leaving the group stops
+-- it (group_members_left, above), and every member sees where it's posted (group_discord, below).
+alter table public.discord_webhooks add column if not exists group_id uuid references public.groups (id) on delete set null;
+grant select (group_id) on public.discord_webhooks to authenticated;
+grant update (group_id) on public.discord_webhooks to authenticated;
+
+create or replace function public.discord_webhooks_group()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.group_id is not null and not exists (
+    select 1
+    from public.groups g
+    join public.group_members m on m.group_id = g.id and m.user_id = new.user_id
+    where g.id = new.group_id and (g.kind = 'public' or g.made_by = new.user_id)
+  ) then
+    raise exception 'not allowed to post that group';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.discord_webhooks_group() from public;
+drop trigger if exists discord_webhooks_group on public.discord_webhooks;
+create trigger discord_webhooks_group before insert or update of group_id on public.discord_webhooks
+  for each row execute function public.discord_webhooks_group();
+
+-- Where a group is posted, for its members: each channel's name in the list of whoever added it, and
+-- their name. Never the webhook's address.
+create or replace function public.group_discord(p_group uuid)
+returns table (label text, added_by text)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+#variable_conflict use_column
+begin
+  if not public.in_group(p_group) then
+    raise exception 'not in this group';
+  end if;
+  return query
+  select w.label, coalesce(nullif(btrim(p.display_name), ''), 'A planker')
+  from public.discord_webhooks w
+  left join public.plank_profiles p on p.user_id = w.user_id
+  where w.group_id = p_group
+  order by w.created_at;
+end;
+$$;
+
+revoke all on function public.group_discord(uuid) from public;
+grant execute on function public.group_discord(uuid) to authenticated;
 revoke all on function public.create_group(text, text, date) from public;
 revoke all on function public.join_group(text, date) from public;
 revoke all on function public.leave_group(uuid) from public;

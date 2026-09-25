@@ -1,5 +1,5 @@
-import { useMemo, useState, type FormEvent } from 'react'
-import { askToSignIn, leaveGroup, newGroupCode, removeFromGroup, renameGroup, useAccount, type Group } from '../lib/account'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { askToSignIn, groupDiscord, leaveGroup, newGroupCode, removeFromGroup, renameGroup, useAccount, type Group } from '../lib/account'
 import { addDays, fromDayKey, type DayKey } from '../lib/dates'
 import {
   contributions,
@@ -146,6 +146,7 @@ export function GroupPage({ id, today, completions }: Props) {
           <h2 id="group-itself">The group</h2>
         </div>
         <div className="section-body">
+          <PostedIn groupId={group.id} />
           {maker && <Rename group={group} onSave={(name) => change(() => renameGroup(group.id, name))} />}
           <div className="button-row">
             <button type="button" className="btn btn-secondary" onClick={() => setAsking({ what: 'leave' })}>
@@ -398,6 +399,36 @@ function ThisMonth({ board, today }: { board: BoardMember[]; today: DayKey }) {
         <p className="fine">Days each member planked today's song this month, since joining. It starts again on the 1st.</p>
       </div>
     </section>
+  )
+}
+
+/**
+ * The Discord channels that post the group each night (its streak, and who planked with their names and
+ * photos), so every member knows. Nothing when none does.
+ */
+function PostedIn({ groupId }: { groupId: string }) {
+  const [channels, setChannels] = useState<{ label: string; added_by: string }[]>([])
+  useEffect(() => {
+    let live = true
+    groupDiscord(groupId)
+      .then((found) => live && setChannels(found))
+      .catch(() => live && setChannels([]))
+    return () => {
+      live = false
+    }
+  }, [groupId])
+  if (channels.length === 0) return null
+  return (
+    <div className="posted-in">
+      <p className="fine">Posted in Discord each night, with everyone's names and photos:</p>
+      <ul>
+        {channels.map((c, i) => (
+          <li key={i}>
+            {c.label} <span className="fine">· added by {c.added_by}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 

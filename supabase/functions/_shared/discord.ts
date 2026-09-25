@@ -14,15 +14,28 @@ export type Refusal = { status: 'gone' } | { status: 'wait'; seconds: number } |
 export type PostResult = { status: 'sent' } | Refusal
 export type LookUpResult = { status: 'found'; channelId: string; name: string | null } | Refusal
 
-/** Posts a message through a webhook. */
-export async function postTo(url: string, message: object, fetcher: typeof fetch = fetch): Promise<PostResult> {
+/** The name a card goes by in Discord, under the post. */
+export const CARD_FILE = 'plank-to-taylor.png'
+
+/** Posts a message through a webhook, with its card as a picture under it when there is one. */
+export async function postTo(url: string, message: object, fetcher: typeof fetch = fetch, picture: Uint8Array | null = null): Promise<PostResult> {
   if (!DISCORD_WEBHOOK.test(url)) return { status: 'gone' }
-  const response = await fetcher(url, { method: 'POST', headers: HEADERS, body: JSON.stringify(message) })
+  const response = picture
+    ? await fetcher(url, { method: 'POST', headers: { 'User-Agent': HEADERS['User-Agent'] }, body: withPicture(message, picture) })
+    : await fetcher(url, { method: 'POST', headers: HEADERS, body: JSON.stringify(message) })
   if (response.ok) {
     await response.body?.cancel()
     return { status: 'sent' }
   }
   return refusal(response)
+}
+
+/** A message and a picture, the way Discord takes them together: the message as JSON beside the file. */
+function withPicture(message: object, picture: Uint8Array): FormData {
+  const form = new FormData()
+  form.append('payload_json', JSON.stringify({ ...message, attachments: [{ id: 0, filename: CARD_FILE }] }))
+  form.append('files[0]', new Blob([picture as Uint8Array<ArrayBuffer>], { type: 'image/png' }), CARD_FILE)
+  return form
 }
 
 /** A webhook's channel and name, from Discord: the check that it exists, before anything is posted. */

@@ -1,5 +1,6 @@
 import type { ScheduledSong } from './daily'
 import type { DayKey } from './dates'
+import { groupStreak, type BoardMember, type GroupKind } from './groups'
 import { localClock, timeHasCome } from './reminders'
 import { togetherTime, toughestStretch, type DailyStats } from './together'
 
@@ -142,9 +143,153 @@ export function nightPost(site: string, song: ScheduledSong | null, stats: Daily
   const lines = [
     `**How everyone did today:** ${who} planked ${song ? plain(song.title) : "today's song"}`,
     stats.seconds > 0 && `Together: ${togetherTime(stats.seconds)} of planking`,
-    stats.noBreak > 0 && `${stats.noBreak.toLocaleString('en-US')} held it all the way through 🟩`,
+    stats.noBreak > 0 && `${stats.noBreak.toLocaleString('en-US')} held it all the way through`,
     toughest !== null && `Toughest stretch: around ${mmss(toughest)}`,
     `Still time to plank along: <${site}>`,
   ]
   return message(site, lines.filter((line): line is string => typeof line === 'string'))
+}
+
+// The cards: each post also carries a picture, drawn by the discord-post function
+// (supabase/functions/_shared/cards.ts) from what's worked out here. The words stay complete on their own,
+// so a post still says everything if a card can't be drawn.
+
+/** The song on a card. Colours come from daily.json; one from before they were added gets plain ones. */
+export interface CardSong {
+  title: string
+  length: string
+  album: string
+  short: string
+  color: string
+  ink: string
+}
+
+/** Someone on a group's card: their name, and their photo's address if they have one. */
+export interface CardPerson {
+  name: string
+  photo: string | null
+}
+
+export type DiscordCard =
+  | { kind: 'morning'; top: string; song: CardSong }
+  | {
+      kind: 'everyone'
+      top: string
+      song: CardSong | null
+      planks: number
+      together: string | null
+      noBreak: number
+      /** The song end to end, darker where breaks bunched up (0 to 1 each), once there are enough planks. */
+      heat: number[] | null
+      toughest: string | null
+    }
+  | { kind: 'group'; top: string; song: CardSong | null; group: string; streak: number; held: CardPerson[]; planked: CardPerson[] }
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** A card's top line: "Daily No. 3 · Thu 24 Sep", the same wherever the server is. */
+export function cardTop(day: DayKey, song: ScheduledSong | null): string {
+  const [y, m, d] = day.split('-').map(Number)
+  const weekday = WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]
+  const date = `${weekday} ${d} ${MONTHS[m - 1]}`
+  return song?.number ? `Daily No. ${song.number} · ${date}` : date
+}
+
+function cardSong(song: ScheduledSong | null): CardSong | null {
+  if (!song) return null
+  return {
+    title: song.title,
+    length: song.length,
+    album: song.album ?? '',
+    short: song.short ?? '',
+    color: song.color ?? '#ebe5da',
+    ink: song.ink ?? '#1c1813',
+  }
+}
+
+/** The morning card: today's song, big, with its album's colour. None without daily.json. */
+export function morningCard(song: ScheduledSong | null, day: DayKey): DiscordCard | null {
+  const shown = cardSong(song)
+  return shown && { kind: 'morning', top: cardTop(day, song), song: shown }
+}
+
+/** The night card for a channel: how everyone did. None on a day nobody's planked. Never a count of breaks. */
+export function everyoneCard(song: ScheduledSong | null, stats: DailyStats, day: DayKey): DiscordCard | null {
+  if (stats.planks === 0) return null
+  const toughest = song ? toughestStretch(stats, song.seconds) : null
+  const most = Math.max(0, ...stats.slices)
+  return {
+    kind: 'everyone',
+    top: cardTop(day, song),
+    song: cardSong(song),
+    planks: stats.planks,
+    together: stats.seconds > 0 ? togetherTime(stats.seconds) : null,
+    noBreak: stats.noBreak,
+    heat: toughest !== null && most > 0 ? stats.slices.map((breaks) => (breaks === 0 ? 0 : 0.12 + 0.6 * (breaks / most))) : null,
+    toughest: toughest !== null ? mmss(toughest) : null,
+  }
+}
+
+/** A group's day, for a channel that posts that group: who planked today's song, and the group streak. */
+export interface GroupNight {
+  name: string
+  streak: number
+  /** Held today's with no breaks, in the order they joined. */
+  held: BoardMember[]
+  /** Planked it with breaks. Nobody's breaks are counted or shown. */
+  planked: BoardMember[]
+}
+
+export function groupNight(group: { name: string; kind: GroupKind }, board: readonly BoardMember[], day: DayKey): GroupNight {
+  const today = board.filter((m) => m.days.includes(day))
+  return {
+    name: group.name,
+    streak: groupStreak(group.kind, board, day).current,
+    held: today.filter((m) => m.clean_today === true),
+    planked: today.filter((m) => m.clean_today !== true),
+  }
+}
+
+/** Names listed in a group's post, at most; the rest are "and 12 more". Discord messages have a limit. */
+const NAMES_SHOWN = 15
+
+const names = (members: readonly BoardMember[]) => {
+  const shown = members.slice(0, NAMES_SHOWN).map((m) => plain(m.name.replace(/\s+/g, ' ').trim()))
+  const rest = members.length - shown.length
+  return rest > 0 ? `${shown.join(', ')} and ${rest} more` : shown.join(', ')
+}
+
+/**
+ * The night post for a channel that posts a group: its streak and who planked today, like Wordle's
+ * results. Null when nobody in it has planked today: there's nothing to cheer, and nobody gets named for
+ * missing it.
+ */
+export function groupNightPost(site: string, night: GroupNight): DiscordMessage | null {
+  if (night.held.length + night.planked.length === 0) return null
+  const name = plain(night.name)
+  const lines = [
+    night.streak > 0 ? `**${name}: a ${night.streak}-day group streak.** Here's how today went:` : `**${name}.** Here's how today went:`,
+    night.held.length > 0 && `All the way through: ${names(night.held)}`,
+    night.planked.length > 0 && `Planked it: ${names(night.planked)}`,
+    `Plank along: <${site}>`,
+  ]
+  return message(site, lines.filter((line): line is string => typeof line === 'string'))
+}
+
+/** Faces shown on a row of a group's card, at most; the rest are "+12". */
+export const FACES_SHOWN = 8
+
+export function groupCard(song: ScheduledSong | null, night: GroupNight, day: DayKey): DiscordCard | null {
+  if (night.held.length + night.planked.length === 0) return null
+  const person = (m: BoardMember): CardPerson => ({ name: m.name, photo: m.avatar_url })
+  return {
+    kind: 'group',
+    top: cardTop(day, song),
+    song: cardSong(song),
+    group: night.name,
+    streak: night.streak,
+    held: night.held.map(person),
+    planked: night.planked.map(person),
+  }
 }
