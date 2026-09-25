@@ -15,7 +15,7 @@ This is the first time one player can read another player's data, so the databas
   - **Contributors** count the days each member planked today's song this calendar month, at most one a day, most first. They reset on the 1st.
   - **50 members** for both kinds.
   - **The kind is chosen when the group is made** and never changes, so the group streak always means the same thing.
-  - Proposed, to confirm before Part 9: both kinds use freezes the same way (3 a month, at most 2 missed days in a row). A private group's day counts when everyone planked; a public group's when anyone did.
+  - **Both kinds use freezes the same way** (3 a month, at most 2 missed days in a row), confirmed before Part 9. A private group's day counts when everyone planked; a public group's when anyone did.
 - **Who counts as "everyone":** the members who had joined by that day, so a new member neither breaks the streak nor rides on it. Built as: each member keeps the day they joined in their own time zone (`joined_on`). In a private group a day needs everyone who joined *before* it, so joining late in the day never breaks it; in a public group, and for contributions, a plank counts from the joining day on.
 - **When the maker leaves,** the member who joined first takes over, so there's always someone who can rename the group, make a new link and remove members.
 - **Limits:** at most 50 members in a group, and 10 groups per player.

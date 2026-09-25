@@ -1,4 +1,6 @@
 import type { DayKey } from './dates'
+import type { Completion } from './progress'
+import { streakInfo, type StreakInfo } from './streaks'
 
 // Groups: friends who plank together (signed-in players only). The rules live in the database
 // (supabase/schema.sql, checked by supabase/groups-test.sql); what's here is the site's side of them.
@@ -99,4 +101,68 @@ export function groupProblem(message: string | undefined): GroupProblem {
   if (message.includes('no such group')) return 'not-found'
   if (message.includes("group's maker")) return 'not-maker'
   return 'unavailable'
+}
+
+/**
+ * The days a group counts, up to today. A plank counts for a group from the day its planker joined. A day
+ * counts once anyone has planked it: in a public group that's all it takes; in a private group it also needs
+ * everyone who joined before that day, so joining partway through a day never breaks it. Members who've
+ * left aren't on the board, so they count neither way.
+ */
+export function groupDays(kind: GroupKind, board: readonly BoardMember[], today: DayKey): Set<DayKey> {
+  const members = board.map((m) => ({ joined: m.joined_on, days: new Set(m.days.filter((d) => d >= m.joined_on && d <= today)) }))
+  const planked = new Set(members.flatMap((m) => [...m.days]))
+  if (kind === 'public') return planked
+  return new Set([...planked].filter((day) => members.every((m) => m.joined >= day || m.days.has(day))))
+}
+
+/** The group streak: worked out like a player's, freezes and all, over the days the group counts. */
+export function groupStreak(kind: GroupKind, board: readonly BoardMember[], today: DayKey): StreakInfo {
+  return streakInfo(groupDays(kind, board, today), today)
+}
+
+export interface GroupToday {
+  /** Members who've planked today's song. */
+  planked: number
+  members: number
+  /** A private group's: members today still needs, who joined before today and haven't planked it. */
+  waiting: number
+}
+
+export function groupToday(kind: GroupKind, board: readonly BoardMember[], today: DayKey): GroupToday {
+  const planked = board.filter((m) => m.days.includes(today)).length
+  const waiting = kind === 'private' ? board.filter((m) => m.joined_on < today && !m.days.includes(today)).length : 0
+  return { planked, members: board.length, waiting }
+}
+
+/**
+ * A public group's contributors: the days each member planked today's song this calendar month, from the
+ * day they joined, most first. Planks only, never breaks. The same as an invite link shows (group_invite).
+ */
+export function contributions(board: readonly BoardMember[], today: DayKey): { member: BoardMember; days: number }[] {
+  const monthStart = `${today.slice(0, 7)}-01`
+  return board
+    .map((member) => {
+      const from = member.joined_on > monthStart ? member.joined_on : monthStart
+      return { member, days: member.days.filter((d) => d >= from && d <= today).length }
+    })
+    .sort((a, b) => b.days - a.days || a.member.name.localeCompare(b.member.name))
+}
+
+/**
+ * The board with the player's own row brought up to date from this browser: a plank just finished may not
+ * have reached the account yet.
+ */
+export function withMine(board: readonly BoardMember[], me: string, completions: readonly Completion[], today: DayKey): BoardMember[] {
+  const daily = completions.filter((c) => c.mode === 'daily')
+  const mineToday = daily.find((c) => c.day === today)
+  return board.map((m) =>
+    m.user_id !== me
+      ? m
+      : {
+          ...m,
+          days: [...new Set([...m.days, ...daily.map((c) => c.day)])].sort(),
+          clean_today: mineToday ? (mineToday.pauses ?? []).length === 0 : m.clean_today,
+        },
+  )
 }

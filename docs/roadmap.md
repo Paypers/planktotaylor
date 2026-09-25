@@ -29,24 +29,13 @@ Adding the site to the home screen (4a) and daily reminders (4b) are built.
 
 Sharing a result (level 1) and the daily post in a server (level 2) are built.
 
-**A Discord Activity** (level 3): the site running inside a voice channel so a group planks to the same song together. This is the big one, and it overlaps with Friends and groups (9). YouTube playing inside Discord is a risk to check first. [Part 11](roadmap-parts/part-11-discord-activity.md) plans it.
-
-**Size:** large.
-
-## 9. Later: Friends and groups
-
-The biggest gap: right now nobody on the site can see anyone else.
-
-- Join a group from an invite link. See who's planked today's song (✓, with 🟩 for no breaks; no break counts), everyone's streaks, and a group streak that only grows on days everyone planks.
-- **Main work:** every rule in the database today lets a player see only their own rows. Groups need `groups` and `group_members` tables, plus rules that let members read a limited view of each other's planks.
-- The same break rule applies: nothing in a group ranks people by breaks.
-- Discord level 3 (the Activity) fits in here.
+**A Discord Activity** (level 3): the site running inside a voice channel so a group planks to the same song together. This is the big one, and it builds on groups, which are built. YouTube playing inside Discord is a risk to check first. [Part 11](roadmap-parts/part-11-discord-activity.md) plans it.
 
 **Size:** large.
 
 ## Not doing
 
-- **A public XP leaderboard.** Everything runs on trust, so a public board would fill up with made-up numbers and turn a daily habit into a contest. Groups (9) give people someone to compete with, among friends.
+- **A public XP leaderboard.** Everything runs on trust, so a public board would fill up with made-up numbers and turn a daily habit into a contest. Groups give people someone to plank with, among friends.
 
 ---
 
@@ -54,6 +43,5 @@ The biggest gap: right now nobody on the site can see anyone else.
 
 | # | Feature | Size | Notes |
 | --- | --- | --- | --- |
-| 9 | Friends and groups | Large | |
 | 4c | Native app | Large | Check the store rules first |
-| 5 | Discord Activity | Large | After groups; plan first |
+| 5 | Discord Activity | Large | Plan first |

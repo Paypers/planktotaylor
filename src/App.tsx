@@ -3,7 +3,8 @@ import { AccountDialog } from './components/AccountDialog'
 import { Avatar } from './components/Avatar'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { ErasPage } from './components/ErasPage'
-import { GroupsPage, JoinPage } from './components/Groups'
+import { GroupPage } from './components/GroupPage'
+import { GroupsPage, HomeGroups, JoinPage } from './components/Groups'
 import { HistoryDialog } from './components/HistoryDialog'
 import { HelpPage } from './components/HelpPage'
 import { InstallNote } from './components/InstallNote'
@@ -404,6 +405,7 @@ export function App() {
             </div>
           </section>
 
+          {accountsEnabled && <HomeGroups today={today} completions={data.completions} />}
           <StreakPanel
             completions={data.completions}
             days={days}
@@ -427,7 +429,12 @@ export function App() {
         )}
         {route.page === 'groups' && (
           <main>
-            <GroupsPage today={today} />
+            <GroupsPage today={today} completions={data.completions} />
+          </main>
+        )}
+        {route.page === 'group' && (
+          <main>
+            <GroupPage key={route.id} id={route.id} today={today} completions={data.completions} />
           </main>
         )}
         {route.page === 'join' && (

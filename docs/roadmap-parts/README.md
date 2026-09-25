@@ -16,7 +16,7 @@ To build one, hand Claude the file: *"Build docs/roadmap-parts/part-01-quick-win
 | [6](part-06-discord-daily-post.md) | Discord daily post | Medium | 2, 5 | Yes | | ✓ |
 | [7](part-07-collect-the-eras.md) | Collect the eras | Medium | | Yes (small) | Settle the release badges first | ✓ |
 | [8](part-08-groups-database.md) | Groups: the database and joining | Large, first half | 1 | Yes | Settle public groups first | ✓ |
-| [9](part-09-groups-page.md) | Groups: the group page | Large, second half | 8 | Maybe | | |
+| [9](part-09-groups-page.md) | Groups: the group page | Large, second half | 8 | No | | ✓ |
 | [10](part-10-native-app.md) | Native app | Large | 1, 5 | No | Plan and feasibility only, no code yet | |
 | [11](part-11-discord-activity.md) | Discord Activity | Large | 8, 9 | ? | Plan and feasibility only, no code yet | |
 

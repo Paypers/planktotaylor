@@ -219,6 +219,11 @@ describe('routes', () => {
     expect(hashFor({ page: 'join', code: '0123456789abcdef0123' })).toBe('#join/0123456789abcdef0123')
     expect(parseRoute('#join/')).toEqual({ page: 'home' })
     expect(parseRoute('#join/a/b')).toEqual({ page: 'home' })
+    const id = '0f8fad5b-d9cb-469f-a165-70867728950e'
+    expect(parseRoute(`#group/${id.toUpperCase()}`)).toEqual({ page: 'group', id })
+    expect(hashFor({ page: 'group', id })).toBe(`#group/${id}`)
+    expect(parseRoute('#group/nope')).toEqual({ page: 'groups' })
+    expect(parseRoute('#group')).toEqual({ page: 'groups' })
   })
 
   it('takes #discord to Settings → Discord', () => {

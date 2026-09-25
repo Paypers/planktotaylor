@@ -1,13 +1,10 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import {
   askToSignIn,
   createGroup,
   GroupError,
   groupInvite,
   joinGroup,
-  leaveGroup,
-  loadBoard,
-  loadGroups,
   saveDisplayName,
   useAccount,
   type Group,
@@ -17,18 +14,23 @@ import {
   forgetInvite,
   GROUP_NAME_LENGTH,
   GROUPS_EACH,
+  groupStreak,
+  groupToday,
   inviteCode,
   keepInvite,
+  withMine,
   type BoardMember,
   type GroupKind,
   type GroupProblem,
   type Invite,
 } from '../lib/groups'
-import { followLink, GROUPS, hashFor, navigate } from '../lib/route'
+import { refreshGroups, useMyGroups } from '../lib/myGroups'
+import type { Completion } from '../lib/progress'
+import { followLink, groupRoute, hashFor, navigate } from '../lib/route'
 import { siteLink } from '../lib/share'
 import { streakInfo } from '../lib/streaks'
 import { Avatar } from './Avatar'
-import { ConfirmDialog } from './ConfirmDialog'
+import { Flame, Icon } from './Icon'
 import { PageTop } from './PageTop'
 
 const PROBLEMS: Record<GroupProblem, string> = {
@@ -41,7 +43,7 @@ const PROBLEMS: Record<GroupProblem, string> = {
   unavailable: "Couldn't reach the site just now. Try again in a moment.",
 }
 
-const problemOf = (error: unknown) => PROBLEMS[error instanceof GroupError ? error.problem : 'unavailable']
+export const problemOf = (error: unknown) => PROBLEMS[error instanceof GroupError ? error.problem : 'unavailable']
 
 /** A group's invite link. */
 export const inviteLink = (code: string) => `${siteLink()}#join/${code}`
@@ -59,41 +61,10 @@ const KINDS: { kind: GroupKind; label: string; about: string }[] = [
   },
 ]
 
-/** Your groups: each with its members, an invite link and a way out, and a form to make one. */
-export function GroupsPage({ today }: { today: DayKey }) {
+/** Your groups, each linking to its page, and a form to make one. */
+export function GroupsPage({ today, completions }: { today: DayKey; completions: readonly Completion[] }) {
   const { user } = useAccount()
-  /** Undefined while loading; null when the site doesn't have groups yet. */
-  const [groups, setGroups] = useState<Group[] | null | undefined>(undefined)
-  const [boards, setBoards] = useState<ReadonlyMap<string, BoardMember[]>>(new Map())
-  const [error, setError] = useState<string | null>(null)
-  const [leaving, setLeaving] = useState<Group | null>(null)
-
-  const reload = useCallback(async () => {
-    try {
-      const found = await loadGroups()
-      setGroups(found)
-      setError(null)
-      if (!found) return
-      const loaded = await Promise.all(found.map(async (g) => [g.id, await loadBoard(g.id, today).catch(() => [])] as const))
-      setBoards(new Map(loaded))
-    } catch {
-      setError("Couldn't load your groups. Try again in a moment.")
-      setGroups((g) => g ?? [])
-    }
-  }, [today])
-
-  useEffect(() => {
-    if (user) void reload()
-  }, [user, reload])
-
-  const leave = () => {
-    const group = leaving
-    setLeaving(null)
-    if (!group) return
-    leaveGroup(group.id)
-      .then(reload)
-      .catch((e) => setError(problemOf(e)))
-  }
+  const { groups, boards, failed } = useMyGroups(today)
 
   return (
     <div className="info-page groups-page">
@@ -115,9 +86,13 @@ export function GroupsPage({ today }: { today: DayKey }) {
           </div>
         </section>
       ) : groups === undefined ? (
-        <p className="grid fine">Loading your groups…</p>
+        <div className="grid">
+          <p className="page-note fine">Loading your groups…</p>
+        </div>
       ) : groups === null ? (
-        <p className="grid settings-note">Groups aren't set up on this site yet.</p>
+        <div className="grid">
+          <p className="page-note settings-note">Groups aren't set up on this site yet.</p>
+        </div>
       ) : (
         <>
           <section className="section grid" aria-labelledby="groups-yours">
@@ -129,81 +104,99 @@ export function GroupsPage({ today }: { today: DayKey }) {
               </p>
             </div>
             <div className="section-body">
-              {error && (
+              {failed && (
                 <p className="error" role="alert">
-                  {error}
+                  Couldn't load your groups. Try again in a moment.
                 </p>
               )}
               {groups.length === 0 ? (
                 <p className="groups-lede">No groups yet. Make one below, or open an invite link a friend sent you.</p>
               ) : (
-                <ul className="group-list">
-                  {groups.map((group) => (
-                    <GroupCard key={group.id} group={group} board={boards.get(group.id)} me={user.id} onLeave={() => setLeaving(group)} />
-                  ))}
-                </ul>
+                <GroupCards groups={groups} boards={boards} me={user.id} today={today} completions={completions} />
               )}
             </div>
           </section>
-          {groups.length < GROUPS_EACH && <MakeGroup today={today} onMade={reload} />}
+          {groups.length < GROUPS_EACH && <MakeGroup today={today} />}
           <WhatTheySee />
         </>
       )}
-
-      <ConfirmDialog
-        open={leaving !== null}
-        title={`Leave ${leaving?.name ?? 'this group'}?`}
-        confirmLabel="Leave"
-        cancelLabel="Stay"
-        destructive
-        onConfirm={leave}
-        onCancel={() => setLeaving(null)}
-      >
-        <p>
-          {leaving?.members === 1
-            ? "You're its last member, so the group goes too."
-            : 'You can join again later from its invite link.'}
-        </p>
-      </ConfirmDialog>
     </div>
   )
 }
 
-function GroupCard({ group, board, me, onLeave }: { group: Group; board: BoardMember[] | undefined; me: string; onLeave: () => void }) {
+/** On the home page, under Today: a card for each group the player's in. Nothing until they're in one. */
+export function HomeGroups({ today, completions }: { today: DayKey; completions: readonly Completion[] }) {
+  const { user } = useAccount()
+  const { groups, boards } = useMyGroups(today)
+  if (!user || !groups || groups.length === 0) return null
   return (
-    <li className="group-card">
-      <div className="group-head">
-        <h3>{group.name}</h3>
-        <p className="group-meta">
-          {group.kind === 'public' ? 'Public' : 'Private'} · {group.members} {group.members === 1 ? 'member' : 'members'}
-        </p>
+    <section className="section grid" aria-labelledby="home-groups">
+      <div className="section-rule" />
+      <div className="section-label">
+        <h2 id="home-groups">Your groups</h2>
       </div>
-      {board && (
-        <ul className="group-members" aria-label={`${group.name}'s members`}>
-          {board.map((m) => (
-            <li key={m.user_id} className="member-chip">
-              <Avatar name={m.name} url={m.avatar_url} size={28} />
-              <span>
-                {m.name}
-                {m.user_id === me && <span className="fine"> (you)</span>}
-                {m.user_id === group.made_by && <span className="fine"> · made it</span>}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-      <InviteLink group={group} />
-      <div className="button-row">
-        <button type="button" className="btn btn-link" onClick={onLeave}>
-          Leave
-        </button>
+      <div className="section-body">
+        <GroupCards groups={groups} boards={boards} me={user.id} today={today} completions={completions} />
       </div>
+    </section>
+  )
+}
+
+interface CardsProps {
+  groups: Group[]
+  boards: ReadonlyMap<string, BoardMember[]>
+  me: string
+  today: DayKey
+  completions: readonly Completion[]
+}
+
+function GroupCards({ groups, boards, me, today, completions }: CardsProps) {
+  return (
+    <ul className="group-list">
+      {groups.map((group) => {
+        const board = boards.get(group.id)
+        return <GroupCard key={group.id} group={group} board={board && withMine(board, me, completions, today)} today={today} />
+      })}
+    </ul>
+  )
+}
+
+/** How today's going, in a line: "5 of 8 have planked today". */
+function todayLine(board: BoardMember[], today: DayKey): string {
+  const { planked, members } = groupToday('public', board, today)
+  if (planked === 0) return "Nobody's planked today yet"
+  if (planked === members) return members === 1 ? 'Planked today' : `All ${members} have planked today`
+  return `${planked} of ${members} ${planked === 1 ? 'has' : 'have'} planked today`
+}
+
+/** A group in a line or two, linking to its page. */
+function GroupCard({ group, board, today }: { group: Group; board: BoardMember[] | undefined; today: DayKey }) {
+  const streak = board ? groupStreak(group.kind, board, today) : null
+  const kind = group.kind === 'public' ? 'Public' : 'Private'
+  return (
+    <li>
+      <a className="group-card" href={hashFor(groupRoute(group.id))} onClick={(e) => followLink(e, groupRoute(group.id))}>
+        <span className="group-card-text">
+          <span className="group-card-name">{group.name}</span>
+          <span className="group-meta">
+            {kind} · {board ? todayLine(board, today) : `${group.members} ${group.members === 1 ? 'member' : 'members'}`}
+          </span>
+        </span>
+        {streak && streak.current > 0 && (
+          <span className="group-card-streak" title="Group streak">
+            <Flame size={18} lit={streak.doneToday} />
+            {streak.current}
+            <span className="sr-only">-day group streak</span>
+          </span>
+        )}
+        <Icon name="right" size={18} className="group-card-go" />
+      </a>
     </li>
   )
 }
 
 /** The group's invite link, to share or copy: anyone who has it can join. */
-function InviteLink({ group }: { group: Group }) {
+export function InviteLink({ group }: { group: Group }) {
   const [copied, setCopied] = useState(false)
   const link = inviteLink(group.invite_code)
   const text = `Plank with us: join ${group.name} on Plank to Taylor.`
@@ -261,26 +254,24 @@ function useGroupName() {
   return { field, ready, missing: needed && name.trim() === '' }
 }
 
-function MakeGroup({ today, onMade }: { today: DayKey; onMade: () => Promise<void> }) {
+function MakeGroup({ today }: { today: DayKey }) {
   const [name, setName] = useState('')
   const [kind, setKind] = useState<GroupKind>('private')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [made, setMade] = useState<string | null>(null)
   const you = useGroupName()
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
     setBusy(true)
     setError(null)
-    setMade(null)
     you
       .ready()
       .then(() => createGroup(name, kind, today))
       .then(async (group) => {
-        setName('')
-        setMade(group.name)
-        await onMade()
+        // On to its page, where the invite link is.
+        await refreshGroups()
+        navigate(groupRoute(group.id))
       })
       .catch((e) => setError(problemOf(e)))
       .finally(() => setBusy(false))
@@ -314,11 +305,6 @@ function MakeGroup({ today, onMade }: { today: DayKey; onMade: () => Promise<voi
         {error && (
           <p className="error" role="alert">
             {error}
-          </p>
-        )}
-        {made && (
-          <p className="settings-note" role="status">
-            {made} is made. Share its invite link to bring people in.
           </p>
         )}
         <div className="button-row">
@@ -395,9 +381,10 @@ export function JoinPage({ code, today }: { code: string; today: DayKey }) {
     you
       .ready()
       .then(() => joinGroup(valid, today))
-      .then(() => {
+      .then(async (joined) => {
         forgetInvite()
-        navigate(GROUPS)
+        await refreshGroups()
+        navigate(groupRoute(joined.id))
       })
       .catch((e) => setError(problemOf(e)))
       .finally(() => setBusy(false))
@@ -428,8 +415,8 @@ export function JoinPage({ code, today }: { code: string; today: DayKey }) {
               {invite?.id ? (
                 <p className="groups-lede">
                   You're in this group.{' '}
-                  <a href={hashFor(GROUPS)} onClick={(e) => followLink(e, GROUPS)}>
-                    Your groups
+                  <a href={hashFor(groupRoute(invite.id))} onClick={(e) => followLink(e, groupRoute(invite.id!))}>
+                    Open its page
                   </a>
                 </p>
               ) : !user ? (

@@ -4,7 +4,13 @@ The page that makes groups worth joining: who's planked today, everyone's streak
 
 **Builds:** roadmap §9, second half · **Needs:** [Part 8](part-08-groups-database.md) · **Schema change:** only if the board from Part 8 turns out to be missing something
 
-Use the answers written into Part 8's "Decide first" (the group streak, who counts as everyone, who can do what).
+Use the answers written into Part 8's "Decided" (the group streak, who counts as everyone, who can do what).
+
+## Decided
+
+- **Freezes work the same for both kinds** (3 a month, at most 2 missed days in a row). A private group's day counts when everyone who joined before it planked today's song; a public group's when anyone did. A day counts only once someone has planked it.
+- **On the home page,** the group cards get a section of their own, "Your groups", right under Today. It shows only once the player is in a group: no nudge before that (groups are reached from the profile and the help page).
+- **A just-finished plank shows straight away** on the player's own row: the board is brought up to date from the browser, since the plank may not have reached the account yet.
 
 ---
 

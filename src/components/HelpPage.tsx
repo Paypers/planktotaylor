@@ -201,12 +201,25 @@ export function HelpPage() {
               Groups
             </a>{' '}
             (from your profile) and share its invite link. Anyone with the link can join: up to 50 members, and 10 groups
-            each. You'll need a name to show the group.
+            each. You'll need a name to show the group. Your groups show on the home page, under Today.
           </dd>
-          <dt>Private or public</dt>
+          <dt>The group page</dt>
           <dd>
-            A private group's day counts when everyone in it has planked today's song; a public group's when anyone has.
-            It's chosen when the group is made.
+            Who's planked today's song (✓, or 🟩 with no breaks), everyone's own streak, and the group's streak. Members are
+            in the order they joined, or by name: never by streak or breaks. Whoever made the group can rename it, make a new
+            invite link (the old one stops working) and remove members.
+          </dd>
+          <dt>The group streak</dt>
+          <dd>
+            A private group's day counts when everyone who joined before that day has planked today's song, so joining
+            partway through a day never breaks it. A public group's day counts when anyone in it has. A day that doesn't
+            count uses one of the group's freezes, on the same rules as yours: 3 a month, at most 2 days in a row. Private or
+            public is chosen when the group is made, so the streak always means the same thing.
+          </dd>
+          <dt>This month</dt>
+          <dd>
+            A public group also shows how many days each member planked today's song this month, since joining. It starts
+            again on the 1st.
           </dd>
           <dt>What the group sees</dt>
           <dd>
@@ -216,7 +229,10 @@ export function HelpPage() {
             month.
           </dd>
           <dt>Leaving</dt>
-          <dd>Leave any time, and join again from the link. The last one out takes the group with them.</dd>
+          <dd>
+            Leave any time, and join again from the link. If whoever made the group leaves, the member who joined first
+            looks after it. The last one out takes the group with them.
+          </dd>
         </Topic>
       )}
 

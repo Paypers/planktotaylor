@@ -3833,7 +3833,7 @@ a {
   }
 }
 
-/* Groups: your groups with their members and invite links, and what an invite link shows. */
+/* Groups: your groups as cards (on home too), a group's page, and what an invite link shows. */
 
 .groups-lede {
   max-width: 560px;
@@ -3851,19 +3851,38 @@ a {
   border-top: 1px solid var(--ink);
 }
 
-.group-card {
-  display: grid;
-  gap: 14px;
-  padding: 18px 0 20px;
+.group-list > li {
   border-bottom: 1px solid var(--rule);
 }
 
-.group-head h3 {
+.group-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 14px 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.group-card-text {
+  display: grid;
+  flex-grow: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.group-card-name {
   font-family: var(--display);
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 600;
-  line-height: 28px;
+  line-height: 26px;
   overflow-wrap: anywhere;
+}
+
+.group-card:hover .group-card-name {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .group-meta {
@@ -3872,21 +3891,117 @@ a {
   color: var(--ink-2);
 }
 
-.group-members {
+.group-card-streak {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.group-card-go {
+  flex-shrink: 0;
+  color: var(--ink-2);
+}
+
+/* A note under a page's title: loading, or why there's nothing to show. */
+.page-note {
+  grid-column: 1 / -1;
+}
+
+.group-rule {
+  max-width: 560px;
+}
+
+.member-order {
+  margin-bottom: 12px;
+}
+
+.member-list {
+  max-width: 560px;
   margin: 0;
   padding: 0;
   list-style: none;
+  border-top: 1px solid var(--ink);
 }
 
-.member-chip {
+.member-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 15px;
-  line-height: 20px;
+  gap: 12px;
+  min-height: 60px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.member-text {
+  display: grid;
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.member-name {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 22px;
+  overflow-wrap: anywhere;
+}
+
+.member-notes {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-2);
+}
+
+.member-streak {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  min-width: 40px;
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.member-today {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  min-width: 52px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-2);
+}
+
+.member-today.done {
+  font-size: 18px;
+  line-height: 22px;
+  color: var(--ink);
+}
+
+/* The maker's Remove, and a space the same size on their own row, so the columns line up. */
+.member-remove,
+.member-remove-space {
+  flex-shrink: 0;
+  min-width: 60px;
+  font-size: 14px;
+  text-align: right;
+}
+
+.group-maker-link {
+  margin-top: 12px;
+}
+
+.group-maker-link .fine {
+  margin-top: 0;
+}
+
+.group-rename {
+  margin-bottom: 16px;
 }
 
 .invite-link {
@@ -3999,6 +4114,8 @@ a {
 /* Collect the eras: a badge for every album, and each album's songs as stamps in its colors. */
 
 .page-back {
+  grid-column: 1 / -1;
+  justify-self: start;
   display: inline-flex;
   align-items: center;
   gap: 4px;
