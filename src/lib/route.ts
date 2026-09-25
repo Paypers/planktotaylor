@@ -11,6 +11,8 @@ export type Route =
   | { page: 'help' }
   | { page: 'year' }
   | { page: 'eras'; album: AlbumId | null }
+  | { page: 'groups' }
+  | { page: 'join'; code: string }
 
 export const HOME: Route = { page: 'home' }
 export const RANKS: Route = { page: 'ranks' }
@@ -21,6 +23,9 @@ export const YEAR: Route = { page: 'year' }
 export const DISCORD: Route = { page: 'settings', section: 'discord' }
 /** Collect the eras: every album, and how much of it is stamped. */
 export const ERAS: Route = { page: 'eras', album: null }
+
+/** Your groups. */
+export const GROUPS: Route = { page: 'groups' }
 
 /** An album's page in Collect the eras. A release that joined an album is on that album's page. */
 export const eraRoute = (album: AlbumId): Route => ({ page: 'eras', album: ALBUMS[album].partOf ?? album })
@@ -36,6 +41,10 @@ export function parseRoute(hash: string): Route {
     const album = era[1]?.toLowerCase()
     return album && Object.hasOwn(ALBUMS, album) ? eraRoute(album as AlbumId) : ERAS
   }
+  if (/^#groups\/?$/i.test(hash)) return GROUPS
+  // An invite link: #join/<code>. Anything that can't be a code still opens the page, which says so.
+  const join = /^#join\/([A-Za-z0-9]{1,64})\/?$/.exec(hash)
+  if (join) return { page: 'join', code: join[1].toLowerCase() }
   const match = /^#settings(?:\/([a-z0-9-]+))?\/?$/i.exec(hash)
   return match ? { page: 'settings', section: match[1]?.toLowerCase() ?? null } : HOME
 }
@@ -44,6 +53,8 @@ export function parseRoute(hash: string): Route {
 export function hashFor(route: Route): string {
   if (route.page === 'ranks' || route.page === 'help' || route.page === 'year') return `#${route.page}`
   if (route.page === 'eras') return `#eras${route.album ? `/${route.album}` : ''}`
+  if (route.page === 'groups') return '#groups'
+  if (route.page === 'join') return `#join/${route.code}`
   return route.page === 'settings' ? `#settings${route.section ? `/${route.section}` : ''}` : ''
 }
 

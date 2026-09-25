@@ -213,6 +213,14 @@ describe('routes', () => {
     expect(hashFor({ page: 'eras', album: null })).toBe('#eras')
   })
 
+  it('reads groups and invite links from the address', () => {
+    expect(parseRoute('#groups')).toEqual({ page: 'groups' })
+    expect(parseRoute('#join/0123456789ABCDEF0123')).toEqual({ page: 'join', code: '0123456789abcdef0123' })
+    expect(hashFor({ page: 'join', code: '0123456789abcdef0123' })).toBe('#join/0123456789abcdef0123')
+    expect(parseRoute('#join/')).toEqual({ page: 'home' })
+    expect(parseRoute('#join/a/b')).toEqual({ page: 'home' })
+  })
+
   it('takes #discord to Settings → Discord', () => {
     expect(parseRoute('#discord')).toEqual({ page: 'settings', section: 'discord' })
     expect(parseRoute('#Discord/')).toEqual({ page: 'settings', section: 'discord' })

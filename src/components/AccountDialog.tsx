@@ -12,6 +12,7 @@ import {
 } from '../lib/account'
 import { squarePhoto } from '../lib/avatar'
 import type { PlayerRank } from '../lib/ranks'
+import { followLink, GROUPS, hashFor } from '../lib/route'
 import { Avatar } from './Avatar'
 import { Dialog } from './Dialog'
 import { RankCard } from './Rank'
@@ -112,6 +113,22 @@ function ProfileForm({ rank, onClose }: { rank: PlayerRank | null; onClose: () =
           {saved && <span className="fine profile-saved">Saved.</span>}
         </div>
       </form>
+
+      <section className="dialog-section">
+        <h3>Groups</h3>
+        <p className="muted">
+          <a
+            href={hashFor(GROUPS)}
+            onClick={(e) => {
+              followLink(e, GROUPS)
+              onClose()
+            }}
+          >
+            Your groups
+          </a>
+          : make one with friends, or share an invite link.
+        </p>
+      </section>
 
       {rank && (
         <section className="dialog-section">

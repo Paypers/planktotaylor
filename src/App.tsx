@@ -3,6 +3,7 @@ import { AccountDialog } from './components/AccountDialog'
 import { Avatar } from './components/Avatar'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { ErasPage } from './components/ErasPage'
+import { GroupsPage, JoinPage } from './components/Groups'
 import { HistoryDialog } from './components/HistoryDialog'
 import { HelpPage } from './components/HelpPage'
 import { InstallNote } from './components/InstallNote'
@@ -36,6 +37,7 @@ import { useToday } from './lib/hooks'
 import { dailyView, ladderView, songFor, streakDays, type Completion, type Pause } from './lib/progress'
 import { dailyNumber } from './lib/daily'
 import { collectionOf, eraStamps, stampNews } from './lib/eras'
+import { forgetInvite, keptInvite } from './lib/groups'
 import { eraRoute, followLink, hashFor, HELP, HOME, navigate, useRoute, YEAR, type Route } from './lib/route'
 import { playerRank, rankName } from './lib/ranks'
 import { plankSummary, type ShareInput } from './lib/share'
@@ -107,6 +109,16 @@ export function App() {
 
   // A player who's travelled gets reminders at their time where they are now.
   const userId = user?.id
+
+  // Signed in from an invite link: back to it, to join. (The magic link lands on the front page.)
+  useEffect(() => {
+    const code = userId ? keptInvite() : null
+    if (code) {
+      forgetInvite()
+      navigate({ page: 'join', code })
+    }
+  }, [userId])
+
   useEffect(() => {
     if (remindersAvailable && userId) void refreshReminderZone().catch(() => {})
   }, [userId])
@@ -411,6 +423,16 @@ export function App() {
         {route.page === 'ranks' && (
           <main>
             <RanksPage rank={rank} onSignIn={offerSignIn} completions={data.completions} />
+          </main>
+        )}
+        {route.page === 'groups' && (
+          <main>
+            <GroupsPage today={today} />
+          </main>
+        )}
+        {route.page === 'join' && (
+          <main>
+            <JoinPage code={route.code} today={today} />
           </main>
         )}
         {route.page === 'eras' && (

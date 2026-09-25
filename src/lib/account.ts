@@ -19,6 +19,7 @@ import { applyPrefs, getData, onPlankRecorded, onPrefsChanged, replaceProgress }
 import { accountThemes, applyAccountThemes, onThemeSaved, readSaved, type AccountThemes } from './theme'
 import { readStats, type DailyStats } from './together'
 import type { AddProblem } from './discord'
+import { groupProblem, type BoardMember, type GroupKind, type GroupProblem, type Invite } from './groups'
 
 // The project address, without the /rest/v1/ the dashboard shows on the end (it breaks sign-in).
 const url = (import.meta.env.VITE_SUPABASE_URL as string | undefined)
@@ -598,6 +599,90 @@ export async function changeDiscordZone(id: string, timeZone: string) {
 export async function removeDiscordWebhook(id: string) {
   const { error } = await (await client()).from('discord_webhooks').delete().eq('id', id)
   if (error) throw error
+}
+
+/** A group the player is in. */
+export interface Group {
+  id: string
+  name: string
+  kind: GroupKind
+  invite_code: string
+  /** Who can rename it, make a new link and remove members. */
+  made_by: string | null
+  created_at: string
+  members: number
+}
+
+/** Why a group call didn't work. */
+export class GroupError extends Error {
+  constructor(readonly problem: GroupProblem) {
+    super(`Group: ${problem}`)
+  }
+}
+
+const groupFailure = (error: { message?: string }) => new GroupError(groupProblem(error.message))
+
+/** The player's groups, oldest first, with how many members each has. Null when the site doesn't have groups yet. */
+export async function loadGroups(): Promise<Group[] | null> {
+  if (!accountsEnabled || !state.user) return []
+  const supabase = await client()
+  const groups = await supabase.from('groups').select('id, name, kind, invite_code, made_by, created_at').order('created_at')
+  if (groups.error && MISSING_TABLE.has(groups.error.code)) return null
+  if (groups.error) throw groups.error
+  // Every member of every one of the player's groups: the database shows no one else's.
+  const members = await supabase.from('group_members').select('group_id')
+  if (members.error) throw members.error
+  const counts = new Map<string, number>()
+  for (const { group_id } of members.data as { group_id: string }[]) counts.set(group_id, (counts.get(group_id) ?? 0) + 1)
+  return (groups.data as Omit<Group, 'members'>[]).map((g) => ({ ...g, members: counts.get(g.id) ?? 0 }))
+}
+
+/** A group's members as the group sees them: names, photos, the days they planked today's song, today's 🟩. */
+export async function loadBoard(groupId: string, today: DayKey): Promise<BoardMember[]> {
+  const { data, error } = await (await client()).rpc('group_board', { p_group: groupId, p_today: today })
+  if (error) throw groupFailure(error)
+  return data as BoardMember[]
+}
+
+export async function createGroup(name: string, kind: GroupKind, today: DayKey): Promise<Group> {
+  const { data, error } = await (await client()).rpc('create_group', { p_name: name, p_kind: kind, p_today: today })
+  if (error) throw groupFailure(error)
+  return { ...(data as Omit<Group, 'members'>), members: 1 }
+}
+
+export async function joinGroup(code: string, today: DayKey): Promise<{ id: string; name: string }> {
+  const { data, error } = await (await client()).rpc('join_group', { p_code: code, p_today: today })
+  if (error) throw groupFailure(error)
+  return data as { id: string; name: string }
+}
+
+export async function leaveGroup(groupId: string) {
+  const { error } = await (await client()).rpc('leave_group', { p_group: groupId })
+  if (error) throw groupFailure(error)
+}
+
+export async function renameGroup(groupId: string, name: string) {
+  const { error } = await (await client()).rpc('rename_group', { p_group: groupId, p_name: name })
+  if (error) throw groupFailure(error)
+}
+
+/** A new invite link's code: the old link stops working. */
+export async function newGroupCode(groupId: string): Promise<string> {
+  const { data, error } = await (await client()).rpc('new_group_code', { p_group: groupId })
+  if (error) throw groupFailure(error)
+  return data as string
+}
+
+export async function removeFromGroup(groupId: string, userId: string) {
+  const { error } = await (await client()).rpc('remove_from_group', { p_group: groupId, p_user: userId })
+  if (error) throw groupFailure(error)
+}
+
+/** What an invite link shows, signed in or not. Null for a link that isn't anyone's (or an old one). */
+export async function groupInvite(code: string, today: DayKey): Promise<Invite | null> {
+  const { data, error } = await (await client()).rpc('group_invite', { p_code: code, p_today: today })
+  if (error) throw groupFailure(error)
+  return (data as Invite | null) ?? null
 }
 
 /** The name to show: the one they chose, or the start of their email. */

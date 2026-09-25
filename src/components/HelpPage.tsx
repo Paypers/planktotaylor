@@ -3,7 +3,7 @@ import { LADDER } from '../data/songs'
 import { accountsEnabled } from '../lib/account'
 import { clockTime } from '../lib/dates'
 import { MORNING_POST, NIGHT_POST, WEBHOOKS_EACH } from '../lib/discord'
-import { DISCORD, ERAS, followLink, hashFor, RANKS } from '../lib/route'
+import { DISCORD, ERAS, followLink, GROUPS, hashFor, RANKS } from '../lib/route'
 import { remindersAvailable } from '../lib/push'
 import { LIGHT_XP } from '../lib/xp'
 import { PageTop } from './PageTop'
@@ -190,6 +190,34 @@ export function HelpPage() {
             </dd>
           </Topic>
         </>
+      )}
+
+      {accountsEnabled && (
+        <Topic id="groups" title="Groups">
+          <dt>Plank together</dt>
+          <dd>
+            Signed in, make a group in{' '}
+            <a href={hashFor(GROUPS)} onClick={(e) => followLink(e, GROUPS)}>
+              Groups
+            </a>{' '}
+            (from your profile) and share its invite link. Anyone with the link can join: up to 50 members, and 10 groups
+            each. You'll need a name to show the group.
+          </dd>
+          <dt>Private or public</dt>
+          <dd>
+            A private group's day counts when everyone in it has planked today's song; a public group's when anyone has.
+            It's chosen when the group is made.
+          </dd>
+          <dt>What the group sees</dt>
+          <dd>
+            Your name and photo, the days you planked today's song, and whether today's was held with no breaks (🟩).
+            Never your breaks, your XP, your ladder or your plank history. In a public group, anyone with its link, signed
+            in or not, can see its name, its streak, and each member's name, photo and how many days they planked this
+            month.
+          </dd>
+          <dt>Leaving</dt>
+          <dd>Leave any time, and join again from the link. The last one out takes the group with them.</dd>
+        </Topic>
       )}
 
       {remindersAvailable && (

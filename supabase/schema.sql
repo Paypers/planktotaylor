@@ -334,6 +334,381 @@ drop trigger if exists discord_webhooks_limit on public.discord_webhooks;
 create trigger discord_webhooks_limit before insert on public.discord_webhooks
   for each row execute function public.discord_webhooks_limit();
 
+-- Groups: friends who plank together. This is the one place a player sees anything of anyone else's, so
+-- every table still shows a player only their own rows. Members see each other only through group_board
+-- (names, photos, the days they planked today's song, and whether today's was held with no breaks), and
+-- anyone with a public group's link through group_invite. Never XP, breaks, attempts or the ladder.
+-- Making, joining, leaving and changing a group all go through the functions below, which check the limits.
+create table if not exists public.groups (
+  id uuid primary key default gen_random_uuid(),
+  name text not null check (char_length(name) between 1 and 40 and name = btrim(name)),
+  -- private: the group's day needs everyone; public: anyone, and its link shows the group. Fixed once made.
+  kind text not null check (kind in ('private', 'public')),
+  -- The invite link's code: random and unguessable. Anyone who has it can join.
+  invite_code text not null unique check (invite_code ~ '^[0-9a-f]{20}$'),
+  -- Who can rename it, make a new link and remove members: its maker, then whoever joined first.
+  made_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.group_members (
+  group_id uuid not null references public.groups (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  -- The day they joined, in their own time zone: the group's days count them from here.
+  joined_on date not null,
+  joined_at timestamptz not null default now(),
+  primary key (group_id, user_id)
+);
+create index if not exists group_members_user on public.group_members (user_id);
+
+-- Is the player a member of this group? Its own function, so the rules below can ask without reading
+-- group_members through its own rule (which would go round in circles).
+create or replace function public.in_group(p_group uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from public.group_members where group_id = p_group and user_id = auth.uid())
+$$;
+revoke all on function public.in_group(uuid) from public;
+grant execute on function public.in_group(uuid) to authenticated;
+
+alter table public.groups enable row level security;
+alter table public.group_members enable row level security;
+drop policy if exists "members read their groups" on public.groups;
+drop policy if exists "members read their groups' members" on public.group_members;
+create policy "members read their groups" on public.groups for select to authenticated using (public.in_group(id));
+create policy "members read their groups' members" on public.group_members for select to authenticated using (public.in_group(group_id));
+revoke all on public.groups, public.group_members from anon, authenticated;
+grant select on public.groups, public.group_members to authenticated;
+
+-- A day from the site is the player's today: within a day of the server's, whatever their time zone.
+create or replace function public.group_day(p_day date)
+returns date
+language plpgsql
+stable
+set search_path = public
+as $$
+begin
+  if p_day is null or p_day < current_date - 1 or p_day > current_date + 1 then
+    raise exception 'day out of range';
+  end if;
+  return p_day;
+end;
+$$;
+
+-- The player calling a group function: signed in, and with a name for the group to see.
+create or replace function public.group_player()
+returns uuid
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+begin
+  if me is null then
+    raise exception 'sign in first';
+  end if;
+  if not exists (select 1 from public.plank_profiles where user_id = me and btrim(coalesce(display_name, '')) <> '') then
+    raise exception 'a name first';
+  end if;
+  return me;
+end;
+$$;
+revoke all on function public.group_player() from public;
+
+create or replace function public.group_code()
+returns text
+language sql
+volatile
+set search_path = public
+as $$
+  select substr(md5(gen_random_uuid()::text || clock_timestamp()::text), 1, 20)
+$$;
+revoke all on function public.group_code() from public;
+
+create or replace function public.group_name(p_name text)
+returns text
+language plpgsql
+immutable
+as $$
+begin
+  if char_length(btrim(coalesce(p_name, ''))) not between 1 and 40 then
+    raise exception 'a name of 1 to 40 characters';
+  end if;
+  return btrim(p_name);
+end;
+$$;
+
+-- Makes a group, with its maker as its first member. At most 10 groups each.
+create or replace function public.create_group(p_name text, p_kind text, p_today date)
+returns public.groups
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := public.group_player();
+  made public.groups;
+begin
+  if p_kind is null or p_kind not in ('private', 'public') then
+    raise exception 'private or public';
+  end if;
+  -- One of the player's own group changes at a time, so two at once can't pass the limit together.
+  perform pg_advisory_xact_lock(hashtext('group player ' || me::text));
+  if (select count(*) from public.group_members where user_id = me) >= 10 then
+    raise exception 'too many groups';
+  end if;
+  insert into public.groups (name, kind, invite_code, made_by)
+  values (public.group_name(p_name), p_kind, public.group_code(), me)
+  returning * into made;
+  insert into public.group_members (group_id, user_id, joined_on) values (made.id, me, public.group_day(p_today));
+  return made;
+end;
+$$;
+
+-- Joins the group an invite code is for. At most 50 members, and 10 groups each. Joining again does nothing.
+create or replace function public.join_group(p_code text, p_today date)
+returns public.groups
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := public.group_player();
+  found_group public.groups;
+begin
+  -- The group's row is held until this finishes, so two joining at once can't pass 50 together.
+  select * into found_group from public.groups where invite_code = lower(btrim(coalesce(p_code, ''))) for update;
+  if not found then
+    raise exception 'no such group';
+  end if;
+  if exists (select 1 from public.group_members where group_id = found_group.id and user_id = me) then
+    return found_group;
+  end if;
+  perform pg_advisory_xact_lock(hashtext('group player ' || me::text));
+  if (select count(*) from public.group_members where user_id = me) >= 10 then
+    raise exception 'too many groups';
+  end if;
+  if (select count(*) from public.group_members where group_id = found_group.id) >= 50 then
+    raise exception 'group full';
+  end if;
+  insert into public.group_members (group_id, user_id, joined_on) values (found_group.id, me, public.group_day(p_today));
+  return found_group;
+end;
+$$;
+
+create or replace function public.leave_group(p_group uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from public.group_members where group_id = p_group and user_id = auth.uid();
+end;
+$$;
+
+-- Only the group's maker (see made_by) can rename it, make a new link, or remove a member.
+create or replace function public.group_maker(p_group uuid)
+returns void
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null or not exists (select 1 from public.groups where id = p_group and made_by = auth.uid()) then
+    raise exception 'only the group''s maker can do that';
+  end if;
+end;
+$$;
+revoke all on function public.group_maker(uuid) from public;
+
+create or replace function public.rename_group(p_group uuid, p_name text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform public.group_maker(p_group);
+  update public.groups set name = public.group_name(p_name) where id = p_group;
+end;
+$$;
+
+-- A new invite code: the old link stops working.
+create or replace function public.new_group_code(p_group uuid)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  code text := public.group_code();
+begin
+  perform public.group_maker(p_group);
+  update public.groups set invite_code = code where id = p_group;
+  return code;
+end;
+$$;
+
+create or replace function public.remove_from_group(p_group uuid, p_user uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform public.group_maker(p_group);
+  if p_user = auth.uid() then
+    raise exception 'leave the group instead';
+  end if;
+  delete from public.group_members where group_id = p_group and user_id = p_user;
+end;
+$$;
+
+-- Whoever leaves (or is removed, or deletes their account): the last one out takes the group with them,
+-- and if the maker went, the member who joined first takes over.
+create or replace function public.group_members_left()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (select 1 from public.group_members where group_id = old.group_id) then
+    delete from public.groups where id = old.group_id;
+  elsif exists (select 1 from public.groups where id = old.group_id and (made_by is null or made_by = old.user_id)) then
+    update public.groups
+    set made_by = (select user_id from public.group_members where group_id = old.group_id order by joined_at, user_id limit 1)
+    where id = old.group_id;
+  end if;
+  return null;
+end;
+$$;
+revoke all on function public.group_members_left() from public;
+drop trigger if exists group_members_left on public.group_members;
+create trigger group_members_left after delete on public.group_members
+  for each row execute function public.group_members_left();
+
+-- The group page's one way in to other players' planks, for members only: for each member, their name
+-- and photo, the day they joined, the days they planked today's song, and whether `p_today`'s was held
+-- with no breaks (null if they haven't planked it). Nothing else.
+create or replace function public.group_board(p_group uuid, p_today date)
+returns table (user_id uuid, name text, avatar_url text, joined_on date, days date[], clean_today boolean)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+#variable_conflict use_column
+begin
+  if not public.in_group(p_group) then
+    raise exception 'not in this group';
+  end if;
+  perform public.group_day(p_today);
+  return query
+  select
+    m.user_id,
+    coalesce(nullif(btrim(p.display_name), ''), 'A planker'),
+    p.avatar_url,
+    m.joined_on,
+    coalesce((select array_agg(c.day order by c.day) from public.plank_completions c where c.user_id = m.user_id and c.mode = 'daily'), '{}'::date[]),
+    (select c.pauses is null or jsonb_array_length(c.pauses) = 0
+     from public.plank_completions c
+     where c.user_id = m.user_id and c.mode = 'daily' and c.day = p_today)
+  from public.group_members m
+  left join public.plank_profiles p on p.user_id = m.user_id
+  where m.group_id = p_group
+  order by m.joined_at, m.user_id;
+end;
+$$;
+
+-- What an invite link shows, before joining. A public group: its name, how many members, the days anyone
+-- in it planked (for the group streak), and this month's contributors (name, photo, days planked), to
+-- anyone with the link. A private group: its name and size to signed-in players only; nothing at all
+-- signed out. Null for a code that isn't anyone's.
+create or replace function public.group_invite(p_code text, p_today date)
+returns json
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+  found_group public.groups;
+  members int;
+  mine boolean;
+  month_start date;
+begin
+  perform public.group_day(p_today);
+  select * into found_group from public.groups where invite_code = lower(btrim(coalesce(p_code, '')));
+  if not found then
+    return null;
+  end if;
+  if found_group.kind = 'private' and me is null then
+    return json_build_object('kind', 'private');
+  end if;
+  members := (select count(*) from public.group_members where group_id = found_group.id);
+  mine := me is not null and exists (select 1 from public.group_members where group_id = found_group.id and user_id = me);
+  if found_group.kind = 'private' then
+    return json_build_object('kind', 'private', 'name', found_group.name, 'members', members, 'id', case when mine then found_group.id end);
+  end if;
+  month_start := date_trunc('month', p_today)::date;
+  return json_build_object(
+    'kind', 'public',
+    'name', found_group.name,
+    'members', members,
+    'id', case when mine then found_group.id end,
+    'days', coalesce((
+      select json_agg(d order by d)
+      from (
+        select distinct c.day as d
+        from public.group_members m
+        join public.plank_completions c on c.user_id = m.user_id and c.mode = 'daily' and c.day >= m.joined_on
+        where m.group_id = found_group.id
+      ) s
+    ), '[]'::json),
+    'contributors', coalesce((
+      select json_agg(json_build_object('name', x.name, 'avatar_url', x.avatar_url, 'days', x.days) order by x.days desc, x.name)
+      from (
+        select
+          coalesce(nullif(btrim(p.display_name), ''), 'A planker') as name,
+          p.avatar_url,
+          (select count(*) from public.plank_completions c
+           where c.user_id = m.user_id and c.mode = 'daily' and c.day >= greatest(m.joined_on, month_start) and c.day <= p_today) as days
+        from public.group_members m
+        left join public.plank_profiles p on p.user_id = m.user_id
+        where m.group_id = found_group.id
+      ) x
+    ), '[]'::json)
+  );
+end;
+$$;
+
+revoke all on function public.create_group(text, text, date) from public;
+revoke all on function public.join_group(text, date) from public;
+revoke all on function public.leave_group(uuid) from public;
+revoke all on function public.rename_group(uuid, text) from public;
+revoke all on function public.new_group_code(uuid) from public;
+revoke all on function public.remove_from_group(uuid, uuid) from public;
+revoke all on function public.group_board(uuid, date) from public;
+revoke all on function public.group_invite(text, date) from public;
+grant execute on function public.create_group(text, text, date) to authenticated;
+grant execute on function public.join_group(text, date) to authenticated;
+grant execute on function public.leave_group(uuid) to authenticated;
+grant execute on function public.rename_group(uuid, text) to authenticated;
+grant execute on function public.new_group_code(uuid) to authenticated;
+grant execute on function public.remove_from_group(uuid, uuid) to authenticated;
+grant execute on function public.group_board(uuid, date) to authenticated;
+grant execute on function public.group_invite(text, date) to anon, authenticated;
+
 -- The schedules: every 15 minutes, call the send-reminders function (only when anyone has reminders on)
 -- and the discord-post function (only when any channel has the daily post). They need the pg_cron and
 -- pg_net extensions (Database → Extensions) and two secrets in Vault, reminders_url and reminders_secret
