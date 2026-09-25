@@ -45,8 +45,9 @@ export function HelpPage() {
         </dd>
         <dt>Time planked</dt>
         <dd>
-          Under your streak, a ring shows where your time went: today's song, the ladder, or planking again, or split by
-          album. Every plank held to the end counts once, goes again included. Tap a slice to see it on its own.
+          Under your streak, tap Time planked to open a ring of where your time went: today's song, the ladder, or
+          planking again, or split by album. Every plank held to the end counts once, goes again included. Tap a slice
+          to see it on its own.
         </dd>
         <dt>Your best</dt>
         <dd>

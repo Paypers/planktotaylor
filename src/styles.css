@@ -1429,36 +1429,79 @@ a {
   border-bottom: 1px solid var(--rule);
 }
 
-/* Time planked: a ring split by what the planks were for, or by album, with the total in the middle */
+/* Time planked: a row with the total that opens a ring split by what the planks were for, or by album */
 
 .time-split {
   margin-bottom: 32px;
   container-type: inline-size;
 }
 
-.time-split-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 16px;
+/* The row carries on the facts list above it, so the two read as one list. */
+.facts:has(+ .time-split) {
+  margin-bottom: 0;
 }
 
-.time-split-head h3 {
+.time-split-head {
+  font: inherit;
+}
+
+.time-split-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 0;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
   font-size: 15px;
-  font-weight: 600;
-  line-height: 20px;
+  line-height: 22px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.time-split-summary:hover {
+  color: var(--ink);
+}
+
+.time-split-label {
+  flex: 1;
+}
+
+.time-split-total {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.time-split-caret {
+  transition: transform 0.15s ease;
+}
+
+.time-split-summary[aria-expanded='true'] .time-split-caret {
+  transform: rotate(180deg);
+}
+
+.time-split-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 16px;
 }
 
 .split-toggle {
   display: inline-flex;
-  padding: 2px;
-  border: 1px solid var(--rule);
+  align-self: center;
+  gap: 2px;
+  padding: 3px;
   border-radius: 999px;
+  background: var(--well);
 }
 
 .split-toggle button {
-  min-height: 32px;
+  min-height: 28px;
   padding: 0 14px;
   border: 0;
   border-radius: 999px;
@@ -1467,6 +1510,7 @@ a {
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: 16px;
   cursor: pointer;
 }
 
@@ -1480,7 +1524,6 @@ a {
   flex-direction: column;
   align-items: center;
   gap: 16px;
-  margin-top: 16px;
 }
 
 .ring {
@@ -1590,6 +1633,9 @@ a {
 
 /* Side by side only when the section itself has room for both: the Streak column is narrow on wide screens. */
 @container (min-width: 440px) {
+  .split-toggle {
+    align-self: flex-start;
+  }
   .time-split-body {
     flex-direction: row;
     align-items: center;
@@ -1598,7 +1644,8 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ring-slice {
+  .ring-slice,
+  .time-split-caret {
     transition: none;
   }
 }

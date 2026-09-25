@@ -36,6 +36,7 @@ const PATHS: Record<IconName, ReactNode> = {
   ),
   left: <path d="m15 18-6-6 6-6" />,
   right: <path d="m9 18 6-6-6-6" />,
+  down: <path d="m6 9 6 6 6-6" />,
   check: <path d="M20 6 9 17l-5-5" />,
   search: (
     <>
@@ -104,6 +105,7 @@ export type IconName =
   | 'x'
   | 'left'
   | 'right'
+  | 'down'
   | 'check'
   | 'search'
   | 'settings'

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { formatTime, splitByAlbum, splitByKind, type Plank, type Slice } from '../lib/planks'
+import { Icon } from './Icon'
 
 type View = 'kind' | 'album'
 
@@ -13,11 +14,13 @@ const GAP = 2
 const plural = (n: number, word: string) => `${n.toLocaleString()} ${word}${n === 1 ? '' : 's'}`
 
 /**
- * Where the time went: a ring split by what the planks were for (today's song, the ladder, goes again)
- * or by album, with the total in the middle. Hovering, focusing or tapping a slice or its row shows
- * that slice in the middle instead; the rows list every value, so nothing needs the hover.
+ * Where the time went: a row with the total that opens a ring split by what the planks were for
+ * (today's song, the ladder, goes again) or by album, with the total in the middle. It starts closed on
+ * every load. Hovering, focusing or tapping a slice or its row shows that slice in the middle instead;
+ * the rows list every value, so nothing needs the hover.
  */
 export function TimeSplit({ planks }: { planks: Plank[] }) {
+  const [open, setOpen] = useState(false)
   const [view, setView] = useState<View>('kind')
   // Hovered (or focused) and tapped are kept apart: a tap arrives after the hover it causes, and
   // shouldn't undo it. Hover wins while it lasts; a tapped slice stays until tapped again.
@@ -42,60 +45,76 @@ export function TimeSplit({ planks }: { planks: Plank[] }) {
 
   return (
     <section className="time-split" aria-labelledby="time-split-heading">
-      <div className="time-split-head">
-        <h3 id="time-split-heading">Time planked</h3>
-        <div className="split-toggle" role="group" aria-label="Split the time by">
-          <button type="button" aria-pressed={view === 'kind'} onClick={() => choose('kind')}>
-            What for
-          </button>
-          <button type="button" aria-pressed={view === 'album'} onClick={() => choose('album')}>
-            Album
-          </button>
-        </div>
-      </div>
+      <h3 className="time-split-head">
+        <button
+          type="button"
+          id="time-split-heading"
+          className="time-split-summary"
+          aria-expanded={open}
+          aria-controls="time-split-panel"
+          onClick={() => setOpen(!open)}
+        >
+          <span className="time-split-label">Time planked</span>
+          <span className="time-split-total">{formatTime(total)}</span>
+          <Icon name="down" size={16} className="time-split-caret" />
+        </button>
+      </h3>
 
-      <div className="time-split-body">
-        <div className="ring">
-          <Ring slices={slices} total={total} active={active} onHover={setHovered} onTap={toggle} />
-          <div className="ring-middle" aria-live="polite">
-            {shown ? (
-              <>
-                <span className="ring-value">{formatTime(shown.seconds)}</span>
-                <span className="ring-label">
-                  {Math.round((shown.seconds / total) * 100)}% · {shown.label}
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="ring-value">{formatTime(total)}</span>
-                <span className="ring-label">{plural(planks.length, 'plank')}</span>
-              </>
-            )}
+      {open && (
+        <div id="time-split-panel" className="time-split-panel">
+          <div className="split-toggle" role="group" aria-label="Split the time by">
+            <button type="button" aria-pressed={view === 'kind'} onClick={() => choose('kind')}>
+              What for
+            </button>
+            <button type="button" aria-pressed={view === 'album'} onClick={() => choose('album')}>
+              Album
+            </button>
+          </div>
+
+          <div className="time-split-body">
+            <div className="ring">
+              <Ring slices={slices} total={total} active={active} onHover={setHovered} onTap={toggle} />
+              <div className="ring-middle" aria-live="polite">
+                {shown ? (
+                  <>
+                    <span className="ring-value">{formatTime(shown.seconds)}</span>
+                    <span className="ring-label">
+                      {Math.round((shown.seconds / total) * 100)}% · {shown.label}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="ring-value">{formatTime(total)}</span>
+                    <span className="ring-label">{plural(planks.length, 'plank')}</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <ul className="split-legend">
+              {slices.map((slice) => (
+                <li key={slice.key}>
+                  <button
+                    type="button"
+                    className={`split-row${active === slice.key ? ' active' : ''}`}
+                    aria-pressed={pinned === slice.key}
+                    onMouseEnter={() => setHovered(slice.key)}
+                    onMouseLeave={() => setHovered(null)}
+                    onFocus={() => setHovered(slice.key)}
+                    onBlur={() => setHovered(null)}
+                    onClick={() => toggle(slice.key)}
+                  >
+                    <span className="split-swatch" style={{ background: slice.color }} aria-hidden="true" />
+                    <span className="split-label">{slice.label}</span>
+                    <span className="split-count">{plural(slice.planks, 'plank')}</span>
+                    <span className="split-time">{formatTime(slice.seconds)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
-
-        <ul className="split-legend">
-          {slices.map((slice) => (
-            <li key={slice.key}>
-              <button
-                type="button"
-                className={`split-row${active === slice.key ? ' active' : ''}`}
-                aria-pressed={pinned === slice.key}
-                onMouseEnter={() => setHovered(slice.key)}
-                onMouseLeave={() => setHovered(null)}
-                onFocus={() => setHovered(slice.key)}
-                onBlur={() => setHovered(null)}
-                onClick={() => toggle(slice.key)}
-              >
-                <span className="split-swatch" style={{ background: slice.color }} aria-hidden="true" />
-                <span className="split-label">{slice.label}</span>
-                <span className="split-count">{plural(slice.planks, 'plank')}</span>
-                <span className="split-time">{formatTime(slice.seconds)}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
+      )}
     </section>
   )
 }
