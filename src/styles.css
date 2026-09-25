@@ -3222,9 +3222,19 @@ a {
   }
 }
 
+/* A light's colour: the album's, pulled a little toward the text colour so a pale album still shows on a
+   pale page and a dark one on a dark page. `--glow` is the album's colour, set where a light is drawn. */
+.aurora-light,
+.light-mark,
+.aurora-spark {
+  --light: color-mix(in srgb, var(--glow) 70%, var(--ink));
+}
+
 .aurora-light {
   position: fixed;
   z-index: 3;
+  display: grid;
+  place-items: center;
   width: 72px;
   height: 72px;
   padding: 0;
@@ -3239,18 +3249,32 @@ a {
     light-glow 1.4s ease-in-out 0.6s infinite alternate;
 }
 
-/* The light itself, inside its 72px target: the album's colour with a bright centre, a thin ring in the
-   album's text colour (so it shows on any page, pale album or dark), and a glow around it. */
-.aurora-light::before {
-  content: '';
-  position: absolute;
-  inset: 10px;
-  border: 2px solid color-mix(in srgb, var(--glow-ink) 50%, transparent);
-  border-radius: 50%;
-  background: radial-gradient(circle at 42% 40%, #fff 0 16%, color-mix(in srgb, var(--glow) 50%, #fff) 34%, var(--glow) 72%);
-  box-shadow:
-    0 0 20px 6px color-mix(in srgb, var(--glow) 60%, transparent),
-    0 0 44px 16px color-mix(in srgb, var(--glow) 28%, transparent);
+/* The light itself, inside its 72px target: the site's star in a line, see-through, in a hairline ring. */
+.light-star {
+  display: block;
+}
+
+.light-star circle {
+  fill: none;
+  stroke: var(--ink);
+  stroke-opacity: 0.2;
+  stroke-width: 1;
+}
+
+.light-star path {
+  fill: color-mix(in srgb, var(--light) 14%, transparent);
+  stroke: var(--light);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+
+/* A light caught, beside the count: the star, small and filled. */
+.light-mark {
+  flex-shrink: 0;
+}
+
+.light-mark path {
+  fill: var(--light);
 }
 
 @keyframes light-in {
@@ -3266,20 +3290,41 @@ a {
   }
 }
 
-/* "+5 ✨" rising from a caught light. */
+/* "+5 XP" (or a small star, when lights don't pay) rising from a caught light, and a ring where it was. */
 .aurora-spark {
   position: fixed;
   z-index: 3;
+  display: grid;
+  place-items: center;
   width: 72px;
+  height: 72px;
   pointer-events: none;
   font-family: var(--mono);
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
-  line-height: 72px;
   color: var(--ink);
-  text-align: center;
   white-space: nowrap;
   animation: spark-rise 1.4s ease-out forwards;
+}
+
+.aurora-spark::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid var(--light);
+  border-radius: 50%;
+  animation: spark-ring 0.9s ease-out forwards;
+}
+
+@keyframes spark-ring {
+  from {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.35);
+  }
 }
 
 @keyframes spark-rise {
@@ -3290,6 +3335,9 @@ a {
 }
 
 .plank-lights-note {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   margin-top: 12px;
   font-size: 14px;
   line-height: 20px;
@@ -3297,6 +3345,9 @@ a {
 }
 
 .plank-lights-caught {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-top: 8px;
   font-family: var(--mono);
   font-size: 15px;
@@ -3306,6 +3357,9 @@ a {
 }
 
 .done-lights {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-top: 12px;
   font-family: var(--mono);
   font-size: 14px;
@@ -3321,6 +3375,10 @@ a {
   }
   .aurora-spark {
     animation: spark-fade 1.4s ease-out forwards;
+  }
+  .aurora-spark::before {
+    animation: none;
+    opacity: 0;
   }
 }
 

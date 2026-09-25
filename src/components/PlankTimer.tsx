@@ -14,7 +14,7 @@ import { youtubeUrl } from '../lib/youtube'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Confetti } from './Confetti'
 import { StampMark } from './EraBadge'
-import { Flame, Icon } from './Icon'
+import { Flame, Icon, LightMark, LightStar } from './Icon'
 import { RankBar, RankPlaque } from './Rank'
 import { RankEmblem } from './RankEmblem'
 import { PlankReceipt } from './Receipt'
@@ -194,7 +194,7 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
   }
   const [caught, setCaught] = useState(0)
   const caughtRef = useRef(0)
-  /** "+5 ✨" rising from where each light was caught. */
+  /** "+5 XP" (or, when lights don't pay, a small star) rising from where each light was caught. */
   const [sparks, setSparks] = useState<ShownLight[]>([])
   const root = useRef<HTMLDivElement>(null)
   // Lights pay only on a plank that pays XP anyway: today's song, or a ladder level the first time.
@@ -690,14 +690,16 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
               {coach}
             </p>
             {prefs.lights && phase === 'ready' && (
-              <p className="plank-lights-note">
-                ✨ Lights will appear as you plank: tap one to catch it. Put your phone at least an arm's length away, so
+              <p className="plank-lights-note" style={{ '--glow': album.color } as CSSProperties}>
+                <LightMark />
+                Lights will appear as you plank: tap one to catch it. Put your phone at least an arm's length away, so
                 catching one means lifting an arm.
               </p>
             )}
             {prefs.lights && caught > 0 && phase !== 'ready' && (
-              <p className="plank-lights-caught" aria-live="polite">
-                ✨ {caught}
+              <p className="plank-lights-caught" aria-live="polite" style={{ '--glow': album.color } as CSSProperties}>
+                <LightMark />
+                {caught} caught
               </p>
             )}
           </div>
@@ -785,7 +787,7 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
         <button
           type="button"
           className="aurora-light"
-          style={{ left: light.x, top: light.y, '--glow': album.color, '--glow-ink': album.ink } as CSSProperties}
+          style={{ left: light.x, top: light.y, '--glow': album.color } as CSSProperties}
           // The tap is the light's alone: it never reaches the video or anything under it.
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
@@ -793,11 +795,18 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
             catchLight()
           }}
           aria-label="Catch the light"
-        />
+        >
+          <LightStar />
+        </button>
       )}
       {sparks.map((spark) => (
-        <span key={spark.id} className="aurora-spark" style={{ left: spark.x, top: spark.y }} aria-hidden="true">
-          {lightsPay ? `+${LIGHT_XP} ✨` : '✨'}
+        <span
+          key={spark.id}
+          className="aurora-spark"
+          style={{ left: spark.x, top: spark.y, '--glow': album.color } as CSSProperties}
+          aria-hidden="true"
+        >
+          {lightsPay ? `+${LIGHT_XP} XP` : <LightMark size={18} />}
         </span>
       ))}
     </div>
@@ -898,8 +907,9 @@ function DoneView({
 
       <PlankReceipt seconds={song.seconds} pauses={pauses} />
       {lights > 0 && (
-        <p className="done-lights">
-          ✨ {lights} {lights === 1 ? 'light' : 'lights'} caught
+        <p className="done-lights" style={{ '--glow': ALBUMS[song.album].color } as CSSProperties}>
+          <LightMark />
+          {lights} {lights === 1 ? 'light' : 'lights'} caught
         </p>
       )}
 
@@ -985,7 +995,7 @@ function XpEarned({ xp, seconds, rankedUp }: { xp: FinishXp; seconds: number; ra
         : award.kind === 'clean'
           ? `+${award.bonus.toLocaleString()} no-break bonus`
           : `Go again with no breaks for the ${bonusName}.`
-    const lit = xp.lightXp > 0 ? ` · +${xp.lightXp.toLocaleString()} for ${xp.lights} ${xp.lights === 1 ? 'light' : 'lights'} ✨` : ''
+    const lit = xp.lightXp > 0 ? ` · +${xp.lightXp.toLocaleString()} for ${xp.lights} ${xp.lights === 1 ? 'light' : 'lights'}` : ''
     detail = `${award.base.toLocaleString()} for ${formatDuration(seconds)} of song · ${how}${lit}`
   }
   return (
@@ -1014,14 +1024,15 @@ interface ShownLight {
 
 /**
  * Somewhere for a light on screen: within the plank's column, clear of the top bar, the timer, the
- * video and the buttons.
+ * coaching line, the count of lights, the video and the buttons. The light is see-through, so it never
+ * sits on words.
  */
 function findLightSpot(plank: HTMLElement | null): { x: number; y: number } | null {
   const column = plank?.querySelector('.plank-inner')?.getBoundingClientRect()
   if (!plank || !column) return null
   const margin = 12
   const area: Box = { left: column.left + margin, top: margin, right: column.right - margin, bottom: window.innerHeight - margin }
-  const avoid: Box[] = [...plank.querySelectorAll('.plank-top, .plank-clock, .plank-music, .plank-actions')]
+  const avoid: Box[] = [...plank.querySelectorAll('.plank-top, .plank-clock, .plank-coach, .plank-lights-caught, .plank-music, .plank-actions')]
     .map((el) => el.getBoundingClientRect())
     .filter((r) => r.width > 0 && r.height > 0)
   return placeLight(area, avoid, LIGHT_SIZE)

@@ -146,7 +146,32 @@ export function Icon({ name, size = 20, filled = false, className }: Props) {
 export function StarMark({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" className="star-mark" style={{ flexShrink: 0 }}>
-      <path d="M12 1.5 14.2 9.8 22.5 12 14.2 14.2 12 22.5 9.8 14.2 1.5 12 9.8 9.8Z" fill="currentColor" />
+      <path d={STAR} fill="currentColor" />
+    </svg>
+  )
+}
+
+/** The site's four-pointed star. */
+const STAR = 'M12 1.5 14.2 9.8 22.5 12 14.2 14.2 12 22.5 9.8 14.2 1.5 12 9.8 9.8Z'
+
+/**
+ * An aurora light: the star, drawn in a line and see-through, in a hairline ring. Its colour is the
+ * album's, from `--glow` on something around it (see .aurora-light in styles.css).
+ */
+export function LightStar() {
+  return (
+    <svg className="light-star" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true">
+      <circle cx="32" cy="32" r="27" />
+      <path d={STAR} transform="translate(15 15) scale(1.4167)" />
+    </svg>
+  )
+}
+
+/** A light caught: the star, small and filled, in the album's colour. */
+export function LightMark({ size = 14 }: { size?: number }) {
+  return (
+    <svg className="light-mark" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <path d={STAR} />
     </svg>
   )
 }
