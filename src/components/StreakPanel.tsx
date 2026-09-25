@@ -98,6 +98,10 @@ export function StreakPanel({ completions, days, streak, today, onSignIn, rank, 
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
+/** A day's planks that don't keep the streak, for its label: "ladder levels", "new releases". */
+const otherPlanks = (planks: readonly Completion[]) =>
+  [planks.some((c) => c.mode === 'ladder') && 'ladder levels', planks.some((c) => c.mode === 'era') && 'new releases'].filter(Boolean).join(' and ')
+
 interface CalendarProps {
   completions: Completion[]
   days: ReadonlySet<DayKey>
@@ -181,7 +185,7 @@ function Calendar({ completions, days, frozen, today }: CalendarProps) {
               onClick={() => setSelected(day)}
               disabled={day > today}
               aria-pressed={day === selected}
-              aria-label={`${date}${streakDay ? ", planked today's song" : planks ? ', ladder levels only' : ''}${froze ? ', a freeze kept the streak' : ''}${runEnd ? `, end of a ${run}-day streak` : ''}${day === today ? ', today' : ''}`}
+              aria-label={`${date}${streakDay ? ", planked today's song" : planks ? `, ${otherPlanks(planks)} only` : ''}${froze ? ', a freeze kept the streak' : ''}${runEnd ? `, end of a ${run}-day streak` : ''}${day === today ? ', today' : ''}`}
             >
               <span>{Number(day.slice(8))}</span>
               {froze && (
@@ -210,7 +214,8 @@ function Calendar({ completions, days, frozen, today }: CalendarProps) {
             if (!planked) return null
             return (
               <p key={`${c.mode}-${c.songId}`}>
-                {c.mode === 'daily' ? "Today's song" : `Level ${c.level}`} · {planked.title} · {formatDuration(c.seconds)}
+                {c.mode === 'daily' ? "Today's song" : c.mode === 'ladder' ? `Level ${c.level}` : `${ALBUMS[planked.album].short} · new release`} ·{' '}
+                {planked.title} · {formatDuration(c.seconds)}
                 {c.xp ? ` · +${c.xp} XP` : ''}
               </p>
             )

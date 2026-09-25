@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { AccountDialog } from './components/AccountDialog'
 import { Avatar } from './components/Avatar'
 import { ConfirmDialog } from './components/ConfirmDialog'
+import { ErasPage } from './components/ErasPage'
 import { HistoryDialog } from './components/HistoryDialog'
 import { HelpPage } from './components/HelpPage'
 import { InstallNote } from './components/InstallNote'
@@ -18,7 +19,7 @@ import { LadderProgress, SongLine, SongRow } from './components/SongRow'
 import { StreakPanel } from './components/StreakPanel'
 import { Together } from './components/Together'
 import { YearReview } from './components/YearReview'
-import { LADDER, type Song } from './data/songs'
+import { ALBUMS, LADDER, type Song } from './data/songs'
 import {
   accountsEnabled,
   bumpDailyStats,
@@ -34,7 +35,8 @@ import { fromDayKey } from './lib/dates'
 import { useToday } from './lib/hooks'
 import { dailyView, ladderView, songFor, streakDays, type Completion, type Pause } from './lib/progress'
 import { dailyNumber } from './lib/daily'
-import { followLink, hashFor, HELP, HOME, useRoute, YEAR, type Route } from './lib/route'
+import { collectionOf, eraStamps, stampNews } from './lib/eras'
+import { eraRoute, followLink, hashFor, HELP, HOME, navigate, useRoute, YEAR, type Route } from './lib/route'
 import { playerRank, rankName } from './lib/ranks'
 import { plankSummary, type ShareInput } from './lib/share'
 import { getData, recordPlank, setLadderLevel, useAppData } from './lib/store'
@@ -136,6 +138,8 @@ export function App() {
       song,
       daily: counted.some((c) => c.mode === 'daily'),
       level: counted.find((c) => c.mode === 'ladder')?.level,
+      // A new release planked from its album page is shared as that release.
+      release: ALBUMS[song.album].afterLaunch && !counted.some((c) => c.mode !== 'era') ? ALBUMS[song.album].short : undefined,
       pauses,
       lights: lights || undefined,
     })
@@ -154,7 +158,8 @@ export function App() {
 
   const finish = useCallback(
     (song: Song, pauses: Pause[], lights: number): FinishSummary => {
-      const rankBefore = playerRank(getData().completions)
+      const before = getData().completions
+      const rankBefore = playerRank(before)
       // Any plank of your ladder level moves you up, a redone one included.
       const climbing = ladderView(getData(), today).song?.id === song.id
       const result = recordPlank(song, pauses, earningXp, lights)
@@ -184,7 +189,16 @@ export function App() {
             rankAfter: playerRank(now.completions),
           }
         : null
-      return { counted, streak: streakInfo(streakDays(now.completions), today).current, next, xp, practiceLevel }
+      return {
+        counted,
+        streak: streakInfo(streakDays(now.completions), today).current,
+        next,
+        xp,
+        practiceLevel,
+        // Collect the eras: a first stamp, or a gold one, and where the album stands now.
+        stamp: stampNews(before, now.completions, song),
+        collection: collectionOf(eraStamps(now.completions), song),
+      }
     },
     [today, earningXp],
   )
@@ -396,7 +410,12 @@ export function App() {
         )}
         {route.page === 'ranks' && (
           <main>
-            <RanksPage rank={rank} onSignIn={offerSignIn} />
+            <RanksPage rank={rank} onSignIn={offerSignIn} completions={data.completions} />
+          </main>
+        )}
+        {route.page === 'eras' && (
+          <main>
+            <ErasPage album={route.album} completions={data.completions} today={today} onStart={start} />
           </main>
         )}
         {route.page === 'help' && (
@@ -435,6 +454,10 @@ export function App() {
           onClose={() => setSession(null)}
           onSignIn={offerSignIn}
           onNext={start}
+          onOpenEra={(album) => {
+            setSession(null)
+            navigate(eraRoute(album))
+          }}
         />
       )}
       <MusicDialog open={dialog === 'music'} prefs={data.prefs} onClose={() => setDialog(null)} />

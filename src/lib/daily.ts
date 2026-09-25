@@ -4,18 +4,27 @@ import { addDays, daysBetween, type DayKey } from './dates'
 /** Daily #1. Everyone on the same calendar date gets the same song, like Wordle. */
 export const DAILY_EPOCH: DayKey = '2026-09-22'
 
-/** One day each for `ids`, in order, starting on `from`. */
-const backToBack = (from: DayKey, ids: string[]) => Object.fromEntries(ids.map((id, i) => [addDays(from, i), id]))
+/** Songs released together after launch: they premiere back to back, one a day from `from`, in this order. */
+export interface Release {
+  from: DayKey
+  songs: readonly string[]
+}
 
 /**
  * New releases as the song of the day, from their release day. Their days are slotted in rather
  * than taken from the rotation, which carries on unchanged after them. A song that isn't out by its
  * day (not found on YouTube yet) leaves its day to a rotation song, and moves nothing else.
+ * Collect the eras counts each release as one: its badge or charm needs all of its songs.
  */
-export const PREMIERES: Readonly<Record<DayKey, string>> = {
+export const RELEASES: readonly Release[] = [
   // The Life of a Showgirl: The Encore, out Friday 25 September: its four new songs, in track order.
-  ...backToBack('2026-09-25', ['patient-zero', 'cleveland', 'pink-clouding', 'babylon']),
-}
+  { from: '2026-09-25', songs: ['patient-zero', 'cleveland', 'pink-clouding', 'babylon'] },
+]
+
+/** Each premiere day's song. */
+export const PREMIERES: Readonly<Record<DayKey, string>> = Object.fromEntries(
+  RELEASES.flatMap((release) => release.songs.map((id, i) => [addDays(release.from, i), id])),
+)
 
 export function dailyNumber(day: DayKey): number {
   return daysBetween(DAILY_EPOCH, day) + 1

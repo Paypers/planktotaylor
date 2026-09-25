@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { SONG_BY_ID, formatDuration } from '../data/songs'
+import { ALBUMS, SONG_BY_ID, formatDuration } from '../data/songs'
 import { pullAttempts } from '../lib/account'
 import { useAttempts, type Attempt, type AttemptOutcome } from '../lib/attempts'
 import { addDays, fromDayKey, toDayKey, todayKey } from '../lib/dates'
@@ -19,6 +19,10 @@ function kindLabel(a: Attempt): string {
   if (a.kind === 'daily') return "Today's song"
   if (a.kind === 'extra') return "Today's song · extra credit"
   if (a.kind === 'practice') return `Level ${a.level} · practice`
+  if (a.kind === 'era') {
+    const song = SONG_BY_ID.get(a.songId)
+    return song ? `${ALBUMS[song.album].short} · new release` : 'New release'
+  }
   return `Level ${a.level}`
 }
 

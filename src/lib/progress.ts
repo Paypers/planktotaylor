@@ -1,9 +1,14 @@
-import { LADDER, SONG_BY_ID, type Song } from '../data/songs'
+import { ALBUMS, LADDER, SONG_BY_ID, type Song } from '../data/songs'
 import { dailyNumber, dailySong } from './daily'
 import type { DayKey } from './dates'
 import { LIGHT_XP, plankXp, totalXp, type XpAward } from './xp'
 
-export type Mode = 'daily' | 'ladder'
+/**
+ * daily   today's song, the one that keeps the streak
+ * ladder  a ladder level climbed
+ * era     a new release planked from its album page: it stamps the song (Collect the eras), with no XP
+ */
+export type Mode = 'daily' | 'ladder' | 'era'
 
 /** A break during a plank: where in the song it happened and how long it lasted. */
 export interface Pause {
@@ -187,7 +192,13 @@ export function applyPlank(
   // A go that counts for nothing new: today's song again, or practice on a ladder level already climbed.
   const target = upgradeTarget(data.completions, song.id, today)
   const gain = target && earnXp && award.kind !== 'held' ? award.total - totalXp(target) : 0
-  if (gain <= 0) return { data: next, added: [], updated: [], gained: 0, lightXp: 0, kind: 'repeat', bonusLeft: target !== null }
+  if (gain <= 0) {
+    if (ALBUMS[song.album].afterLaunch) {
+      const stamped = eraStamp(data, song, today, at, pauses, lights)
+      if (stamped) return stamped
+    }
+    return { data: next, added: [], updated: [], gained: 0, lightXp: 0, kind: 'repeat', bonusLeft: target !== null }
+  }
 
   // Held straight through this time: that earlier plank becomes the clean one, with the bonus added
   // to whichever of its records carries the XP.
@@ -222,6 +233,44 @@ export function upgradeTarget(completions: readonly Completion[], songId: string
   if (withBreaks.length === 0) return null
   // Every record of that plank: they share its finishing time.
   return mine.filter((c) => c.at === withBreaks[0].at)
+}
+
+/**
+ * A new release planked when it isn't today's song (from its album page: it's not on the ladder, and
+ * it's today's song only on its premiere day). The first go stamps it, and the first go with no breaks
+ * makes the stamp gold: each is an `era` record, with no XP, that doesn't touch the streak or the ladder.
+ * A go with no breaks after one with breaks the same day replaces that day's record. Null when this go
+ * adds nothing: the song is stamped, and gold already or not this time.
+ */
+function eraStamp(data: AppData, song: Song, today: DayKey, at: string, pauses: Pause[], lights: number): PlankResult | null {
+  const mine = data.completions.filter((c) => c.songId === song.id)
+  const gold = pauses.length === 0 && !mine.some((c) => !c.pauses?.length)
+  if (mine.length > 0 && !gold) return null
+  const caught = lights > 0 ? { lights } : {}
+  const sameDay = mine.find((c) => c.mode === 'era' && c.day === today)
+  if (sameDay) {
+    const clean: Completion = { ...sameDay, at, ...caught }
+    delete clean.pauses
+    return {
+      data: { ...data, completions: data.completions.map((c) => (c === sameDay ? clean : c)) },
+      added: [],
+      updated: [clean],
+      gained: 0,
+      lightXp: 0,
+      kind: 'upgrade',
+      bonusLeft: false,
+    }
+  }
+  const record: Completion = {
+    day: today,
+    mode: 'era',
+    songId: song.id,
+    seconds: song.seconds,
+    at,
+    ...(pauses.length > 0 ? { pauses } : {}),
+    ...caught,
+  }
+  return { data: { ...data, completions: [...data.completions, record] }, added: [record], updated: [], gained: 0, lightXp: 0, kind: 'new', bonusLeft: false }
 }
 
 /**

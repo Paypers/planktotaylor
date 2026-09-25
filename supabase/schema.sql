@@ -6,7 +6,8 @@
 create table if not exists public.plank_completions (
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
   day date not null,
-  mode text not null check (mode in ('daily', 'ladder')),
+  -- 'era': a new release planked from its album page (Collect the eras), with no XP.
+  mode text not null check (mode in ('daily', 'ladder', 'era')),
   song_id text not null,
   level int check (level is null or level >= 1),
   seconds int not null check (seconds > 0),
@@ -25,6 +26,9 @@ alter table public.plank_completions add column if not exists xp int check (xp i
 alter table public.plank_completions add column if not exists lights int check (lights is null or lights between 0 and 50);
 alter table public.plank_completions drop constraint if exists plank_completions_pkey;
 alter table public.plank_completions add primary key (user_id, day, mode, song_id);
+-- For databases created before new releases could be planked from their album page.
+alter table public.plank_completions drop constraint if exists plank_completions_mode_check;
+alter table public.plank_completions add constraint plank_completions_mode_check check (mode in ('daily', 'ladder', 'era'));
 
 -- Where each user is on the shortest-to-longest ladder, the name and photo they chose, and their
 -- settings, so every device they sign in on looks and sounds the same.
@@ -76,7 +80,7 @@ create table if not exists public.plank_attempts (
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
   id uuid not null,
   song_id text not null,
-  kind text not null check (kind in ('daily', 'ladder', 'practice', 'extra')),
+  kind text not null check (kind in ('daily', 'ladder', 'practice', 'extra', 'era')),
   level int check (level is null or level >= 1),
   started_at timestamptz not null,
   ended_at timestamptz not null,
@@ -87,6 +91,9 @@ create table if not exists public.plank_attempts (
   primary key (user_id, id)
 );
 create index if not exists plank_attempts_recent on public.plank_attempts (user_id, started_at desc);
+-- For databases created before new releases could be planked from their album page.
+alter table public.plank_attempts drop constraint if exists plank_attempts_kind_check;
+alter table public.plank_attempts add constraint plank_attempts_kind_check check (kind in ('daily', 'ladder', 'practice', 'extra', 'era'));
 
 alter table public.plank_attempts enable row level security;
 drop policy if exists "read own attempts" on public.plank_attempts;

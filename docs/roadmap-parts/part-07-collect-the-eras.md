@@ -2,12 +2,18 @@
 
 Achievements, done her way: every song you plank is stamped into its album.
 
-**Builds:** roadmap §8 · **Needs:** nothing · **Schema change:** no
+**Builds:** roadmap §8 · **Needs:** nothing · **Schema change:** yes, small (the `era` kind, decided below)
 
 ## Decided
 
-- **A finished album's badge stays** when new songs join it. New songs join their album as they premiere, the way The Encore's four did. The album page shows them unstamped: "New: 4 songs to stamp". So the site needs to know which songs were out when the album was finished. [`PREMIERES` in daily.ts](../../src/lib/daily.ts) has the dates for new songs.
-- **Small badges for new-release groups** as well, like The Encore's four songs: stamp them all and you get a small badge of their own. Settle the details with the person when this part starts: what counts as a group, what it's called, and how it looks next to the album badges.
+- **A finished album's badge stays** when new songs join it. New songs join their album as they premiere, the way The Encore's four did. The album page shows them unstamped: "New: 4 songs to stamp". So the site needs to know which songs were out when the album was finished. [`RELEASES` in daily.ts](../../src/lib/daily.ts) has each release's songs and first day (it used to be a flat `PREMIERES` list; `PREMIERES` is now built from it).
+- **Small badges for new-release groups** as well, like The Encore's four songs: stamp them all and you get a small badge of their own.
+  - **What counts as a group:** songs released together after launch that join an album already out. In songs.ts that's an album entry with `afterLaunch` and `partOf` (The Encore is `partOf: 'showgirl'`). They show on the parent album's page under their own heading. The parent's badge is for its own songs, so it stays whatever joins it. A whole new album (`afterLaunch` with no `partOf`) gets a page and a full badge of its own.
+  - **Called a charm:** a small round charm in the release's color with the site's star, on the edge of its album's badge, like a friendship-bracelet charm. A dashed outline until it's earned.
+- **Stamping new releases after their premiere day:** the album page has a Start button on new-release songs. Finishing one stamps it: a new kind of record, `era`, with no XP, and it doesn't touch the streak or the ladder. The first go with no breaks makes the stamp gold. On its premiere day the song is today's song, so Start there starts today's song. This is a small schema change (the `era` kind on planks and attempts).
+- **Gold badge:** an album whose songs all have gold stamps gets a gold edge on its badge (a charm gets one too, when all its songs are gold). A shout-out only.
+- **Badges stay, and a release counts as a whole:** a badge (or charm, or gold edge) is earned on the first day every song that counted by then was stamped (or gold). Launch songs always count; a release's songs all count, announced ones too, from its first day or the day one of them was first stamped. So The Encore's charm needs all four songs, not just the ones out so far, and a later release never takes a badge away ("New: 4 songs to stamp").
+- **The time ring** gets a fourth slice, New releases, for planks from album pages, in plum (`--chart-era`, checked colorblind-safe with the other three in both themes).
 
 ---
 

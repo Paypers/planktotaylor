@@ -2,6 +2,7 @@ import { useDeferredValue, useMemo, useState } from 'react'
 import { ALBUMS, LADDER, formatDuration, type Song } from '../data/songs'
 import { normalizeTitle } from '../lib/match'
 import { ladderRecords, type Completion, type LevelRecord } from '../lib/progress'
+import { ERAS, followLink, hashFor } from '../lib/route'
 import { Icon } from './Icon'
 
 interface Props {
@@ -79,6 +80,13 @@ export function Setlist({ level, completions, onOpen }: Props) {
           {TOTAL_HOURS} hours in all.
         </p>
         <p className="label-note">Tap a song for its details. The ladder is climbed in order, one level at a time.</p>
+        <p className="label-note">
+          Every song you plank is stamped into its album:{' '}
+          <a href={hashFor(ERAS)} onClick={(e) => followLink(e, ERAS)}>
+            Collect the eras
+          </a>
+          .
+        </p>
       </div>
       <div className="section-body setlist-body">
         <label className="search">

@@ -439,6 +439,7 @@ describe('pauses', () => {
     expect(plankHeadline(false, 12)).toBe('Level 12 done.')
     expect(plankHeadline(true)).toBe("Today's song, done.")
     expect(plankHeadline(false)).toBe('Extra credit.')
+    expect(plankHeadline(false, undefined, 'The Encore')).toBe('Collected.')
   })
 })
 

@@ -33,17 +33,6 @@ Sharing a result (level 1) and the daily post in a server (level 2) are built.
 
 **Size:** large.
 
-## 8. Later: Collect the eras
-
-Achievements, done her way.
-
-- Every song you plank (today's song or the ladder) gets stamped into its album. An album page shows every song, stamped or not, in the album's colors, like the calendar.
-- Finish an album and its badge goes on your profile. A song held with no breaks could get a gold stamp.
-- New albums after launch (see New releases in the README) join as their songs premiere.
-- All the data is already there (`song_id` on planks, `album` on songs), so there's no schema change.
-
-**Size:** medium.
-
 ## 9. Later: Friends and groups
 
 The biggest gap: right now nobody on the site can see anyone else.
@@ -65,7 +54,6 @@ The biggest gap: right now nobody on the site can see anyone else.
 
 | # | Feature | Size | Notes |
 | --- | --- | --- | --- |
-| 8 | Collect the eras | Medium | |
 | 9 | Friends and groups | Large | |
 | 4c | Native app | Large | Check the store rules first |
 | 5 | Discord Activity | Large | After groups; plan first |

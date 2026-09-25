@@ -3,7 +3,8 @@ import { useSyncExternalStore } from 'react'
 // Every plank attempt, from the moment the plank begins, finished or not. A record, not a score:
 // nothing here moves the ladder, the streak or XP.
 
-export type AttemptKind = 'daily' | 'ladder' | 'practice' | 'extra'
+/** `era`: a new release, planked from its album page (Collect the eras). */
+export type AttemptKind = 'daily' | 'ladder' | 'practice' | 'extra' | 'era'
 
 /**
  * finished  held to the end of the song

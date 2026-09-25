@@ -1,6 +1,10 @@
-import type { CSSProperties } from 'react'
+import { useMemo, type CSSProperties } from 'react'
+import { eraStamps } from '../lib/eras'
+import type { Completion } from '../lib/progress'
 import { RANK_STEPS, rankName, TIERS, tierStart, type PlayerRank, type Tier } from '../lib/ranks'
+import { eraRoute, ERAS, followLink, hashFor } from '../lib/route'
 import { CLEAN_BONUS, MARATHON_BONUS, MARATHON_SECONDS } from '../lib/xp'
+import { EraBadge } from './EraBadge'
 import { PageTop } from './PageTop'
 import { RankCard, RankPlaque } from './Rank'
 import { RankEmblem } from './RankEmblem'
@@ -19,10 +23,12 @@ interface Props {
   rank: PlayerRank | null
   /** Set when accounts are on and nobody's signed in. */
   onSignIn?: () => void
+  /** For the badges won in Collect the eras. */
+  completions: readonly Completion[]
 }
 
 /** Every rank, what each one takes, and where you are: opened from your plaque. */
-export function RanksPage({ rank, onSignIn }: Props) {
+export function RanksPage({ rank, onSignIn, completions }: Props) {
   return (
     <div className="info-page">
       <PageTop title="Ranks" />
@@ -52,6 +58,8 @@ export function RanksPage({ rank, onSignIn }: Props) {
           </div>
         </section>
       )}
+
+      <YourEras completions={completions} />
 
       <section className="section grid" aria-labelledby="ranks-how">
         <div className="section-rule" />
@@ -142,6 +150,51 @@ export function RanksPage({ rank, onSignIn }: Props) {
         </div>
       </section>
     </div>
+  )
+}
+
+/** The badges (and charms) won in Collect the eras, each linked to its album. */
+function YourEras({ completions }: { completions: readonly Completion[] }) {
+  const eras = useMemo(() => eraStamps(completions), [completions])
+  // An album shows once its badge or any of its charms is won.
+  const shown = eras.filter((era) => era.earnedOn || era.releases.some((r) => r.earnedOn))
+  const badges = eras.filter((era) => era.earnedOn).length
+  return (
+    <section className="section grid" aria-labelledby="ranks-eras">
+      <div className="section-rule" />
+      <div className="section-label">
+        <h2 id="ranks-eras">Your eras</h2>
+        <p className="label-meta">
+          {badges} of {eras.length} badges
+        </p>
+      </div>
+      <div className="section-body">
+        {shown.length > 0 ? (
+          <ul className="won-badges">
+            {shown.map((era) => (
+              <li key={era.album.id}>
+                <a href={hashFor(eraRoute(era.album.id))} onClick={(e) => followLink(e, eraRoute(era.album.id))}>
+                  <EraBadge
+                    album={era.album}
+                    size={72}
+                    progress={era.total ? era.stamped / era.total : 0}
+                    won={!!era.earnedOn}
+                    gold={!!era.goldOn}
+                    charms={era.releases.map((r) => ({ album: r.album, won: !!r.earnedOn, gold: !!r.goldOn }))}
+                  />
+                  {era.album.short}
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="ranks-eras-note">Stamp every song on an album, by planking each one, and its badge goes here.</p>
+        )}
+        <a href={hashFor(ERAS)} onClick={(e) => followLink(e, ERAS)}>
+          Collect the eras
+        </a>
+      </div>
+    </section>
   )
 }
 

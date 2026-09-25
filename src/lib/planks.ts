@@ -3,16 +3,18 @@ import type { Attempt } from './attempts'
 import { toDayKey, type DayKey } from './dates'
 import type { Completion } from './progress'
 
-// Every plank held to the end of the song, counted once: today's song, ladder climbs, and goes again
-// (extra credit on today's song, practice on a climbed level). The records only keep what counted
-// for something, so goes again come from the attempt history.
+// Every plank held to the end of the song, counted once: today's song, ladder climbs, new releases from
+// their album page, and goes again (extra credit on today's song, practice on a climbed level, a new
+// release again). The records only keep what counted for something, so goes again come from the
+// attempt history.
 
 /**
  * daily   today's song, the one that keeps the streak (a two-for-one counts here)
  * ladder  a ladder level climbed
- * again   planked again: today's song once it was done, or a level already climbed
+ * era     a new release planked from its album page, for its stamp
+ * again   planked again: today's song once it was done, a level already climbed, or a new release stamped already
  */
-export type PlankKind = 'daily' | 'ladder' | 'again'
+export type PlankKind = 'daily' | 'ladder' | 'era' | 'again'
 
 export interface Plank {
   song: Song
@@ -42,13 +44,13 @@ export function allPlanks(completions: readonly Completion[], attempts: readonly
       day: records[0].day,
       at,
       seconds: records[0].seconds,
-      kind: records.some((c) => c.mode === 'daily') ? 'daily' : 'ladder',
+      kind: records.some((c) => c.mode === 'daily') ? 'daily' : records.some((c) => c.mode === 'ladder') ? 'ladder' : 'era',
       clean: records.every((c) => !c.pauses?.length),
       lights: records.reduce((sum, c) => sum + (c.lights ?? 0), 0),
     })
   }
   for (const a of attempts) {
-    if (a.outcome !== 'finished' || (a.kind !== 'extra' && a.kind !== 'practice')) continue
+    if (a.outcome !== 'finished' || (a.kind !== 'extra' && a.kind !== 'practice' && a.kind !== 'era')) continue
     const song = SONG_BY_ID.get(a.songId)
     if (!song) continue
     const ended = Date.parse(a.endedAt)
@@ -77,8 +79,8 @@ export interface Slice {
   color: string
 }
 
-export const KIND_LABELS: Record<PlankKind, string> = { daily: "Today's song", ladder: 'Ladder', again: 'Planked again' }
-const KIND_ORDER: PlankKind[] = ['daily', 'ladder', 'again']
+export const KIND_LABELS: Record<PlankKind, string> = { daily: "Today's song", ladder: 'Ladder', era: 'New releases', again: 'Planked again' }
+const KIND_ORDER: PlankKind[] = ['daily', 'ladder', 'era', 'again']
 
 /** Time by what the planks were for, always in the same order and colours. Kinds with none are left out. */
 export function splitByKind(planks: readonly Plank[]): Slice[] {

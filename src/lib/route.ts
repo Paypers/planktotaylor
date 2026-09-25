@@ -1,9 +1,16 @@
 import { useSyncExternalStore, type MouseEvent } from 'react'
+import { ALBUMS, type AlbumId } from '../data/songs'
 
 // Pages live in the address's #hash, so any static host serves them and Back works.
 // Sign-in links use the hash too (#access_token=…): anything that isn't a page here is left alone.
 
-export type Route = { page: 'home' } | { page: 'settings'; section: string | null } | { page: 'ranks' } | { page: 'help' } | { page: 'year' }
+export type Route =
+  | { page: 'home' }
+  | { page: 'settings'; section: string | null }
+  | { page: 'ranks' }
+  | { page: 'help' }
+  | { page: 'year' }
+  | { page: 'eras'; album: AlbumId | null }
 
 export const HOME: Route = { page: 'home' }
 export const RANKS: Route = { page: 'ranks' }
@@ -12,6 +19,11 @@ export const HELP: Route = { page: 'help' }
 export const YEAR: Route = { page: 'year' }
 /** Settings → Discord: the daily post in a server. */
 export const DISCORD: Route = { page: 'settings', section: 'discord' }
+/** Collect the eras: every album, and how much of it is stamped. */
+export const ERAS: Route = { page: 'eras', album: null }
+
+/** An album's page in Collect the eras. A release that joined an album is on that album's page. */
+export const eraRoute = (album: AlbumId): Route => ({ page: 'eras', album: ALBUMS[album].partOf ?? album })
 
 export function parseRoute(hash: string): Route {
   if (/^#ranks\/?$/i.test(hash)) return RANKS
@@ -19,6 +31,11 @@ export function parseRoute(hash: string): Route {
   if (/^#year\/?$/i.test(hash)) return YEAR
   // A short address to give server admins: Settings → Discord.
   if (/^#discord\/?$/i.test(hash)) return DISCORD
+  const era = /^#eras(?:\/([a-z0-9-]+))?\/?$/i.exec(hash)
+  if (era) {
+    const album = era[1]?.toLowerCase()
+    return album && Object.hasOwn(ALBUMS, album) ? eraRoute(album as AlbumId) : ERAS
+  }
   const match = /^#settings(?:\/([a-z0-9-]+))?\/?$/i.exec(hash)
   return match ? { page: 'settings', section: match[1]?.toLowerCase() ?? null } : HOME
 }
@@ -26,6 +43,7 @@ export function parseRoute(hash: string): Route {
 /** The route's #hash, '' for the home page. */
 export function hashFor(route: Route): string {
   if (route.page === 'ranks' || route.page === 'help' || route.page === 'year') return `#${route.page}`
+  if (route.page === 'eras') return `#eras${route.album ? `/${route.album}` : ''}`
   return route.page === 'settings' ? `#settings${route.section ? `/${route.section}` : ''}` : ''
 }
 

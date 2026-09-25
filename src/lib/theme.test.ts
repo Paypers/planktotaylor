@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import css from '../styles.css?raw'
 import { contrast, CONTRAST_CHECKS, DARK, LIGHT, normalizeHex, schemeFor, TOKENS, type Palette } from './palette'
-import { parseRoute } from './route'
+import { hashFor, parseRoute } from './route'
 
 function memoryStorage(): Storage {
   const items = new Map<string, string>()
@@ -200,6 +200,17 @@ describe('routes', () => {
   it('reads the help page from the address', () => {
     expect(parseRoute('#help')).toEqual({ page: 'help' })
     expect(parseRoute('#Help/')).toEqual({ page: 'help' })
+  })
+
+  it('reads Collect the eras and its album pages from the address', () => {
+    expect(parseRoute('#eras')).toEqual({ page: 'eras', album: null })
+    expect(parseRoute('#eras/red')).toEqual({ page: 'eras', album: 'red' })
+    expect(parseRoute('#Eras/1989/')).toEqual({ page: 'eras', album: '1989' })
+    // A release is on the page of the album it joined.
+    expect(parseRoute('#eras/encore')).toEqual({ page: 'eras', album: 'showgirl' })
+    expect(parseRoute('#eras/nope')).toEqual({ page: 'eras', album: null })
+    expect(hashFor({ page: 'eras', album: 'red' })).toBe('#eras/red')
+    expect(hashFor({ page: 'eras', album: null })).toBe('#eras')
   })
 
   it('takes #discord to Settings → Discord', () => {

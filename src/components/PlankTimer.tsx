@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
-import { ALBUMS, LADDER, formatDuration, type Album, type Song } from '../data/songs'
+import { ALBUMS, LADDER, formatDuration, type Album, type AlbumId, type Song } from '../data/songs'
 import { useWakeLock } from '../lib/hooks'
 import type { Completion, Pause, PlankResult, Prefs } from '../lib/progress'
 import type { PlayerRank } from '../lib/ranks'
 import { pausedSeconds, plankHeadline } from '../lib/share'
 import { beginAttempt, endAttempt, getAttempts, ghostFor, saveAttemptProgress, type AttemptKind, type AttemptOutcome } from '../lib/attempts'
+import type { Collection, StampNews } from '../lib/eras'
 import { LIGHT_SHOW_MS, LIGHT_SIZE, lightTimes, placeLight, type Box } from '../lib/lights'
 import { sounds, unlockAudio } from '../lib/sound'
 import { getData } from '../lib/store'
@@ -12,6 +13,7 @@ import { LIGHT_XP, MARATHON_SECONDS, type XpAward } from '../lib/xp'
 import { youtubeUrl } from '../lib/youtube'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Confetti } from './Confetti'
+import { StampMark } from './EraBadge'
 import { Flame, Icon } from './Icon'
 import { RankBar, RankPlaque } from './Rank'
 import { RankEmblem } from './RankEmblem'
@@ -42,6 +44,10 @@ export interface FinishSummary {
   xp: FinishXp | null
   /** Practice on a ladder level already climbed (from the setlist): it doesn't move the ladder. */
   practiceLevel: number | null
+  /** Collect the eras: a first stamp or a gold one, if this plank made one. */
+  stamp: StampNews | null
+  /** The song's album (or release) after this plank. */
+  collection: Collection | null
 }
 
 export interface FinishXp {
@@ -83,6 +89,8 @@ interface Props {
   onSignIn?: () => void
   /** Go straight on to another plank (the next ladder level). */
   onNext: (session: PlankSession) => void
+  /** Close the plank screen and open an album's page in Collect the eras. */
+  onOpenEra: (album: AlbumId) => void
 }
 
 /**
@@ -132,7 +140,7 @@ function coachLine(elapsed: number, total: number): string {
   return 'Elbows under shoulders. Squeeze everything.'
 }
 
-export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClose, onSignIn, onNext }: Props) {
+export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClose, onSignIn, onNext, onOpenEra }: Props) {
   const { song } = session
   const album = ALBUMS[song.album]
   const total = song.seconds * 1000
@@ -628,7 +636,16 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
         </div>
 
         {phase === 'done' && summary ? (
-          <DoneView song={song} summary={summary} pauses={pauses} lights={caught} onSignIn={onSignIn} onNext={onNext} />
+          <DoneView
+            song={song}
+            kind={session.kind}
+            summary={summary}
+            pauses={pauses}
+            lights={caught}
+            onSignIn={onSignIn}
+            onNext={onNext}
+            onOpenEra={onOpenEra}
+          />
         ) : (
           <div className="plank-body">
             <div className="plank-song">
@@ -789,43 +806,73 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
 
 function DoneView({
   song,
+  kind,
   summary,
   pauses,
   lights,
   onSignIn,
   onNext,
+  onOpenEra,
 }: {
   song: Song
+  /** What the plank was started for. */
+  kind: AttemptKind
   summary: FinishSummary
   pauses: Pause[]
   /** Aurora lights caught. Only ever shown when there were some. */
   lights: number
   onSignIn?: () => void
   onNext: (session: PlankSession) => void
+  onOpenEra: (album: AlbumId) => void
 }) {
   const ladder = summary.counted.find((c) => c.mode === 'ladder')
   const daily = summary.counted.some((c) => c.mode === 'daily')
   const length = formatDuration(song.seconds)
-  const { next, xp } = summary
+  const { next, xp, stamp, collection } = summary
+  // A new release from its album page, that didn't count as today's song: it earns stamps, not XP.
+  const fromAlbum = kind === 'era' && !daily && !ladder && collection
   const upgraded = xp?.kind === 'upgrade'
   const practice = summary.practiceLevel
-  const title = upgraded ? 'Straight through.' : practice ? `Level ${practice}, again.` : plankHeadline(daily, ladder?.level)
-  const text = upgraded
-    ? 'No breaks this time, so the no-break bonus is yours.'
-    : practice
-      ? `Another go at ${song.title}, ${length}. Practice doesn't move your ladder.`
-      : ladder && daily
-        ? `${song.title} counted for today's song and level ${ladder.level}.`
-        : ladder || daily
-          ? `You held a plank for all of ${song.title}, ${length}.`
-          : `Today was already in the bag. That's ${length} more.`
+  const title = fromAlbum
+    ? stamp?.stamp === 'gold'
+      ? 'Gold.'
+      : stamp
+        ? 'Collected.'
+        : `${song.title}, again.`
+    : upgraded
+      ? 'Straight through.'
+      : practice
+        ? `Level ${practice}, again.`
+        : plankHeadline(daily, ladder?.level)
+  const text = fromAlbum
+    ? stamp
+      ? `You held a plank for all of ${song.title}, ${length}.`
+      : `Another go at ${song.title}, ${length}.`
+    : upgraded
+      ? 'No breaks this time, so the no-break bonus is yours.'
+      : practice
+        ? `Another go at ${song.title}, ${length}. Practice doesn't move your ladder.`
+        : ladder && daily
+          ? `${song.title} counted for today's song and level ${ladder.level}.`
+          : ladder || daily
+            ? `You held a plank for all of ${song.title}, ${length}.`
+            : `Today was already in the bag. That's ${length} more.`
   const rankedUp = !!xp?.earned && xp.rankAfter.step > xp.rankBefore.step
   const album = ALBUMS[song.album]
 
   return (
     <div className="plank-done">
       <div className="done-streak">
-        {ladder && !daily ? (
+        {fromAlbum ? (
+          // Planked for its stamp: show how much of the release is stamped.
+          <>
+            <span className="done-num">{collection.stamped}</span>
+            <span className="done-unit">
+              <span>of {collection.total}</span>
+              in {collection.album.short}
+            </span>
+          </>
+        ) : ladder && !daily ? (
           // A ladder level doesn't touch the streak, so show the climb instead.
           <>
             <span className="done-num">{ladder.level}</span>
@@ -843,10 +890,11 @@ function DoneView({
             </span>
           </>
         )}
-        {(daily || rankedUp) && <Confetti colors={['var(--signal)', 'var(--held)', 'var(--paused)', album.color, 'var(--ink)']} />}
+        {(daily || rankedUp || stamp?.earned) && <Confetti colors={['var(--signal)', 'var(--held)', 'var(--paused)', album.color, 'var(--ink)']} />}
       </div>
       <h2 className="done-title">{title}</h2>
       <p className="done-text">{text}</p>
+      {stamp && <StampLine news={stamp} song={song} onOpen={() => onOpenEra(stamp.collection.album.id)} />}
 
       <PlankReceipt seconds={song.seconds} pauses={pauses} />
       {lights > 0 && (
@@ -855,7 +903,9 @@ function DoneView({
         </p>
       )}
 
-      {xp?.earned ? (
+      {fromAlbum ? (
+        <p className="save-note done-save">New releases planked from their album page earn stamps, not XP.</p>
+      ) : xp?.earned ? (
         <XpEarned xp={xp} seconds={song.seconds} rankedUp={rankedUp} />
       ) : xp?.kind === 'new' && onSignIn ? (
         <p className="save-note done-save">
@@ -884,6 +934,32 @@ function DoneView({
         </section>
       )}
     </div>
+  )
+}
+
+/** What a plank did for Collect the eras: a new stamp, a gold one, a badge or a charm won. */
+function StampLine({ news, song, onOpen }: { news: StampNews; song: Song; onOpen: () => void }) {
+  const { collection, stamp, earned, allGold } = news
+  const { album } = collection
+  const prize = album.partOf ? 'charm' : 'badge'
+  const gold = !!collection.stamps.find((s) => s.song.id === song.id)?.goldOn
+  const line = earned
+    ? `${album.title}, every song stamped: its ${prize} is yours.`
+    : allGold
+      ? `Every stamp on ${album.title} is gold: its ${prize} has a gold edge.`
+      : stamp === 'gold'
+        ? 'A gold stamp: held with no breaks.'
+        : `Stamped into ${album.title}${gold ? ', in gold' : ''}: ${collection.stamped} of ${collection.total}.`
+  return (
+    <p className="done-stamp">
+      <StampMark album={album} stamped gold={gold} />
+      <span>
+        {line}{' '}
+        <button type="button" className="text-btn" onClick={onOpen}>
+          See {album.partOf ? ALBUMS[album.partOf].short : album.short}
+        </button>
+      </span>
+    </p>
   )
 }
 

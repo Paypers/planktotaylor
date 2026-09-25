@@ -3,7 +3,7 @@ import { LADDER } from '../data/songs'
 import { accountsEnabled } from '../lib/account'
 import { clockTime } from '../lib/dates'
 import { MORNING_POST, NIGHT_POST, WEBHOOKS_EACH } from '../lib/discord'
-import { DISCORD, followLink, hashFor, RANKS } from '../lib/route'
+import { DISCORD, ERAS, followLink, hashFor, RANKS } from '../lib/route'
 import { remindersAvailable } from '../lib/push'
 import { LIGHT_XP } from '../lib/xp'
 import { PageTop } from './PageTop'
@@ -129,6 +129,31 @@ export function HelpPage() {
         </dd>
         <dt>The top</dt>
         <dd>Once you've climbed every level, you can start again from level 1. Your streak and XP stay as they are.</dd>
+      </Topic>
+
+      <Topic id="eras" title="Collect the eras">
+        <dt>Stamps</dt>
+        <dd>
+          Every song you plank, as today's song or a ladder level, is stamped into its album. See them all in{' '}
+          <a href={hashFor(ERAS)} onClick={(e) => followLink(e, ERAS)}>
+            Collect the eras
+          </a>
+          , from the setlist or the Ranks page.
+        </dd>
+        <dt>Gold</dt>
+        <dd>Hold a song with no breaks, any time, and its stamp turns gold.</dd>
+        <dt>Badges</dt>
+        <dd>
+          Stamp every song on an album and its badge is yours, on your Ranks page. When every stamp on it is gold, the
+          badge gets a gold edge.
+        </dd>
+        <dt>New releases</dt>
+        <dd>
+          New songs premiere as today's song and join their album's page. A release that joins an album has a charm of
+          its own, on the edge of the album's badge, for stamping all of its songs. After its premiere day, plank a new song
+          from its album page to stamp it: that earns stamps, not XP, and doesn't touch your streak. A badge or charm
+          you've won stays when new songs join.
+        </dd>
       </Topic>
 
       {accountsEnabled && (

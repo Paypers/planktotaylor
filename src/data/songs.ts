@@ -31,6 +31,12 @@ export interface Album {
    * They premiere as the song of the day instead (PREMIERES in src/lib/daily.ts).
    */
   afterLaunch?: boolean
+  /**
+   * New songs that join an album already out, released together (The Encore joins The Life of a
+   * Showgirl). They show on that album's page as a release of their own, with a charm of their own,
+   * and never change its badge. A whole new album has none.
+   */
+  partOf?: AlbumId
 }
 
 export interface Song {
@@ -58,7 +64,16 @@ export const ALBUMS: Record<AlbumId, Album> = {
   midnights: { id: 'midnights', title: 'Midnights', short: 'Midnights', year: 2022, color: '#2f3d73', ink: '#eef0ff' },
   ttpd: { id: 'ttpd', title: 'The Tortured Poets Department', short: 'TTPD', year: 2024, color: '#d6cdbf', ink: '#2b2621' },
   showgirl: { id: 'showgirl', title: 'The Life of a Showgirl', short: 'Showgirl', year: 2025, color: '#e8742f', ink: '#2a1206' },
-  encore: { id: 'encore', title: 'The Life of a Showgirl: The Encore', short: 'The Encore', year: 2026, color: '#c5d93b', ink: '#232b06', afterLaunch: true },
+  encore: {
+    id: 'encore',
+    title: 'The Life of a Showgirl: The Encore',
+    short: 'The Encore',
+    year: 2026,
+    color: '#c5d93b',
+    ink: '#232b06',
+    afterLaunch: true,
+    partOf: 'showgirl',
+  },
 }
 
 /** Release order, used to break ties between songs of equal length. */

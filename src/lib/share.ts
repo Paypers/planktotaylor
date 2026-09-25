@@ -66,6 +66,8 @@ export interface ShareInput {
   /** What this plank counted for. */
   daily: boolean
   level?: number
+  /** A new release planked from its album page: the release's name (Collect the eras). */
+  release?: string
   pauses: readonly Pause[]
   /** XP the plank earned (signed-in players only). */
   xp?: number
@@ -74,18 +76,27 @@ export interface ShareInput {
 }
 
 /** The finished screen's headline, also printed on the share card. */
-export function plankHeadline(daily: boolean, level?: number): string {
+export function plankHeadline(daily: boolean, level?: number, release?: string): string {
   if (daily && level) return 'Two for one.'
   if (level) return `Level ${level} done.`
   if (daily) return "Today's song, done."
+  if (release) return 'Collected.'
   return 'Extra credit.'
 }
 
 export const siteLink = () => window.location.origin + import.meta.env.BASE_URL
 
-export function shareText({ dailyNumber, streak, song, daily, level, pauses, xp, lights }: ShareInput): string {
+export function shareText({ dailyNumber, streak, song, daily, level, release, pauses, xp, lights }: ShareInput): string {
   const what =
-    daily && level ? `Today's song + level ${level}` : daily ? "Today's song" : level ? `Level ${level}` : 'Extra credit'
+    daily && level
+      ? `Today's song + level ${level}`
+      : daily
+        ? "Today's song"
+        : level
+          ? `Level ${level}`
+          : release
+            ? `New release: ${release}`
+            : 'Extra credit'
   return [
     `Plank to Taylor #${dailyNumber}${streak > 0 ? ` 🔥${streak}` : ''}`,
     `${what} · ${song.title}`,

@@ -65,7 +65,7 @@ export async function renderShareCard(share: ShareInput): Promise<Blob> {
     text(ctx, 'day streak', left + numberWidth + 16, 486, unitFont, COLOR.ink2)
   }
 
-  text(ctx, plankHeadline(share.daily, share.level), left, 628, `600 76px ${DISPLAY}`, COLOR.ink)
+  text(ctx, plankHeadline(share.daily, share.level, share.release), left, 628, `600 76px ${DISPLAY}`, COLOR.ink)
   // Aurora lights caught, beside the headline. Never the ones missed.
   if (share.lights) text(ctx, `✨ ${share.lights}`, right, 624, `600 44px ${SANS}`, COLOR.ink2, 'right')
 

@@ -7,7 +7,7 @@ import type { Completion } from './progress'
 const song = (title: string): Song => SONGS.find((s) => s.title === title)!
 const style = song('Style')
 const atw = song('All Too Well (10 Minute Version)')
-const record = (at: string, s: Song, mode: 'daily' | 'ladder' = 'daily', extra: Partial<Completion> = {}): Completion => ({
+const record = (at: string, s: Song, mode: Completion['mode'] = 'daily', extra: Partial<Completion> = {}): Completion => ({
   day: at.slice(0, 10),
   mode,
   songId: s.id,
@@ -64,6 +64,19 @@ describe('every plank', () => {
       { key: 'again', label: 'Planked again', planks: 2, seconds: 2 * style.seconds, color: 'var(--chart-again)' },
     ])
     expect(splitByKind(planks.filter((p) => p.kind !== 'ladder')).map((s) => s.key)).toEqual(['daily', 'again'])
+  })
+
+  it('counts new releases from their album page as their own kind, and goes after that as again', () => {
+    const planks = allPlanks(
+      [record('2026-10-01T09:00:00.000Z', style, 'daily'), record('2026-10-02T09:00:00.000Z', atw, 'era')],
+      [go('2026-10-02T09:00:03.000Z', atw, 'era'), go('2026-10-03T09:00:00.000Z', atw, 'era', 'finished', 1)],
+    )
+    expect(planks.map((p) => p.kind)).toEqual(['daily', 'era', 'again'])
+    expect(splitByKind(planks).map((s) => [s.key, s.label, s.color])).toEqual([
+      ['daily', "Today's song", 'var(--chart-daily)'],
+      ['era', 'New releases', 'var(--chart-era)'],
+      ['again', 'Planked again', 'var(--chart-again)'],
+    ])
   })
 
   it('splits the time by album, most first, folding the rest into Other', () => {
