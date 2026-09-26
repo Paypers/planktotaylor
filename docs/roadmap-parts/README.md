@@ -17,7 +17,7 @@ To build one, hand Claude the file: *"Build docs/roadmap-parts/part-01-quick-win
 | [7](part-07-collect-the-eras.md) | Collect the eras | Medium | | Yes (small) | Settle the release badges first | ✓ |
 | [8](part-08-groups-database.md) | Groups: the database and joining | Large, first half | 1 | Yes | Settle public groups first | ✓ |
 | [9](part-09-groups-page.md) | Groups: the group page | Large, second half | 8 | No | | ✓ |
-| [10](part-10-native-app.md) | Native app | Large | 1, 5 | Yes (small, iOS push) | Planned: about 45% overall, 75% for Android alone | |
+| [10](part-10-native-app.md) | Native app | Large | 1, 5 | Yes (small, iOS push) | Not doing: the site on the home screen is the app | – |
 | [11](part-11-discord-activity.md) | Discord Activity | Large | 8, 9 | No | Planned: about 80% planking together, 30% with the music inside Discord; test first | |
 
 **Why it's cut this way**
@@ -25,7 +25,8 @@ To build one, hand Claude the file: *"Build docs/roadmap-parts/part-01-quick-win
 - **Part 1** has all four small features. None of them change the database or need a server. The chimes and the ghost both go in the plank screen's tick loop and `sound.ts`, so they're built back to back.
 - **Parts 2–7** are one medium feature each. Each one changes the database, adds server code, or has a lot of new screens, so each gets a session of its own.
 - **Groups is split in two** (8 and 9). Part 8 is the first time one player can see another's data, so its database rules need a session of their own. Part 9 builds the page on top.
-- **Parts 10 and 11** are too big and too uncertain to build straight away. Each starts with a decision or a small test, then gets planned into more parts.
+- **Part 11** is too big and too uncertain to build straight away. It starts with a small test, then gets planned into more parts.
+- **Part 10** (store apps) was planned the same way, then dropped: the site on the home screen is the app. Its file keeps the research.
 
 **Order:** Part 4 needs Part 1 (the best streak counts freezes) and Part 3 (the lights slide), and has a deadline, so don't let it slip behind 5–7. Part 6 uses Part 5's scheduled-function setup and Part 2's stats.
 

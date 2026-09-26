@@ -83,7 +83,7 @@ About an hour of your time, most of it the Developer Portal. I write the page an
 
 ### 11.5 Going public
 
-- A privacy page and terms (10.1's privacy page covers most of it), then verification in the Developer Portal to be listed in the App Launcher.
+- A privacy page and terms (neither is written yet), then verification in the Developer Portal to be listed in the App Launcher.
 - Until then it works in any server where it's installed, which covers your own servers and friends'.
 
 ---

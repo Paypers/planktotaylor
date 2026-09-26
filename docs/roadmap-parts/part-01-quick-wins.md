@@ -59,7 +59,7 @@ Right now a single missed day ends a streak. Freezes make it a little more forgi
 
 ## 4. Add to home screen
 
-This comes first on the way to daily reminders (Part 5) and an app (Part 10).
+This comes first on the way to daily reminders (Part 5). It's also the app itself: there are no store apps (Part 10 was dropped).
 
 **Manifest and icons**
 

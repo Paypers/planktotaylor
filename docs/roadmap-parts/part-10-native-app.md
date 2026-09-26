@@ -1,5 +1,7 @@
 # Part 10: Native app
 
+> **Not doing** (decided 26 September 2026). There won't be an app in the App Store or Google Play. The site added to the home screen is the app, and the site teaches how to add it on each phone and browser (`#install`). The research below is kept in case that changes.
+
 This same site as an iOS and Android app, with real push notifications and a home-screen widget.
 
 **Builds:** roadmap §4c · **Needs:** Part 1 (installable) and Part 5 (reminders) · **Size:** large, planned below as five smaller parts (10.1–10.5)

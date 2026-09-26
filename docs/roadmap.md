@@ -14,17 +14,6 @@ To build them, use [the roadmap in parts](roadmap-parts/README.md): the same fea
 
 ---
 
-## 4. Native app
-
-Adding the site to the home screen (4a) and daily reminders (4b) are built.
-
-### 4c. Native app (later)
-
-- **Capacitor** wraps this same site as an iOS and Android app with real push notifications. It also makes a home-screen widget possible (today's song and your streak), which is native code. Android alone could go out sooner as a TWA through Bubblewrap.
-- **Check before building:** Apple's rules on using someone else's name and work (guideline 5.2). An app with "Taylor" in the name that's built around her songs could be rejected, and Google has similar rules. Apple also rejects apps that are only a website in a wrapper (4.2), so push and widgets help there. Apple's developer account is $99 a year, Google's is $25 once. [Part 10](roadmap-parts/part-10-native-app.md) plans it.
-
-**Size:** large.
-
 ## 5. Discord Activity
 
 Sharing a result (level 1) and the daily post in a server (level 2) are built.
@@ -36,6 +25,7 @@ Sharing a result (level 1) and the daily post in a server (level 2) are built.
 ## Not doing
 
 - **A public XP leaderboard.** Everything runs on trust, so a public board would fill up with made-up numbers and turn a daily habit into a contest. Groups give people someone to plank with, among friends.
+- **Apps in the App Store or Google Play.** The site on the home screen is the app: it opens full screen from its own icon, sends the daily reminders and updates itself. The site teaches how to add it on each phone and browser (`#install`). Store apps would have needed a Mac, a yearly fee, and store reviews that could turn down a fan app built around her name. [Part 10](roadmap-parts/part-10-native-app.md) keeps the research.
 
 ---
 
@@ -43,5 +33,4 @@ Sharing a result (level 1) and the daily post in a server (level 2) are built.
 
 | # | Feature | Size | Notes |
 | --- | --- | --- | --- |
-| 4c | Native app | Large | Check the store rules first |
 | 5 | Discord Activity | Large | Plan first |
