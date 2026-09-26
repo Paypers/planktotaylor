@@ -103,8 +103,9 @@ function message(site: string, lines: string[]): DiscordMessage {
   return { content: lines.join('\n'), username: 'Plank to Taylor', avatar_url: `${site}/icon-192.png`, allowed_mentions: { parse: [] } }
 }
 
-/** A title as Discord shows it, with nothing read as formatting. */
-const plain = (text: string) => text.replace(/[\\*_~`|]/g, '\\$&')
+// Names and titles go out on one line, with nothing Discord reads as formatting.
+// Escaping [ ] < > : @ also stops hidden links, bare https:// links and mentions.
+const plain = (text: string) => text.replace(/\s+/g, ' ').trim().replace(/[\\*_~`|[\]<>:@]/g, '\\$&')
 
 /** "08:00" → "8 am", "21:30" → "9:30 pm". */
 function hourName(hhmm: string): string {
@@ -255,7 +256,7 @@ export function groupNight(group: { name: string; kind: GroupKind }, board: read
 const NAMES_SHOWN = 15
 
 const names = (members: readonly BoardMember[]) => {
-  const shown = members.slice(0, NAMES_SHOWN).map((m) => plain(m.name.replace(/\s+/g, ' ').trim()))
+  const shown = members.slice(0, NAMES_SHOWN).map((m) => plain(m.name))
   const rest = members.length - shown.length
   return rest > 0 ? `${shown.join(', ')} and ${rest} more` : shown.join(', ')
 }

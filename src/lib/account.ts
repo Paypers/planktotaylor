@@ -20,6 +20,7 @@ import { accountThemes, applyAccountThemes, onThemeSaved, readSaved, type Accoun
 import { readStats, type DailyStats } from './together'
 import type { AddProblem } from './discord'
 import { groupProblem, type BoardMember, type GroupKind, type GroupProblem, type Invite } from './groups'
+import { photoInOwnBucket } from './avatar'
 
 // The project address, without the /rest/v1/ the dashboard shows on the end (it breaks sign-in).
 const url = (import.meta.env.VITE_SUPABASE_URL as string | undefined)
@@ -94,6 +95,10 @@ interface CompletionRow {
   lights?: number | null
 }
 
+// schema.sql has the same limit: keep the two in step. Real planks never get near it,
+// but one over it would be refused, and every sync with it.
+const BREAKS_PER_PLANK = 100
+
 const toRow = (userId: string, c: Completion): CompletionRow => ({
   user_id: userId,
   day: c.day,
@@ -102,7 +107,7 @@ const toRow = (userId: string, c: Completion): CompletionRow => ({
   level: c.level ?? null,
   seconds: c.seconds,
   completed_at: c.at,
-  pauses: c.pauses ?? null,
+  pauses: c.pauses?.slice(0, BREAKS_PER_PLANK) ?? null,
   xp: c.xp ?? null,
   // Left off when there are none, so planks still save to a database that hasn't had the column added.
   ...(c.lights ? { lights: c.lights } : {}),
@@ -267,7 +272,7 @@ async function syncNow(user: User) {
     ])
     if (profile.error) throw profile.error
     const row = profile.data
-    setState({ profile: { name: row?.display_name ?? null, avatarUrl: ownPhoto(row?.avatar_url) } })
+    setState({ profile: { name: row?.display_name ?? null, avatarUrl: photoToShow(row?.avatar_url) } })
 
     const local = getData()
     const merged = mergeCompletions(local.completions, remote)
@@ -668,7 +673,7 @@ export async function loadGroups(): Promise<Group[] | null> {
 export async function loadBoard(groupId: string, today: DayKey): Promise<BoardMember[]> {
   const { data, error } = await (await client()).rpc('group_board', { p_group: groupId, p_today: today })
   if (error) throw groupFailure(error)
-  return data as BoardMember[]
+  return (data as BoardMember[]).map((member) => ({ ...member, avatar_url: photoToShow(member.avatar_url) }))
 }
 
 export async function createGroup(name: string, kind: GroupKind, today: DayKey): Promise<Group> {
@@ -718,7 +723,9 @@ export async function groupDiscord(groupId: string): Promise<{ label: string; ad
 export async function groupInvite(code: string, today: DayKey): Promise<Invite | null> {
   const { data, error } = await (await client()).rpc('group_invite', { p_code: code, p_today: today })
   if (error) throw groupFailure(error)
-  return (data as Invite | null) ?? null
+  const invite = (data as Invite | null) ?? null
+  if (!invite || !('contributors' in invite) || !invite.contributors) return invite
+  return { ...invite, contributors: invite.contributors.map((c) => ({ ...c, avatar_url: photoToShow(c.avatar_url) })) }
 }
 
 /** The name to show: the one they chose, or the start of their email. */
@@ -764,9 +771,7 @@ export async function saveDisplayName(name: string) {
 
 const avatarPath = (userId: string) => `${userId}/avatar.jpg`
 
-/** Only a photo from this project's own bucket is ever shown. */
-const ownPhoto = (link: string | null | undefined): string | null =>
-  link?.startsWith(`${url}/storage/v1/object/public/avatars/`) ? link : null
+const photoToShow = (link: string | null | undefined): string | null => photoInOwnBucket(link, url ?? '')
 
 /** Uploads an already-resized photo (see lib/avatar.ts) to the public avatars bucket. */
 export async function uploadAvatar(photo: Blob) {

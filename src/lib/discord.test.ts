@@ -290,6 +290,17 @@ describe("a group's night", () => {
     expect(groupNightPost(SITE, night)?.allowed_mentions).toEqual({ parse: [] })
   })
 
+  it("names can't carry links, mentions or new lines into someone's server", () => {
+    const sneaky = [member('[Free Nitro](https://phish.example)', [today], true), member('@everyone\n# Big news https://x.example', [today], false)]
+    const night = groupNight({ name: '<@123>\n> quoted', kind: 'public' }, sneaky, today)
+    expect(groupNightPost(SITE, night)?.content.split('\n')).toEqual([
+      "**\\<\\@123\\> \\> quoted: a 1-day group streak.** Here's how today went:",
+      'All the way through: \\[Free Nitro\\](https\\://phish.example)',
+      'Planked it: \\@everyone # Big news https\\://x.example',
+      `Plank along: <${SITE}>`,
+    ])
+  })
+
   it('keeps a long list short', () => {
     const many = Array.from({ length: 20 }, (_, i) => member(`P${i}`, [today], true))
     const night = groupNight({ name: 'Gym', kind: 'public' }, many, today)

@@ -214,7 +214,7 @@ export function liveDeps(env: (name: string) => string | undefined): Deps {
       return readStats(data)
     },
     group: (id, day) => loadGroupBoard(db, id, day),
-    draw: (card) => drawCard(card, site),
+    draw: (card) => drawCard(card, site, need('SUPABASE_URL')),
     post: (row, message, picture) => postTo(row.url, message, fetch, picture),
     async markSent(row, kind, day) {
       const { error } = await db

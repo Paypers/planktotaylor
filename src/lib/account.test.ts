@@ -9,6 +9,8 @@ const fake = vi.hoisted(() => {
     users: new Map<string, Rows>(),
     user: null as string | null,
     requests: 0,
+    // What each database function answers, by name
+    answers: new Map<string, unknown>(),
     onAuth: null as ((event: string, session: { user: { id: string; email: string } } | null) => void) | null,
   }
   const rows = () => {
@@ -61,6 +63,7 @@ const fake = vi.hoisted(() => {
   }
   const client = {
     from,
+    rpc: async (name: string) => ({ data: state.answers.get(name) ?? null, error: null }),
     auth: {
       onAuthStateChange: (fn: NonNullable<typeof state.onAuth>) => {
         state.onAuth = fn
@@ -119,6 +122,7 @@ describe('account sync', () => {
     fake.state.users.clear()
     fake.state.user = null
     fake.state.requests = 0
+    fake.state.answers.clear()
     fake.state.onAuth = null
   })
   afterEach(() => {
@@ -217,6 +221,29 @@ describe('account sync', () => {
     signOut()
     signIn('ana')
     await vi.waitFor(() => expect(store.getData().completions).toHaveLength(1))
+  })
+
+  it('sends a plank with no more breaks than the database keeps', async () => {
+    const { store } = await visit()
+    const pauses = Array.from({ length: 150 }, (_, i) => ({ at: i, ms: 1000 }))
+    store.replaceProgress([{ ...plank, pauses }], { level: 1, updatedAt: '2026-09-22T12:00:00.000Z' })
+    signIn('ana')
+    await vi.waitFor(() => expect(account('ana')?.completions).toHaveLength(1))
+    expect(account('ana')!.completions[0].pauses).toHaveLength(100)
+  })
+
+  it("shows other players' photos only from the project's own bucket", async () => {
+    const { account: sync } = await visit()
+    signIn('ana')
+    const photo = 'https://example.supabase.co/storage/v1/object/public/avatars/0f8fad5b-d9cb-469f-a165-70867728950e/avatar.jpg?v=1'
+    const tracker = 'https://tracker.example/storage/v1/object/public/avatars/0f8fad5b-d9cb-469f-a165-70867728950e/avatar.jpg'
+    fake.state.answers.set('group_board', [
+      { name: 'Ben', avatar_url: photo },
+      { name: 'Mallory', avatar_url: tracker },
+    ])
+    fake.state.answers.set('group_invite', { kind: 'public', contributors: [{ name: 'Mallory', avatar_url: tracker, days: 1 }] })
+    expect((await sync.loadBoard('gym', '2026-09-25')).map((m) => m.avatar_url)).toEqual([photo, null])
+    expect(await sync.groupInvite('0123456789abcdef0123', '2026-09-25')).toMatchObject({ contributors: [{ name: 'Mallory', avatar_url: null }] })
   })
 
   it('still brings progress made before ever signing in', async () => {

@@ -3,7 +3,7 @@ import type { Completion } from './progress'
 import { streakInfo, type StreakInfo } from './streaks'
 
 // Groups: friends who plank together (signed-in players only). The rules live in the database
-// (supabase/schema.sql, checked by supabase/groups-test.sql); what's here is the site's side of them.
+// (supabase/schema.sql, checked by supabase/rules-test.sql); what's here is the site's side of them.
 
 /**
  * private  the group's day counts when everyone has planked; only members see the group

@@ -50,10 +50,11 @@ alter table public.plank_profiles add column if not exists avatar_url text;
 alter table public.plank_profiles add column if not exists prefs jsonb check (octet_length(prefs::text) <= 1024);
 alter table public.plank_profiles add column if not exists theme jsonb check (octet_length(theme::text) <= 65536);
 
--- Profile photos: a public bucket (anyone with the link can see a photo), where each player can only
--- add, replace or remove the one file in their own folder. The site shrinks photos to about 20 KB first.
+-- Profile photos: a public bucket (anyone with the link can see a photo). Each player has one file,
+-- <their id>/avatar.jpg, that only they can add, replace or remove. The site shrinks photos to about 20 KB
+-- JPEGs first, so nothing bigger or of another type gets in.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('avatars', 'avatars', true, 1048576, array['image/jpeg', 'image/png', 'image/webp'])
+values ('avatars', 'avatars', true, 262144, array['image/jpeg'])
 on conflict (id) do update
   set public = excluded.public, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
 
@@ -67,10 +68,10 @@ drop policy if exists "remove own avatar" on storage.objects;
 create policy "read own avatar" on storage.objects for select to authenticated
   using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
 create policy "add own avatar" on storage.objects for insert to authenticated
-  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+  with check (bucket_id = 'avatars' and name = auth.uid()::text || '/avatar.jpg');
 create policy "replace own avatar" on storage.objects for update to authenticated
-  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text)
-  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+  using (bucket_id = 'avatars' and name = auth.uid()::text || '/avatar.jpg')
+  with check (bucket_id = 'avatars' and name = auth.uid()::text || '/avatar.jpg');
 create policy "remove own avatar" on storage.objects for delete to authenticated
   using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
 
@@ -808,12 +809,16 @@ $schedule$;
 -- "not valid" checks new and changed rows only, so older rows never stop this script.
 -- The most a plank can earn is double its seconds (no breaks on a 6-minute-plus song), plus 5 for each
 -- aurora light caught: that 5 is LIGHT_XP in src/lib/xp.ts, so keep the two in step.
+-- A plank keeps its first 100 breaks: BREAKS_PER_PLANK in src/lib/account.ts, so keep the two in step.
 alter table public.plank_completions drop constraint if exists plank_completions_limits;
 alter table public.plank_completions add constraint plank_completions_limits check (
   char_length(song_id) <= 100
   and seconds <= 3600
   and (xp is null or xp <= 2 * seconds + 5 * coalesce(lights, 0))
-  and (pauses is null or (jsonb_typeof(pauses) = 'array' and octet_length(pauses::text) <= 20000))
+  and (pauses is null or case
+    when jsonb_typeof(pauses) = 'array' then jsonb_array_length(pauses) <= 100 and octet_length(pauses::text) <= 4000
+    else false
+  end)
 ) not valid;
 
 alter table public.plank_attempts drop constraint if exists plank_attempts_limits;
@@ -821,9 +826,53 @@ alter table public.plank_attempts add constraint plank_attempts_limits check (
   char_length(song_id) <= 100 and reached <= 3600 and pauses <= 1000
 ) not valid;
 
--- A photo link can only point at the player's own photo in this project's bucket.
+-- A photo link can only be the player's own photo, with the version the site adds to get past caches.
+-- The host can't be checked here, so the site and the functions check it before showing or fetching one:
+-- a link to any other server would tell it who opened the page.
+create or replace function public.is_own_photo_link(p_link text, p_user uuid)
+returns boolean
+language sql
+immutable
+as $$
+  select p_link ~ ('^https://[^/?#@]+/storage/v1/object/public/avatars/' || p_user::text || '/avatar\.jpg(\?v=[0-9]{1,16})?$')
+$$;
+-- Any other link is cleared first. The site shows none of them anyway, and one would stop its row changing.
+update public.plank_profiles set avatar_url = null
+where avatar_url is not null and not public.is_own_photo_link(avatar_url, user_id);
 alter table public.plank_profiles drop constraint if exists plank_profiles_avatar;
 alter table public.plank_profiles add constraint plank_profiles_avatar check (
-  avatar_url is null
-  or (char_length(avatar_url) <= 500 and avatar_url like ('%/storage/v1/object/public/avatars/' || user_id::text || '/%'))
+  avatar_url is null or public.is_own_photo_link(avatar_url, user_id)
 ) not valid;
+
+-- At most 10,000 planks and 20,000 attempts each: years of the keenest planking, but nowhere near enough
+-- for one account to fill the database. Raise them here if anyone ever gets close.
+-- Checked once per insert, only for the players it added rows for.
+create or replace function public.rows_each_limit()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  over boolean;
+begin
+  execute format(
+    'select exists (select 1 from (select distinct user_id from added) a where (select count(*) from %I.%I t where t.user_id = a.user_id) > $1)',
+    tg_table_schema,
+    tg_table_name
+  ) into over using tg_argv[0]::int;
+  if over then
+    raise exception 'too many rows in %', tg_table_name;
+  end if;
+  return null;
+end;
+$$;
+revoke all on function public.rows_each_limit() from public;
+drop trigger if exists plank_completions_limit on public.plank_completions;
+create trigger plank_completions_limit after insert on public.plank_completions
+  referencing new table as added
+  for each statement execute function public.rows_each_limit('10000');
+drop trigger if exists plank_attempts_limit on public.plank_attempts;
+create trigger plank_attempts_limit after insert on public.plank_attempts
+  referencing new table as added
+  for each statement execute function public.rows_each_limit('20000');

@@ -4,7 +4,7 @@
 // satori lays it out into an SVG and resvg turns that into a PNG, drawn at twice the size for sharpness.
 import satori from 'npm:satori@0.12.2'
 import { initWasm, Resvg } from 'npm:@resvg/resvg-wasm@2.6.2'
-import { FACES_SHOWN } from './site.js'
+import { FACES_SHOWN, photoInOwnBucket } from './site.js'
 
 type CardSong = { title: string; length: string; album: string; short: string; color: string; ink: string }
 type CardPerson = { name: string; photo: string | null }
@@ -37,9 +37,9 @@ let ready: Promise<void> | null = null
 /** resvg's WebAssembly, once per instance of the function. */
 const wasm = () => (ready ??= initWasm(fetch('https://cdn.jsdelivr.net/npm/@resvg/resvg-wasm@2.6.2/index_bg.wasm')))
 
-/** Draws a card as a PNG. */
-export async function drawCard(card: Card, site: string, fetcher: typeof fetch = fetch): Promise<Uint8Array> {
-  const [tree, height] = await layout(card, new URL(site).host, fetcher)
+/** Draws a card as a PNG. Photos only ever come from the project at `supabaseUrl`. */
+export async function drawCard(card: Card, site: string, supabaseUrl: string, fetcher: typeof fetch = fetch): Promise<Uint8Array> {
+  const [tree, height] = await layout(card, new URL(site).host, (link) => photo(photoInOwnBucket(link, supabaseUrl), fetcher))
   const [fonts] = await Promise.all([fontsFor(textOf(card), fetcher), wasm()])
   const svg = await satori(tree, { width: WIDTH, height, fonts })
   return new Resvg(svg, { fitTo: { mode: 'width', value: WIDTH * SCALE } }).render().asPng()
@@ -178,7 +178,7 @@ async function photo(url: string | null, fetcher: typeof fetch): Promise<string 
   }
 }
 
-async function layout(card: Card, host: string, fetcher: typeof fetch): Promise<[Node, number]> {
+async function layout(card: Card, host: string, photoOf: (link: string | null) => Promise<string | null>): Promise<[Node, number]> {
   const page = (height: number, ...children: Child[]) =>
     el('div', { width: WIDTH, height, flexDirection: 'column', padding: '22px 24px 20px', background: COLOR.paper, color: COLOR.ink, fontFamily: 'Sans' }, ...children)
 
@@ -255,7 +255,7 @@ async function layout(card: Card, host: string, fetcher: typeof fetch): Promise<
 
   // A group's night: its streak, and everyone who planked on the row they finished in.
   const withPhotos = async (people: CardPerson[]) =>
-    Promise.all(people.map(async (p, i) => ({ ...p, data: i < FACES_SHOWN ? await photo(p.photo, fetcher) : null })))
+    Promise.all(people.map(async (p, i) => ({ ...p, data: i < FACES_SHOWN ? await photoOf(p.photo) : null })))
   const [held, planked] = await Promise.all([withPhotos(card.held), withPhotos(card.planked)])
   const count = card.held.length + card.planked.length
   const { song } = card

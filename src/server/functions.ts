@@ -20,3 +20,4 @@ export {
   welcomePost,
 } from '../lib/discord'
 export { readStats } from '../lib/together'
+export { photoInOwnBucket } from '../lib/avatar'
