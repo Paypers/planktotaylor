@@ -9,6 +9,7 @@ export type Route =
   | { page: 'settings'; section: string | null }
   | { page: 'ranks' }
   | { page: 'help' }
+  | { page: 'install' }
   | { page: 'year' }
   | { page: 'eras'; album: AlbumId | null }
   | { page: 'groups' }
@@ -18,6 +19,8 @@ export type Route =
 export const HOME: Route = { page: 'home' }
 export const RANKS: Route = { page: 'ranks' }
 export const HELP: Route = { page: 'help' }
+/** How to add the site to the home screen, on each phone and browser. */
+export const INSTALL: Route = { page: 'install' }
 /** Your Plank Year: the year in slides. */
 export const YEAR: Route = { page: 'year' }
 /** Settings → Discord: the daily post in a server. */
@@ -39,6 +42,7 @@ export const eraRoute = (album: AlbumId): Route => ({ page: 'eras', album: ALBUM
 export function parseRoute(hash: string): Route {
   if (/^#ranks\/?$/i.test(hash)) return RANKS
   if (/^#help\/?$/i.test(hash)) return HELP
+  if (/^#install\/?$/i.test(hash)) return INSTALL
   if (/^#year\/?$/i.test(hash)) return YEAR
   // A short address to give server admins: Settings → Discord.
   if (/^#discord\/?$/i.test(hash)) return DISCORD
@@ -63,7 +67,7 @@ export function parseRoute(hash: string): Route {
 
 /** The route's #hash, '' for the home page. */
 export function hashFor(route: Route): string {
-  if (route.page === 'ranks' || route.page === 'help' || route.page === 'year') return `#${route.page}`
+  if (route.page === 'ranks' || route.page === 'help' || route.page === 'install' || route.page === 'year') return `#${route.page}`
   if (route.page === 'eras') return `#eras${route.album ? `/${route.album}` : ''}`
   if (route.page === 'groups') return '#groups'
   if (route.page === 'group') return `#group/${route.id}`

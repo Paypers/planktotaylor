@@ -1,8 +1,9 @@
 import { useSyncExternalStore } from 'react'
+import { deviceOf } from './installGuide'
 
-// Adding the site to the home screen. Chrome and Edge (Android, and computers) fire an install event,
-// which is held on to here and fired from our own button at a calm moment instead of the browser's
-// banner. iPhones and iPads have no such event, so there the site shows the steps instead.
+// Adding the site to the home screen, which is the app: there's none in the app stores. Chrome and
+// Edge (Android, and computers) fire an install event, which is held on to here and fired from our own
+// button at a calm moment instead of the browser's banner. Elsewhere the site shows the steps instead.
 // Imported from main.tsx so the event is caught even if it fires before the page has drawn.
 
 interface InstallPromptEvent extends Event {
@@ -12,10 +13,18 @@ interface InstallPromptEvent extends Event {
 
 /**
  * prompt  the browser can install it: our button calls its prompt
- * steps   iPhone or iPad: show "Tap Share, then Add to Home Screen"
- * null    nothing to offer: already on the home screen, installed, dismissed, or a browser that can't
+ * steps   a phone or tablet without the event: point to the steps for its browser
+ * null    nothing to offer: already on the home screen, installed, dismissed, or a computer without the event
  */
 export type InstallWay = 'prompt' | 'steps' | null
+
+/**
+ * standalone  opened from the home screen
+ * installed   installed just now, from the browser's own dialog
+ * prompt      the browser can install it in one tap
+ * by-hand     it takes the browser's menus: the steps for this one
+ */
+export type InstallStatus = 'standalone' | 'installed' | 'prompt' | 'by-hand'
 
 const DISMISSED_KEY = 'plank-to-taylor:install-dismissed'
 
@@ -38,9 +47,10 @@ export function isStandalone(): boolean {
   return matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true
 }
 
-/** iPhone or iPad. iPads report themselves as Macs, but Macs have no touch screen. */
+/** iPhone or iPad. */
 export function isIos(): boolean {
-  return /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  const device = deviceOf(navigator)
+  return device === 'iphone' || device === 'ipad'
 }
 
 if (typeof window !== 'undefined') {
@@ -56,22 +66,33 @@ if (typeof window !== 'undefined') {
   })
 }
 
-function installWay(): InstallWay {
-  if (dismissed || installed || isStandalone()) return null
-  if (held) return 'prompt'
-  return isIos() ? 'steps' : null
+function installStatus(): InstallStatus {
+  if (isStandalone()) return 'standalone'
+  if (installed) return 'installed'
+  return held ? 'prompt' : 'by-hand'
 }
 
-export function useInstallWay(): InstallWay {
+// The home page's offer. Not now hides it, but never the guide page, which people open themselves.
+function installWay(): InstallWay {
+  if (dismissed) return null
+  const status = installStatus()
+  if (status === 'prompt') return 'prompt'
+  return status === 'by-hand' && deviceOf(navigator) !== 'computer' ? 'steps' : null
+}
+
+function useInstallStore<T>(read: () => T, onServer: T): T {
   return useSyncExternalStore(
     (fn) => {
       listeners.add(fn)
       return () => listeners.delete(fn)
     },
-    installWay,
-    () => null,
+    read,
+    () => onServer,
   )
 }
+
+export const useInstallWay = () => useInstallStore(installWay, null)
+export const useInstallStatus = () => useInstallStore(installStatus, 'by-hand')
 
 /** Not now: remembered in this browser, so it isn't offered again. */
 export function dismissInstall() {

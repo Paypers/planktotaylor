@@ -1,25 +1,12 @@
-import type { ReactNode } from 'react'
 import { LADDER } from '../data/songs'
 import { accountsEnabled } from '../lib/account'
 import { clockTime } from '../lib/dates'
 import { MORNING_POST, NIGHT_POST, WEBHOOKS_EACH } from '../lib/discord'
-import { DISCORD, ERAS, followLink, GROUPS, hashFor, RANKS } from '../lib/route'
+import { DISCORD, ERAS, followLink, GROUPS, hashFor, INSTALL, RANKS } from '../lib/route'
 import { remindersAvailable } from '../lib/push'
 import { LIGHT_XP } from '../lib/xp'
 import { PageTop } from './PageTop'
-
-/** One topic: its name in the left column on wide screens, the rules beside it. */
-function Topic({ id, title, children }: { id: string; title: string; children: ReactNode }) {
-  return (
-    <section className="section grid" aria-labelledby={`help-${id}`}>
-      <div className="section-rule" />
-      <div className="section-label">
-        <h2 id={`help-${id}`}>{title}</h2>
-      </div>
-      <dl className="section-body rules">{children}</dl>
-    </section>
-  )
-}
+import { Topic } from './Topic'
 
 /** How the site works, from the info button in the header. */
 export function HelpPage() {
@@ -291,12 +278,23 @@ export function HelpPage() {
         </Topic>
       )}
 
-      <Topic id="home-screen" title="On your phone">
-        <dt>Home screen</dt>
+      <Topic id="home-screen" title="On your home screen">
+        <dt>The app</dt>
         <dd>
-          Add Plank to Taylor to your home screen and it opens full screen, like an app. On iPhone or iPad, tap Share,
-          then Add to Home Screen. On Android, use the button the site offers after a couple of planks, or Add to Home
-          screen in the browser's menu.
+          Add Plank to Taylor to your home screen and it opens full screen from its own icon, like an app. There's no app
+          in the App Store or Google Play: this is it.{' '}
+          <a href={hashFor(INSTALL)} onClick={(e) => followLink(e, INSTALL)}>
+            See how, step by step
+          </a>
+          , for iPhone, iPad, Android and computers.
+        </dd>
+        <dt>iPhone and iPad</dt>
+        <dd>
+          The home screen keeps its own copy of the site, apart from the browser.
+          {accountsEnabled
+            ? ' Sign in there, with the code from the email, to bring your planks along.'
+            : ' It starts afresh there.'}
+          {remindersAvailable && ' Daily reminders only come to that copy.'}
         </dd>
       </Topic>
 

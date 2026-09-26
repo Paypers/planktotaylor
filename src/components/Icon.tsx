@@ -95,6 +95,58 @@ const PATHS: Record<IconName, ReactNode> = {
     </>
   ),
   message: <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />,
+  // The browsers' own buttons, for the home screen steps.
+  more: (
+    <>
+      <circle cx="5" cy="12" r="1" />
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="19" cy="12" r="1" />
+    </>
+  ),
+  'more-vertical': (
+    <>
+      <circle cx="12" cy="5" r="1" />
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="12" cy="19" r="1" />
+    </>
+  ),
+  menu: (
+    <>
+      <path d="M4 6h16" />
+      <path d="M4 12h16" />
+      <path d="M4 18h16" />
+    </>
+  ),
+  // Safari's page menu from iOS 27: three lines, the last one short.
+  'page-menu': (
+    <>
+      <path d="M5 7.5h14" />
+      <path d="M5 12h14" />
+      <path d="M5 16.5h9.5" />
+    </>
+  ),
+  'view-more': (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="m16 10-4 4-4-4" />
+    </>
+  ),
+  'add-square': (
+    <>
+      <rect width="18" height="18" x="3" y="3" rx="2" />
+      <path d="M8 12h8" />
+      <path d="M12 8v8" />
+    </>
+  ),
+  install: (
+    <>
+      <path d="M12 13V7" />
+      <path d="m15 10-3 3-3-3" />
+      <rect width="20" height="14" x="2" y="3" rx="2" />
+      <path d="M12 17v4" />
+      <path d="M8 21h8" />
+    </>
+  ),
 }
 
 export type IconName =
@@ -116,6 +168,13 @@ export type IconName =
   | 'plus'
   | 'info'
   | 'message'
+  | 'more'
+  | 'more-vertical'
+  | 'menu'
+  | 'page-menu'
+  | 'view-more'
+  | 'add-square'
+  | 'install'
 
 interface Props {
   name: IconName

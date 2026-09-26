@@ -225,6 +225,12 @@ describe('routes', () => {
     expect(parseRoute('#Help/')).toEqual({ page: 'help' })
   })
 
+  it('reads the home screen guide from the address', () => {
+    expect(parseRoute('#install')).toEqual({ page: 'install' })
+    expect(parseRoute('#Install/')).toEqual({ page: 'install' })
+    expect(hashFor({ page: 'install' })).toBe('#install')
+  })
+
   it('reads Collect the eras and its album pages from the address', () => {
     expect(parseRoute('#eras')).toEqual({ page: 'eras', album: null })
     expect(parseRoute('#eras/red')).toEqual({ page: 'eras', album: 'red' })

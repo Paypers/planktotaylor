@@ -1233,6 +1233,99 @@ a {
   vertical-align: -3px;
 }
 
+/* The home screen guide (#install): this device's steps first, then every browser's */
+
+.install-here {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 720px;
+}
+
+.install-browser {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.install-about,
+.install-hint {
+  font-size: 15px;
+  line-height: 23px;
+  color: var(--ink-2);
+}
+
+.install-about {
+  margin-bottom: 8px;
+}
+
+.install-hint {
+  margin-top: 8px;
+}
+
+.install-steps {
+  margin: 0;
+  padding-left: 22px;
+  font-size: 15px;
+  line-height: 26px;
+  color: var(--ink-2);
+}
+
+.install-steps li + li {
+  margin-top: 6px;
+}
+
+.install-steps li::marker {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* A button to press, named: its icon, then its name in bold. */
+.press {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.press .inline-icon {
+  margin-right: 4px;
+}
+
+/* A button that's only an icon (⋯, ⋮), drawn as a key so it reads as something to tap. */
+.press-key {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 24px;
+  margin: 0 1px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  color: var(--ink);
+  vertical-align: -6px;
+}
+
+.install-done {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  line-height: 24px;
+}
+
+/* On iPhone and iPad the home screen keeps its own copy: how to bring your planks along. */
+.install-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 12px 14px;
+  border-radius: 4px;
+  background: var(--well);
+  font-size: 15px;
+  line-height: 22px;
+}
+
 @media (min-width: 760px) {
   .install-row {
     flex-direction: row;

@@ -7,7 +7,8 @@ import { GroupPage } from './components/GroupPage'
 import { GroupsPage, HomeGroups, JoinPage } from './components/Groups'
 import { HistoryDialog } from './components/HistoryDialog'
 import { HelpPage } from './components/HelpPage'
-import { InstallNote } from './components/InstallNote'
+import { BringPlanksNote, InstallNote } from './components/install/InstallNote'
+import { InstallPage } from './components/install/InstallPage'
 import { Flame, Icon, StarMark } from './components/Icon'
 import { LevelDialog } from './components/LevelDialog'
 import { MusicDialog } from './components/MusicDialog'
@@ -39,7 +40,8 @@ import { dailyView, ladderView, songFor, streakDays, type Completion, type Pause
 import { dailyNumber } from './lib/daily'
 import { collectionOf, eraStamps, stampNews } from './lib/eras'
 import { forgetInvite, keptInvite } from './lib/groups'
-import { eraRoute, followLink, hashFor, HELP, HOME, navigate, useRoute, YEAR, type Route } from './lib/route'
+import { isStandalone } from './lib/install'
+import { eraRoute, followLink, hashFor, HELP, HOME, INSTALL, navigate, useRoute, YEAR, type Route } from './lib/route'
 import { playerRank, rankName } from './lib/ranks'
 import { plankSummary, type ShareInput } from './lib/share'
 import { getData, recordPlank, setLadderLevel, useAppData } from './lib/store'
@@ -402,6 +404,7 @@ export function App() {
                 </SongRow>
               )}
               <InstallNote completions={data.completions} />
+              <BringPlanksNote completions={data.completions} onSignIn={offerSignIn} />
             </div>
           </section>
 
@@ -452,6 +455,11 @@ export function App() {
             <HelpPage />
           </main>
         )}
+        {route.page === 'install' && (
+          <main>
+            <InstallPage signedIn={user !== null} onSignIn={offerSignIn} />
+          </main>
+        )}
         {route.page === 'year' && <YearReview completions={data.completions} today={today} earningXp={earningXp} />}
 
         <footer className="site-footer grid">
@@ -467,6 +475,14 @@ export function App() {
                   ? 'Your progress is saved in this browser. Sign in to take it with you.'
                   : 'Your progress is saved in this browser.'}
             </p>
+            {!isStandalone() && (
+              <p>
+                <a href={hashFor(INSTALL)} onClick={(e) => followLink(e, INSTALL)}>
+                  Add it to your home screen
+                </a>{' '}
+                and it opens like an app.
+              </p>
+            )}
             <p>A fan project. Not affiliated with Taylor Swift, her label or YouTube.</p>
           </div>
         </footer>

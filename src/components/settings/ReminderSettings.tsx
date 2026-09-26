@@ -3,6 +3,7 @@ import { askToSignIn, useAccount, type DeviceReminder } from '../../lib/account'
 import { changeReminder, reminderSupport, thisDeviceReminder, turnOffReminders, turnOnReminders, type ReminderSupport } from '../../lib/push'
 import { clockTime } from '../../lib/dates'
 import { DEFAULT_REMINDER, EVENING_NUDGE, NUDGE_STREAK, STEP_MINUTES } from '../../lib/reminders'
+import { followLink, hashFor, INSTALL } from '../../lib/route'
 
 /** Every time a reminder can be set to: a quarter hour apart, all day. */
 const TIMES = Array.from({ length: (24 * 60) / STEP_MINUTES }, (_, i) => {
@@ -105,8 +106,11 @@ export function ReminderSettings() {
         <p className="fine">Checking this device…</p>
       ) : support === 'install-first' ? (
         <p className="settings-note">
-          On iPhone and iPad, reminders come to Plank to Taylor on your home screen. Add it there first: tap Share, then
-          Add to Home Screen. Then open it from your home screen and come back here.
+          On iPhone and iPad, reminders only come to Plank to Taylor on your home screen.{' '}
+          <a href={hashFor(INSTALL)} onClick={(e) => followLink(e, INSTALL)}>
+            Add it there
+          </a>
+          , open it from your home screen and sign in, then turn them on here.
         </p>
       ) : support === 'blocked' ? (
         <p className="settings-note">

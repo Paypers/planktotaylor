@@ -11,6 +11,7 @@ import {
   verifySignInCode,
 } from '../lib/account'
 import { squarePhoto } from '../lib/avatar'
+import { isIos, isStandalone } from '../lib/install'
 import type { PlayerRank } from '../lib/ranks'
 import { followLink, GROUPS, hashFor } from '../lib/route'
 import { Avatar } from './Avatar'
@@ -166,6 +167,8 @@ function SignInForm() {
   const [sent, setSent] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // On an iPhone or iPad home screen, the email's link would sign Safari in instead of this copy.
+  const codeOnly = isIos() && isStandalone()
 
   const run = async (event: FormEvent, action: () => Promise<void>) => {
     event.preventDefault()
@@ -208,7 +211,7 @@ function SignInForm() {
         </label>
         {error && <p className="error">{error}</p>}
         <button className="btn btn-primary btn-block" disabled={busy}>
-          {busy ? 'Sending…' : 'Email me a sign-in link'}
+          {busy ? 'Sending…' : codeOnly ? 'Email me a sign-in code' : 'Email me a sign-in link'}
         </button>
         <p className="fine">No password. Your streak so far comes with you.</p>
       </form>
@@ -218,7 +221,10 @@ function SignInForm() {
   return (
     <form onSubmit={(e) => run(e, () => verifySignInCode(email.trim(), code.trim()))}>
       <p>
-        Check <strong>{email}</strong>. Tap the link in the email, or type the code from it here:
+        Check <strong>{email}</strong>.{' '}
+        {codeOnly
+          ? 'Type the code from it here. Its link would open Safari, which keeps its own copy of the site.'
+          : 'Tap the link in the email, or type the code from it here:'}
       </p>
       <label className="field">
         <span>Code</span>
