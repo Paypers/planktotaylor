@@ -42,6 +42,37 @@ export function hideTokens(text: string): string {
   return text.replace(/(webhooks\/\d+\/)[\w-]+/g, '$1…')
 }
 
+/** People and roles a channel's posts can ping, at most. schema.sql has the same limit: keep them in step. */
+export const MENTIONS_EACH = 5
+
+/**
+ * One pasted mention: a person as Discord writes them (<@id>, or <@!id> from older apps) or their bare ID
+ * from Copy User ID, a role (<@&id>), or @everyone or @here.
+ */
+const PASTED_MENTION = /^(?:<@!?(\d{17,20})>|(\d{17,20})|<@&(\d{17,20})>|@(everyone|here))$/i
+
+/**
+ * The one form a channel's mentions are kept in: each as Discord writes it, a space between. schema.sql
+ * has the same pattern: keep them in step.
+ */
+export const DISCORD_MENTIONS = /^(?:<@&?\d{17,20}>|@everyone|@here)(?: (?:<@&?\d{17,20}>|@everyone|@here)){0,4}$/
+
+/**
+ * Pasted mentions in the form they're kept in, each once, whatever's between them (spaces, commas or
+ * nothing). Empty for none; null when anything in it isn't a mention, like a name: Discord only pings by ID.
+ */
+export function mentionsIn(text: string): string[] | null {
+  const found: string[] = []
+  for (const piece of text.replace(/>(?=[<@])/g, '> ').split(/[\s,]+/).filter(Boolean)) {
+    const match = PASTED_MENTION.exec(piece)
+    if (!match) return null
+    const [, person, id, role, everyone] = match
+    const mention = role ? `<@&${role}>` : everyone ? `@${everyone.toLowerCase()}` : `<@${person ?? id}>`
+    if (!found.includes(mention)) found.push(mention)
+  }
+  return found
+}
+
 /** A time zone this runtime knows, like "America/New_York". */
 export function knownZone(timeZone: string): boolean {
   return timeZone.length > 0 && timeZone.length <= 64 && localClock(new Date(), timeZone) !== null
@@ -91,16 +122,36 @@ export function duePost(row: WebhookRow, now: Date): { kind: PostKind; day: DayK
   return null
 }
 
-/** What's sent to Discord. Mentions are off, so a post can never ping anyone. */
+/**
+ * What's sent to Discord. Discord is told exactly who a post may ping: nobody, unless the channel chose
+ * people or roles to ping (withMentions), so nothing else in a post can ever ping anyone.
+ */
 export interface DiscordMessage {
   content: string
   username: string
   avatar_url: string
-  allowed_mentions: { parse: [] }
+  allowed_mentions: { parse: 'everyone'[]; users?: string[]; roles?: string[] }
 }
 
 function message(site: string, lines: string[]): DiscordMessage {
   return { content: lines.join('\n'), username: 'Plank to Taylor', avatar_url: `${site}/icon-192.png`, allowed_mentions: { parse: [] } }
+}
+
+/** A post that pings the people and roles its channel chose (Settings → Discord) first, and only them. */
+export function withMentions(post: DiscordMessage, mentions: string | null): DiscordMessage {
+  const chosen = mentions ? (mentionsIn(mentions) ?? []).slice(0, MENTIONS_EACH) : []
+  if (chosen.length === 0) return post
+  const ids = (pattern: RegExp) => chosen.flatMap((mention) => pattern.exec(mention)?.[1] ?? [])
+  return {
+    ...post,
+    content: `${chosen.join(' ')} ${post.content}`,
+    allowed_mentions: {
+      // @everyone and @here both go by 'everyone'.
+      parse: chosen.some((mention) => mention.startsWith('@')) ? ['everyone'] : [],
+      users: ids(/^<@(\d+)>$/),
+      roles: ids(/^<@&(\d+)>$/),
+    },
+  }
 }
 
 // Names and titles go out on one line, with nothing Discord reads as formatting.

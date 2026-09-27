@@ -18,6 +18,7 @@ import {
   morningPost,
   nightPost,
   readStats,
+  withMentions,
 } from '../_shared/site.js'
 
 export interface WebhookRow {
@@ -28,6 +29,8 @@ export interface WebhookRow {
   last_night: string | null
   /** A group this channel posts at night, instead of how everyone did. */
   group_id: string | null
+  /** Who each post pings, as Discord writes them (Settings → Discord). */
+  mention: string | null
 }
 
 type Kind = 'morning' | 'night'
@@ -143,7 +146,7 @@ export async function postDue(deps: Deps, now = new Date()): Promise<Report> {
             await deps.markSent(row, kind, day)
             return
           }
-          const result = await postWithWaits(deps, row, message, picture)
+          const result = await postWithWaits(deps, row, withMentions(message, row.mention), picture)
           if (result.status === 'sent') {
             report.sent++
             if (card && !picture) report.plain++
@@ -195,7 +198,7 @@ export function liveDeps(env: (name: string) => string | undefined): Deps {
       for (let from = 0; ; from += PAGE_SIZE) {
         const { data, error } = await db
           .from('discord_webhooks')
-          .select('id, url, time_zone, last_morning, last_night, group_id')
+          .select('id, url, time_zone, last_morning, last_night, group_id, mention')
           .order('id')
           .range(from, from + PAGE_SIZE - 1)
         if (error) throw error

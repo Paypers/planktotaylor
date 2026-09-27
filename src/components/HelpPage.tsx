@@ -1,7 +1,7 @@
 import { LADDER } from '../data/songs'
 import { accountsEnabled } from '../lib/account'
 import { clockTime } from '../lib/dates'
-import { MORNING_POST, NIGHT_POST, WEBHOOKS_EACH } from '../lib/discord'
+import { MENTIONS_EACH, MORNING_POST, NIGHT_POST, WEBHOOKS_EACH } from '../lib/discord'
 import { DISCORD, ERAS, followLink, GROUPS, hashFor, INSTALL, RANKS } from '../lib/route'
 import { remindersAvailable } from '../lib/push'
 import { LIGHT_XP } from '../lib/xp'
@@ -260,6 +260,12 @@ export function HelpPage() {
             </a>
             . In Discord, open the server's settings, then Integrations → Webhooks → New Webhook, pick the channel and
             Copy Webhook URL. Paste it in, and a hello appears in the channel. Up to {WEBHOOKS_EACH} channels each.
+          </dd>
+          <dt>Pinging people</dt>
+          <dd>
+            Each channel can ping up to {MENTIONS_EACH} people or roles with every post, or @everyone or @here. Discord
+            pings by ID, not by name: in any channel, send \@ and their name, copy what shows (like &lt;@1234…&gt;), and
+            paste it under Ping with each post in Settings → Discord. Nobody else in a post is ever pinged.
           </dd>
           <dt>What it shares</dt>
           <dd>

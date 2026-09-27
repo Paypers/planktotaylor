@@ -18,6 +18,7 @@ export {
   webhookAddress,
   webhookLabel,
   welcomePost,
+  withMentions,
 } from '../lib/discord'
 export { readStats } from '../lib/together'
 export { photoInOwnBucket } from '../lib/avatar'

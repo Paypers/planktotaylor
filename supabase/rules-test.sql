@@ -270,6 +270,22 @@ begin
   assert (select group_id from public.discord_webhooks) = current_setting('test.club')::uuid, 'Ben posts his public group too';
 end;
 $$;
+-- Discord: who a channel's posts ping, as Discord writes each mention. Only its adder chooses.
+do $$
+begin
+  update public.discord_webhooks set mention = '<@100000000000000001> <@&100000000000000002> @here';
+  assert (select mention from public.discord_webhooks) = '<@100000000000000001> <@&100000000000000002> @here', 'Ben''s channel pings who he chose';
+  assert public.rules_test_refused($q$ update public.discord_webhooks set mention = '@taylor' $q$), 'only mentions as Discord writes them, never a name';
+  assert public.rules_test_refused($q$ update public.discord_webhooks set mention = '<@100000000000000001>  @here' $q$), 'in one form';
+  assert public.rules_test_refused(
+    $q$ update public.discord_webhooks set mention = '<@100000000000000001> <@100000000000000002> <@100000000000000003> <@100000000000000004> <@100000000000000005> <@100000000000000006>' $q$
+  ), 'and 5 at most';
+  update public.discord_webhooks set mention = '@everyone' where id = '00000000-0000-4000-8000-0000000000a1';
+  assert not found, 'never in anyone else''s channel';
+  update public.discord_webhooks set mention = null;
+  assert (select mention from public.discord_webhooks) is null, 'and he can stop the pings';
+end;
+$$;
 
 -- Limits: 50 members (48 more made up here), and 10 groups each.
 reset role;

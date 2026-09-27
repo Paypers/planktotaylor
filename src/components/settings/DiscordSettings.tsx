@@ -3,6 +3,7 @@ import {
   addDiscordWebhook,
   askToSignIn,
   changeDiscordGroup,
+  changeDiscordMention,
   changeDiscordZone,
   DiscordAddError,
   discordPreview,
@@ -13,7 +14,17 @@ import {
   type Group,
 } from '../../lib/account'
 import { clockTime } from '../../lib/dates'
-import { LABEL_LENGTH, MORNING_POST, NIGHT_POST, WEBHOOKS_EACH, webhookAddress, zoneName, type AddProblem } from '../../lib/discord'
+import {
+  LABEL_LENGTH,
+  MENTIONS_EACH,
+  mentionsIn,
+  MORNING_POST,
+  NIGHT_POST,
+  WEBHOOKS_EACH,
+  webhookAddress,
+  zoneName,
+  type AddProblem,
+} from '../../lib/discord'
 import { useToday } from '../../lib/hooks'
 import { useMyGroups } from '../../lib/myGroups'
 import { ConfirmDialog } from '../ConfirmDialog'
@@ -138,6 +149,16 @@ export function DiscordSettings() {
     })
   }
 
+  const changeMention = (webhook: DiscordWebhook, mention: string | null) => {
+    const before = webhooks
+    setWebhooks((list) => list?.map((w) => (w.id === webhook.id ? { ...w, mention } : w)) ?? null)
+    setRowError(null)
+    changeDiscordMention(webhook.id, mention).catch(() => {
+      setWebhooks(before)
+      setRowError(`Couldn't change who ${webhook.label} pings. Try again in a moment.`)
+    })
+  }
+
   const remove = () => {
     const webhook = removing
     setRemoving(null)
@@ -192,6 +213,7 @@ export function DiscordSettings() {
                       ))}
                     </select>
                   </label>
+                  <PingChoice webhook={webhook} onChange={(mention) => changeMention(webhook, mention)} />
                   {postable && <NightChoice webhook={webhook} groups={postable} onChange={(groupId) => changeGroup(webhook, groupId)} />}
                 </li>
               ))}
@@ -293,6 +315,71 @@ export function DiscordSettings() {
         <p>Plank to Taylor won't post there any more. You can add it again later.</p>
       </ConfirmDialog>
     </>
+  )
+}
+
+/**
+ * Who a channel's posts ping, morning and night: people or roles as Discord writes them. Discord only
+ * pings by ID, never by a name typed in, so it says how to get one.
+ */
+function PingChoice({ webhook, onChange }: { webhook: DiscordWebhook; onChange: (mention: string | null) => void }) {
+  const [text, setText] = useState(webhook.mention ?? '')
+  const [problem, setProblem] = useState<string | null>(null)
+  const id = `ping-${webhook.id}`
+
+  // Put back after a save that didn't work: show what's kept.
+  useEffect(() => setText(webhook.mention ?? ''), [webhook.mention])
+
+  const save = (event: FormEvent) => {
+    event.preventDefault()
+    const mentions = mentionsIn(text)
+    if (mentions === null) {
+      setProblem("That isn't something Discord can ping. Copy a mention as below, or use @everyone or @here.")
+      return
+    }
+    if (mentions.length > MENTIONS_EACH) {
+      setProblem(`That's more than ${MENTIONS_EACH}. To ping more people, give them a role in Discord and ping that.`)
+      return
+    }
+    setProblem(null)
+    const mention = mentions.join(' ') || null
+    setText(mention ?? '')
+    if (mention !== webhook.mention) onChange(mention)
+  }
+
+  return (
+    <form className="field webhook-ping" onSubmit={save} noValidate>
+      <label htmlFor={id}>Ping with each post</label>
+      <div className="webhook-ping-row">
+        <input
+          id={id}
+          className="input"
+          type="text"
+          autoComplete="off"
+          spellCheck={false}
+          placeholder="Optional: <@1234…> or @everyone"
+          aria-describedby={`${id}-how`}
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value)
+            setProblem(null)
+          }}
+        />
+        <button type="submit" className="btn btn-secondary" disabled={text.trim() === (webhook.mention ?? '')}>
+          Save<span className="sr-only"> who {webhook.label} pings</span>
+        </button>
+      </div>
+      {problem && (
+        <p className="error" role="alert">
+          {problem}
+        </p>
+      )}
+      <p className="fine" id={`${id}-how`}>
+        Discord pings by ID, not by name. In any channel, send \@ and their name (or a role's), then copy what shows,
+        like &lt;@1234…&gt;, and paste it here. Up to {MENTIONS_EACH}, with a space between. A role or @everyone only pings
+        if the server lets everyone mention it. Leave it empty to ping nobody.
+      </p>
+    </form>
   )
 }
 

@@ -549,25 +549,29 @@ export interface DiscordWebhook {
   created_at: string
   /** A group it posts at night instead of how everyone did. */
   group_id: string | null
+  /** Who each post pings, as Discord writes them, a space between. */
+  mention: string | null
 }
 
 // Until schema.sql has been run for the Discord post, there's no table: these errors mean "not there yet".
 const MISSING_TABLE = new Set(['42P01', 'PGRST205'])
 
+/** A channel's later choices, newest last: until schema.sql's change for one is run, none is chosen. */
+const LATER_CHOICES = ['group_id', 'mention'] as const
+const UNCHOSEN = { group_id: null, mention: null }
+
 /** The player's channels with the daily post, oldest first. Null when the site doesn't have the post yet. */
 export async function loadDiscordWebhooks(): Promise<DiscordWebhook[] | null> {
   if (!accountsEnabled || !state.user) return []
   const supabase = await client()
-  const found = await supabase.from('discord_webhooks').select('id, label, time_zone, created_at, group_id').order('created_at')
-  if (found.error && MISSING_TABLE.has(found.error.code)) return null
-  // Before schema.sql's groups-in-Discord change: no group column yet, so none posts a group.
-  if (found.error?.code === MISSING_COLUMN) {
-    const older = await supabase.from('discord_webhooks').select('id, label, time_zone, created_at').order('created_at')
-    if (older.error) throw older.error
-    return (older.data as Omit<DiscordWebhook, 'group_id'>[]).map((w) => ({ ...w, group_id: null }))
+  for (let later = LATER_CHOICES.length; ; later--) {
+    const columns = ['id, label, time_zone, created_at', ...LATER_CHOICES.slice(0, later)].join(', ')
+    const found = await supabase.from('discord_webhooks').select(columns).order('created_at')
+    if (found.error && MISSING_TABLE.has(found.error.code)) return null
+    if (found.error?.code === MISSING_COLUMN && later > 0) continue
+    if (found.error) throw found.error
+    return (found.data as unknown as Partial<DiscordWebhook>[]).map((w) => ({ ...UNCHOSEN, ...w }) as DiscordWebhook)
   }
-  if (found.error) throw found.error
-  return found.data as DiscordWebhook[]
 }
 
 const ADD_PROBLEMS: ReadonlySet<string> = new Set<AddProblem>([
@@ -595,7 +599,8 @@ export class DiscordAddError extends Error {
  */
 export async function addDiscordWebhook(url: string, timeZone: string, label: string): Promise<DiscordWebhook> {
   const { data, error } = await (await client()).functions.invoke('discord-add', { body: { url, timeZone, label } })
-  if (!error) return (data as { webhook: DiscordWebhook }).webhook
+  // A new channel has nothing chosen yet, and the function doesn't say.
+  if (!error) return { ...UNCHOSEN, ...(data as { webhook: Omit<DiscordWebhook, keyof typeof UNCHOSEN> }).webhook }
   const context: unknown = error.context
   const answer = context instanceof Response ? ((await context.json().catch(() => null)) as { problem?: unknown } | null) : null
   const problem = answer?.problem
@@ -610,6 +615,12 @@ export async function changeDiscordZone(id: string, timeZone: string) {
 /** What a channel posts at night: how everyone did (null), or one of the player's groups. */
 export async function changeDiscordGroup(id: string, groupId: string | null) {
   const { error } = await (await client()).from('discord_webhooks').update({ group_id: groupId }).eq('id', id)
+  if (error) throw error
+}
+
+/** Who a channel's posts ping: mentions as Discord writes them, a space between, or null for nobody. */
+export async function changeDiscordMention(id: string, mention: string | null) {
+  const { error } = await (await client()).from('discord_webhooks').update({ mention }).eq('id', id)
   if (error) throw error
 }
 

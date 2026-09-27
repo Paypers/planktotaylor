@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { ScheduledSong } from './daily'
 import {
   cardTop,
+  DISCORD_MENTIONS,
   DISCORD_WEBHOOK,
   duePost,
   everyoneCard,
@@ -10,12 +11,15 @@ import {
   groupNightPost,
   hideTokens,
   knownZone,
+  MENTIONS_EACH,
+  mentionsIn,
   morningCard,
   morningPost,
   nightPost,
   webhookAddress,
   webhookLabel,
   welcomePost,
+  withMentions,
   zoneName,
   type WebhookRow,
 } from './discord'
@@ -75,6 +79,59 @@ describe('webhook addresses', () => {
     expect(webhookLabel('', 'Captain Hook')).toBe('Captain Hook')
     expect(webhookLabel(' ', null)).toBe('Discord channel')
     expect(webhookLabel('x'.repeat(80), null)).toHaveLength(60)
+  })
+})
+
+describe('pinging people', () => {
+  const ANA = '123456789012345678'
+  const BEN = '223456789012345678'
+  const ROLE = '323456789012345678'
+  const style: ScheduledSong = { id: 'style', title: 'Style', seconds: 231, length: '3:51', album: '1989', number: 3 }
+
+  it('takes mentions as Discord writes them, or a bare ID from Copy User ID, in one form', () => {
+    expect(mentionsIn(`<@${ANA}>`)).toEqual([`<@${ANA}>`])
+    expect(mentionsIn(`<@!${ANA}>`)).toEqual([`<@${ANA}>`])
+    expect(mentionsIn(` ${ANA} `)).toEqual([`<@${ANA}>`])
+    expect(mentionsIn(`<@&${ROLE}>`)).toEqual([`<@&${ROLE}>`])
+    expect(mentionsIn('@Everyone @here')).toEqual(['@everyone', '@here'])
+    // However they're run together, and each once.
+    expect(mentionsIn(`<@${ANA}><@&${ROLE}>, <@${BEN}>,@here <@!${ANA}>`)).toEqual([`<@${ANA}>`, `<@&${ROLE}>`, `<@${BEN}>`, '@here'])
+    expect(mentionsIn('  ')).toEqual([])
+  })
+
+  it("refuses what Discord can't ping by", () => {
+    for (const pasted of ['@taylor', 'taylor', '@taylor#1989', `<#${ANA}>`, `<@${ANA}`, '<@123>', `<@${ANA}> and Ben`, 'https://x.example', '@everyone!']) {
+      expect(mentionsIn(pasted), pasted).toBeNull()
+    }
+  })
+
+  it(`keeps up to ${MENTIONS_EACH}, in the form schema.sql checks`, () => {
+    const ids = Array.from({ length: MENTIONS_EACH + 1 }, (_, i) => `<@${ANA.slice(0, -1)}${i}>`)
+    expect(DISCORD_MENTIONS.test(ids.slice(0, MENTIONS_EACH).join(' '))).toBe(true)
+    expect(DISCORD_MENTIONS.test(ids.join(' '))).toBe(false)
+    expect(DISCORD_MENTIONS.test(`<@&${ROLE}> @everyone @here`)).toBe(true)
+    for (const kept of ['', ' @here', `<@!${ANA}>`, `<@${ANA}>  @here`, `<@${ANA}>,@here`, '@Everyone']) {
+      expect(DISCORD_MENTIONS.test(kept), kept).toBe(false)
+    }
+  })
+
+  it('pings who the channel chose, first, and nobody else', () => {
+    const post = withMentions(morningPost(SITE, style), `<@${ANA}> <@&${ROLE}>`)
+    expect(post.content.split('\n')[0]).toBe(`<@${ANA}> <@&${ROLE}> **Today's song:** Style (3:51), from 1989 · Daily No. 3`)
+    expect(post.allowed_mentions).toEqual({ parse: [], users: [ANA], roles: [ROLE] })
+    expect(withMentions(morningPost(SITE, style), '@here').allowed_mentions).toEqual({ parse: ['everyone'], users: [], roles: [] })
+  })
+
+  it('leaves a post alone when the channel pings nobody', () => {
+    expect(withMentions(morningPost(SITE, style), null)).toEqual(morningPost(SITE, style))
+    expect(withMentions(morningPost(SITE, style), 'not a mention')).toEqual(morningPost(SITE, style))
+  })
+
+  it("names in a post still can't ping anyone", () => {
+    const stats = { planks: 1, noBreak: 0, seconds: 0, slices: Array(20).fill(0) }
+    const sneaky = withMentions(nightPost(SITE, { ...style, title: `@everyone <@${BEN}>` }, stats)!, `<@${ANA}>`)
+    expect(sneaky.content.split('\n')[0]).toBe(`<@${ANA}> **How everyone did today:** 1 person has planked \\@everyone \\<\\@${BEN}\\>`)
+    expect(sneaky.allowed_mentions).toEqual({ parse: [], users: [ANA], roles: [] })
   })
 })
 

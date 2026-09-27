@@ -335,6 +335,15 @@ drop trigger if exists discord_webhooks_limit on public.discord_webhooks;
 create trigger discord_webhooks_limit before insert on public.discord_webhooks
   for each row execute function public.discord_webhooks_limit();
 
+-- Who a channel's posts ping (Settings → Discord): up to 5 people or roles each as Discord writes them
+-- (<@id> a person, <@&id> a role, @everyone, @here), a space between. The same pattern is
+-- DISCORD_MENTIONS in src/lib/discord.ts, so keep the two in step. The posts let Discord ping these and
+-- nobody else.
+alter table public.discord_webhooks add column if not exists mention text
+  check (mention ~ '^(<@&?[0-9]{17,20}>|@everyone|@here)( (<@&?[0-9]{17,20}>|@everyone|@here)){0,4}$');
+grant select (mention) on public.discord_webhooks to authenticated;
+grant update (mention) on public.discord_webhooks to authenticated;
+
 -- Groups: friends who plank together. This is the one place a player sees anything of anyone else's, so
 -- every table still shows a player only their own rows. Members see each other only through group_board
 -- (names, photos, the days they planked today's song, and whether today's was held with no breaks), and
