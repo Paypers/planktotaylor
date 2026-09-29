@@ -89,9 +89,13 @@ create table if not exists public.plank_attempts (
   -- Seconds into the song it got to.
   reached numeric(6, 1) not null check (reached >= 0),
   pauses int not null default 0 check (pauses >= 0),
+  -- Each break: [{ "at": seconds into the song, "ms": length }]. Null = none, or their times weren't kept.
+  breaks jsonb,
   primary key (user_id, id)
 );
 create index if not exists plank_attempts_recent on public.plank_attempts (user_id, started_at desc);
+-- For databases created before each break was timed.
+alter table public.plank_attempts add column if not exists breaks jsonb;
 -- For databases created before new releases could be planked from their album page.
 alter table public.plank_attempts drop constraint if exists plank_attempts_kind_check;
 alter table public.plank_attempts add constraint plank_attempts_kind_check check (kind in ('daily', 'ladder', 'practice', 'extra', 'era'));
@@ -818,7 +822,8 @@ $schedule$;
 -- "not valid" checks new and changed rows only, so older rows never stop this script.
 -- The most a plank can earn is double its seconds (no breaks on a 6-minute-plus song), plus 5 for each
 -- aurora light caught: that 5 is LIGHT_XP in src/lib/xp.ts, so keep the two in step.
--- A plank keeps its first 100 breaks: BREAKS_PER_PLANK in src/lib/account.ts, so keep the two in step.
+-- A plank keeps its first 100 breaks, and an attempt its breaks only up to 100: BREAKS_PER_PLANK in
+-- src/lib/account.ts, so keep the two in step.
 alter table public.plank_completions drop constraint if exists plank_completions_limits;
 alter table public.plank_completions add constraint plank_completions_limits check (
   char_length(song_id) <= 100
@@ -833,6 +838,10 @@ alter table public.plank_completions add constraint plank_completions_limits che
 alter table public.plank_attempts drop constraint if exists plank_attempts_limits;
 alter table public.plank_attempts add constraint plank_attempts_limits check (
   char_length(song_id) <= 100 and reached <= 3600 and pauses <= 1000
+  and (breaks is null or case
+    when jsonb_typeof(breaks) = 'array' then jsonb_array_length(breaks) <= 100 and octet_length(breaks::text) <= 4000
+    else false
+  end)
 ) not valid;
 
 -- A photo link can only be the player's own photo, with the version the site adds to get past caches.

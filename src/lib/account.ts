@@ -14,7 +14,7 @@ import {
   type Pause,
   type Prefs,
 } from './progress'
-import { forgetAttempts, getAttempts, mergeAttempts, onAttemptEnded, type AttemptKind, type AttemptOutcome } from './attempts'
+import { forgetAttempts, getAttempts, mergeAttempts, onAttemptEnded, type Attempt, type AttemptKind, type AttemptOutcome } from './attempts'
 import { applyPrefs, getData, onPlankRecorded, onPrefsChanged, replaceProgress } from './store'
 import { accountThemes, applyAccountThemes, onThemeSaved, readSaved, type AccountThemes } from './theme'
 import { readStats, type DailyStats } from './together'
@@ -348,6 +348,21 @@ interface AttemptRow {
   outcome: AttemptOutcome
   reached: number
   pauses: number
+  breaks: Pause[] | null
+}
+
+/** An attempt's breaks as the account keeps them: over its limit only the count goes, so the row still saves. */
+const breaksToSave = (breaks: readonly Pause[] | undefined): Pause[] | null =>
+  breaks?.length && breaks.length <= BREAKS_PER_PLANK ? [...breaks] : null
+
+const isTime = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value >= 0
+const isBreak = (value: unknown): value is Pause =>
+  typeof value === 'object' && value !== null && isTime((value as Pause).at) && isTime((value as Pause).ms)
+
+/** An attempt's breaks from the account: kept when they are breaks, one for each it counted. */
+function breaksFromRow(breaks: unknown, pauses: number): Pick<Attempt, 'breaks'> {
+  if (!Array.isArray(breaks) || breaks.length === 0 || breaks.length !== pauses || !breaks.every(isBreak)) return {}
+  return { breaks: breaks.map(({ at, ms }: Pause) => ({ at, ms })) }
 }
 
 /** Sends attempts the account doesn't have yet. The account only ever adds them: none can be edited or removed. */
@@ -365,6 +380,7 @@ async function pushAttempts(supabase: SupabaseClient, userId: string) {
     outcome: a.outcome,
     reached: a.reached,
     pauses: a.pauses,
+    breaks: breaksToSave(a.breaks),
   }))
   const { error } = await supabase.from('plank_attempts').upsert(rows, { onConflict: 'user_id,id', ignoreDuplicates: true })
   if (error) throw error
@@ -379,7 +395,7 @@ export async function pullAttempts() {
   await pushAttempts(supabase, user.id)
   const { data, error } = await supabase
     .from('plank_attempts')
-    .select('id, song_id, kind, level, started_at, ended_at, outcome, reached, pauses')
+    .select('id, song_id, kind, level, started_at, ended_at, outcome, reached, pauses, breaks')
     .order('started_at', { ascending: false })
     .limit(100)
   if (error) throw error
@@ -394,6 +410,7 @@ export async function pullAttempts() {
       outcome: row.outcome,
       reached: Number(row.reached),
       pauses: row.pauses,
+      ...breaksFromRow(row.breaks, row.pauses),
     })),
   )
 }

@@ -257,12 +257,17 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
 
   const readElapsedRef = useRef(readElapsed)
   readElapsedRef.current = readElapsed
-  const breakCount = () => pausesRef.current.length + (pauseStart.current ? 1 : 0)
+  /** The breaks so far, for the record: one still going counts, as long as it's lasted. */
+  const breaksSoFar = (): Pause[] => {
+    const open = pauseStart.current
+    if (!open) return pausesRef.current
+    return [...pausesRef.current, { at: Math.round(open.at * 10) / 10, ms: Math.round(performance.now() - open.t) }]
+  }
 
   /** Closes the attempt on the record, however the plank ended. */
   const endRecord = (outcome: AttemptOutcome, reachedMs: number) => {
     if (!attempt.current) return
-    endAttempt(attempt.current, outcome, reachedMs / 1000, breakCount())
+    endAttempt(attempt.current, outcome, reachedMs / 1000, breaksSoFar())
     attempt.current = null
   }
 
@@ -531,14 +536,14 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
       window.removeEventListener('offline', lost)
       window.removeEventListener('pagehide', left)
       // The plank screen went away some other way mid-plank.
-      if (attempt.current) endAttempt(attempt.current, 'stopped', readElapsedRef.current() / 1000, breakCount())
+      if (attempt.current) endAttempt(attempt.current, 'stopped', readElapsedRef.current() / 1000, breaksSoFar())
     }
   }, [])
 
   // Save the attempt's progress every couple of seconds, so however it ends, the record knows how far it got.
   useEffect(() => {
     if (phase !== 'running' && phase !== 'paused') return
-    const save = () => attempt.current && saveAttemptProgress(attempt.current, readElapsed() / 1000, breakCount())
+    const save = () => attempt.current && saveAttemptProgress(attempt.current, readElapsed() / 1000, breaksSoFar())
     save()
     const timer = setInterval(save, 2000)
     return () => clearInterval(timer)

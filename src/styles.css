@@ -645,24 +645,10 @@ a {
   white-space: nowrap;
 }
 
-.attempt-bar {
-  height: 4px;
-  margin-top: 6px;
-  overflow: hidden;
-  border-radius: 2px;
-  background: var(--rule);
-}
-
-.attempt-bar > span {
-  display: block;
-  height: 100%;
-  min-width: 2px;
-  border-radius: inherit;
-  background: var(--paused);
-}
-
-.attempt-bar > span.done {
-  background: var(--held);
+/* Under the song and how it ended, as wide as both: the middle column alone is narrow on a phone. */
+.attempt .timeline {
+  grid-column: 2 / -1;
+  margin-bottom: -6px;
 }
 
 .attempt-end {
@@ -679,6 +665,156 @@ a {
 
 .dialog-section .attempt-outcome.done {
   color: var(--held);
+}
+
+/* A plank to scale (history, the calendar's day): green held, orange paused, the song it didn't reach.
+   The track is taller than the bar it draws, so it's easy to tap. It picks the part a pointer means
+   (PlankTimeline), so the parts themselves only take the keyboard. */
+
+.timeline {
+  position: relative;
+  isolation: isolate;
+}
+
+.timeline-track {
+  display: flex;
+  gap: 2px;
+  height: 24px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Parts keep a visible width, but never more than their share: a bar crowded with breaks still fits its row. */
+.timeline-part {
+  --share: calc((100% - (var(--parts) - 1) * 2px) / var(--parts));
+  position: relative;
+  flex-basis: 0;
+  min-width: min(4px, var(--share));
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  pointer-events: none;
+}
+
+.timeline-part::before {
+  content: '';
+  position: absolute;
+  inset: 8px 0;
+  border-radius: 2px;
+  background: var(--held);
+  transition:
+    inset 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.timeline-part.pause {
+  min-width: min(6px, var(--share));
+}
+
+.timeline-part.pause::before {
+  background: var(--paused);
+}
+
+.timeline-part.rest::before {
+  background: var(--rule);
+}
+
+.timeline-part.active::before {
+  inset: 5px 0;
+}
+
+.timeline.showing .timeline-part:not(.active)::before {
+  opacity: 0.35;
+}
+
+/* The focus ring goes round the bar, not the taller tap area. */
+.timeline-part:focus-visible {
+  outline: none;
+}
+
+.timeline-part:focus-visible::before {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+
+.timeline-tip {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  z-index: 2;
+  display: grid;
+  width: max-content;
+  max-width: 240px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/* Points down at the part. */
+.timeline-tip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: var(--point, 50%);
+  translate: -50% 0;
+  border-width: 4px 4px 0;
+  border-style: solid;
+  border-color: var(--ink) transparent transparent;
+}
+
+/* No room above (the top of the dialog or the screen): below the bar, pointing up. */
+.timeline-tip[data-side='below'] {
+  top: 100%;
+  bottom: auto;
+}
+
+.timeline-tip[data-side='below']::after {
+  top: auto;
+  bottom: 100%;
+  border-width: 0 4px 4px;
+  border-color: transparent transparent var(--ink);
+}
+
+.timeline-tip-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.timeline-tip-title::before {
+  content: '';
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--held);
+}
+
+.timeline-tip.pause .timeline-tip-title::before {
+  background: var(--paused);
+}
+
+.timeline-tip.rest .timeline-tip-title::before {
+  background: var(--rule);
+}
+
+.timeline-tip-detail {
+  padding-left: 14px;
+  color: color-mix(in srgb, var(--paper) 75%, var(--ink));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timeline-part::before {
+    transition: none;
+  }
 }
 
 /* Buttons */

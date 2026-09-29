@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
-import { ALBUMS, formatDuration } from '../data/songs'
+import { ALBUMS } from '../data/songs'
 import { addDays, fromDayKey, type DayKey } from '../lib/dates'
 import { useAttempts } from '../lib/attempts'
 import { allPlanks } from '../lib/planks'
 import { songFor, type Completion } from '../lib/progress'
 import type { PlayerRank } from '../lib/ranks'
 import { streakRuns, type StreakInfo } from '../lib/streaks'
+import { DayDetail } from './DayDetail'
 import { Flame, Icon } from './Icon'
 import { RankBar } from './Rank'
 import { SaveNote } from './SaveNote'
@@ -134,7 +135,6 @@ function Calendar({ completions, days, frozen, today }: CalendarProps) {
     setMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
   }
   const title = firstDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
-  const selectedPlanks = byDay.get(selected) ?? []
 
   return (
     <div className="calendar">
@@ -203,25 +203,7 @@ function Calendar({ completions, days, frozen, today }: CalendarProps) {
           )
         })}
       </div>
-      <div className="calendar-detail" aria-live="polite">
-        <strong>{fromDayKey(selected).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</strong>
-        {frozen.has(selected) && <p>A freeze kept your streak going.</p>}
-        {selectedPlanks.length === 0 ? (
-          !frozen.has(selected) && <p>{selected === today ? 'Nothing yet today.' : 'Rest day.'}</p>
-        ) : (
-          selectedPlanks.map((c) => {
-            const planked = songFor(c)
-            if (!planked) return null
-            return (
-              <p key={`${c.mode}-${c.songId}`}>
-                {c.mode === 'daily' ? "Today's song" : c.mode === 'ladder' ? `Level ${c.level}` : `${ALBUMS[planked.album].short} · new release`} ·{' '}
-                {planked.title} · {formatDuration(c.seconds)}
-                {c.xp ? ` · +${c.xp} XP` : ''}
-              </p>
-            )
-          })
-        )}
-      </div>
+      <DayDetail day={selected} today={today} frozen={frozen.has(selected)} planks={byDay.get(selected) ?? []} />
     </div>
   )
 }

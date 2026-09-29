@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import type { Pause } from './progress'
 
 // Every plank attempt, from the moment the plank begins, finished or not. A record, not a score:
 // nothing here moves the ladder, the streak or XP.
@@ -24,6 +25,8 @@ export interface Attempt {
   /** How far into the song it got, in seconds. */
   reached: number
   pauses: number
+  /** Each break, where and how long. Absent with none, and on attempts saved before breaks were timed. */
+  breaks?: Pause[]
   endedAt: string
   outcome: AttemptOutcome
   /** Saved to the account (signed-in players). */
@@ -123,26 +126,35 @@ export function beginAttempt(fields: { songId: string; kind: AttemptKind; level?
   return id
 }
 
-/** Called every couple of seconds mid-plank. */
-export function saveAttemptProgress(id: string, reached: number, pauses: number) {
-  const live = read<LiveAttempt | null>(LIVE_KEY, null)
-  if (live?.id !== id) return
-  write(LIVE_KEY, { ...live, reached: round(reached), pauses, seenAt: new Date().toISOString() })
+/** How many breaks, and each one when there were any, rounded as the timer rounds them. */
+function breakFields(breaks: readonly Pause[]): Pick<Attempt, 'pauses' | 'breaks'> {
+  if (breaks.length === 0) return { pauses: 0 }
+  return { pauses: breaks.length, breaks: breaks.map((b) => ({ at: round(b.at), ms: Math.round(b.ms) })) }
 }
 
-export function endAttempt(id: string, outcome: AttemptOutcome, reached: number, pauses: number) {
+/** Called every couple of seconds mid-plank, with the breaks so far (one still going included). */
+export function saveAttemptProgress(id: string, reached: number, breaks: readonly Pause[]) {
+  const live = read<LiveAttempt | null>(LIVE_KEY, null)
+  if (live?.id !== id) return
+  // The last save's breaks go: a break that turned out too short to count is no longer one.
+  const { breaks: _last, ...rest } = live
+  write(LIVE_KEY, { ...rest, reached: round(reached), ...breakFields(breaks), seenAt: new Date().toISOString() })
+}
+
+export function endAttempt(id: string, outcome: AttemptOutcome, reached: number, breaks: readonly Pause[]) {
   const live = read<LiveAttempt | null>(LIVE_KEY, null)
   if (live?.id !== id) return
   write(LIVE_KEY, null)
-  const { seenAt: _seen, ...rest } = live
-  commit([...log, { ...rest, reached: round(reached), pauses, endedAt: new Date().toISOString(), outcome }])
+  const { seenAt: _seen, breaks: _last, ...rest } = live
+  commit([...log, { ...rest, reached: round(reached), ...breakFields(breaks), endedAt: new Date().toISOString(), outcome }])
   endedListeners.forEach((fn) => fn())
 }
 
 /** Adds attempts from the account (another device's) and marks ones the account now has. */
 export function mergeAttempts(fromAccount: readonly Attempt[], savedIds: readonly string[] = []) {
   const byId = new Map(log.map((a) => [a.id, a]))
-  for (const a of fromAccount) byId.set(a.id, { ...a, synced: true })
+  // The account's copy wins, but one saved without its breaks keeps the ones timed here.
+  for (const a of fromAccount) byId.set(a.id, { ...byId.get(a.id), ...a, synced: true })
   for (const id of savedIds) {
     const a = byId.get(id)
     if (a) byId.set(id, { ...a, synced: true })

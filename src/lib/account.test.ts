@@ -4,7 +4,7 @@ import type { Completion } from './progress'
 // The account's side is a stand-in for Supabase: one row set per user, as row-level security gives
 // each player only their own. Every request is counted, to check what leaves the browser.
 const fake = vi.hoisted(() => {
-  type Rows = { completions: Record<string, unknown>[]; profile: Record<string, unknown> | null }
+  type Rows = { completions: Record<string, unknown>[]; profile: Record<string, unknown> | null; attempts?: Record<string, unknown>[] }
   const state = {
     users: new Map<string, Rows>(),
     user: null as string | null,
@@ -24,6 +24,11 @@ const fake = vi.hoisted(() => {
     if (table === 'plank_completions' && op === 'select') return { data: mine.completions, error: null }
     if (table === 'plank_completions' && op === 'upsert') {
       mine.completions.push(...(value as Record<string, unknown>[]))
+      return { error: null }
+    }
+    if (table === 'plank_attempts' && op === 'select') return { data: mine.attempts ?? [], error: null }
+    if (table === 'plank_attempts' && op === 'upsert') {
+      mine.attempts = [...(mine.attempts ?? []), ...(value as Record<string, unknown>[])]
       return { error: null }
     }
     if (table === 'plank_profiles' && op === 'select') return { data: mine.profile, error: null }
@@ -96,8 +101,9 @@ async function visit() {
   const account = await import('./account')
   const store = await import('./store')
   const theme = await import('./theme')
+  const attempts = await import('./attempts')
   await vi.waitFor(() => expect(fake.state.onAuth).not.toBeNull())
-  return { account, store, theme }
+  return { account, store, theme, attempts }
 }
 
 function signIn(id: string) {
@@ -230,6 +236,61 @@ describe('account sync', () => {
     signIn('ana')
     await vi.waitFor(() => expect(account('ana')?.completions).toHaveLength(1))
     expect(account('ana')!.completions[0].pauses).toHaveLength(100)
+  })
+
+  it("sends an attempt's breaks, and only its count when there are more than the database keeps", async () => {
+    const { attempts } = await visit()
+    const few = attempts.beginAttempt({ songId: 'cancelled', kind: 'daily' })
+    attempts.endAttempt(few, 'gave-up', 95, [{ at: 60, ms: 8000 }])
+    const many = attempts.beginAttempt({ songId: 'cancelled', kind: 'daily' })
+    attempts.endAttempt(many, 'finished', 211, Array.from({ length: 150 }, (_, i) => ({ at: i, ms: 1000 })))
+    const clean = attempts.beginAttempt({ songId: 'cancelled', kind: 'daily' })
+    attempts.endAttempt(clean, 'finished', 211, [])
+    signIn('ana')
+    await vi.waitFor(() => expect(account('ana')?.attempts).toHaveLength(3))
+    const sent = new Map(account('ana')!.attempts!.map((row) => [row.id, row]))
+    expect(sent.get(few)).toMatchObject({ pauses: 1, breaks: [{ at: 60, ms: 8000 }] })
+    expect(sent.get(many)).toMatchObject({ pauses: 150, breaks: null })
+    expect(sent.get(clean)).toMatchObject({ pauses: 0, breaks: null })
+  })
+
+  it('brings back only breaks that are breaks, one for each the attempt counted', async () => {
+    const row = (id: string, pauses: number, breaks: unknown) => ({
+      id,
+      song_id: 'cancelled',
+      kind: 'daily',
+      level: null,
+      started_at: '2026-09-22 12:00:00+00',
+      ended_at: '2026-09-22 12:04:00+00',
+      outcome: 'gave-up',
+      reached: '95.0',
+      pauses,
+      breaks,
+    })
+    fake.state.users.set('ana', {
+      completions: [],
+      profile: null,
+      attempts: [
+        row('timed', 2, [
+          { at: 30.5, ms: 4000 },
+          { at: 61, ms: 0 },
+        ]),
+        row('untimed', 3, null),
+        row('not-a-list', 1, { at: 1, ms: 1000 }),
+        row('negative', 1, [{ at: -1, ms: 1000 }]),
+        row('not-numbers', 1, [{ at: '30', ms: 1000 }]),
+        row('miscounted', 2, [{ at: 30, ms: 1000 }]),
+      ],
+    })
+    const { account: sync, attempts } = await visit()
+    signIn('ana')
+    await sync.pullAttempts()
+    const byId = new Map(attempts.getAttempts().map((a) => [a.id, a]))
+    expect(byId.get('timed')).toMatchObject({ pauses: 2, breaks: [{ at: 30.5, ms: 4000 }, { at: 61, ms: 0 }] })
+    for (const id of ['untimed', 'not-a-list', 'negative', 'not-numbers', 'miscounted']) {
+      expect(byId.get(id)).not.toHaveProperty('breaks')
+    }
+    expect(byId.get('untimed')).toMatchObject({ pauses: 3 })
   })
 
   it("shows other players' photos only from the project's own bucket", async () => {

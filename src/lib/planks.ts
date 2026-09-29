@@ -29,7 +29,7 @@ export interface Plank {
 }
 
 /** A go again that finished within this long of a record is that record (it counted after all). */
-const SAME_PLANK_MS = 10_000
+export const SAME_PLANK_MS = 10_000
 
 export function allPlanks(completions: readonly Completion[], attempts: readonly Attempt[]): Plank[] {
   const planks: Plank[] = []

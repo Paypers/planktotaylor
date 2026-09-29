@@ -357,18 +357,23 @@ begin
 end;
 $$;
 
--- Limits on what a player can store: a plank keeps at most 100 breaks, and nobody has more than 10,000
--- planks or 20,000 attempts. Anything within them saves as normal, a whole history at once included.
+-- Limits on what a player can store: a plank or an attempt keeps at most 100 breaks, and nobody has more
+-- than 10,000 planks or 20,000 attempts. Anything within them saves as normal, a whole history at once included.
 select public.rules_test_as('ana');
 do $$
 declare
   breaks jsonb := (select jsonb_agg(jsonb_build_object('at', 612.3, 'ms', 12345678)) from generate_series(1, 100));
   plank text := $q$ insert into public.plank_completions (day, mode, song_id, seconds, pauses) values (current_date, 'ladder', 'dear-john', 404, %L) $q$;
+  attempt text := $q$ insert into public.plank_attempts (id, song_id, kind, started_at, ended_at, outcome, reached, pauses, breaks) values (gen_random_uuid(), 'dear-john', 'ladder', now(), now(), 'gave-up', 90, %s, %L) $q$;
 begin
   assert public.rules_test_refused(format(plank, breaks || '[{"at": 1, "ms": 1000}]'::jsonb)), 'a plank with 101 breaks is refused';
   assert public.rules_test_refused(format(plank, '{"at": 1, "ms": 1000}')), 'breaks are a list';
   execute format(plank, breaks);
   assert (select jsonb_array_length(pauses) from public.plank_completions where user_id = auth.uid() and song_id = 'dear-john') = 100, 'a plank with 100 long breaks saves';
+  assert public.rules_test_refused(format(attempt, 101, breaks || '[{"at": 1, "ms": 1000}]'::jsonb)), 'an attempt with 101 breaks is refused';
+  assert public.rules_test_refused(format(attempt, 1, '{"at": 1, "ms": 1000}')), 'its breaks are a list too';
+  execute format(attempt, 2, '[{"at": 30.5, "ms": 4000}, {"at": 61, "ms": 12000}]');
+  assert (select a.breaks from public.plank_attempts a where a.user_id = auth.uid() and a.song_id = 'dear-john') = '[{"at": 30.5, "ms": 4000}, {"at": 61, "ms": 12000}]', 'an attempt saves with its breaks';
   -- Signing in brings the browser's whole history in one go: here, all she has room for.
   insert into public.plank_completions (day, mode, song_id, seconds, xp)
   select current_date - n, 'daily', 'style', 231, 347 from generate_series(1, 10000 - (select count(*) from public.plank_completions where user_id = auth.uid())::int) n;

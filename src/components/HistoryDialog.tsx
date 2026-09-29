@@ -3,7 +3,11 @@ import { ALBUMS, SONG_BY_ID, formatDuration } from '../data/songs'
 import { pullAttempts } from '../lib/account'
 import { useAttempts, type Attempt, type AttemptOutcome } from '../lib/attempts'
 import { addDays, fromDayKey, toDayKey, todayKey } from '../lib/dates'
+import type { Completion } from '../lib/progress'
+import { useAppData } from '../lib/store'
+import { attemptBreaks } from '../lib/timeline'
 import { Dialog } from './Dialog'
+import { PlankTimeline } from './PlankTimeline'
 
 const OUTCOME: Record<AttemptOutcome, string> = {
   finished: 'Finished',
@@ -37,6 +41,8 @@ export function HistoryDialog({ open, onClose, signedIn }: { open: boolean; onCl
 
 function History({ signedIn }: { signedIn: boolean }) {
   const attempts = useAttempts()
+  // Attempts saved before breaks were timed borrow them from the plank's record.
+  const { completions } = useAppData()
   const [loading, setLoading] = useState(signedIn)
 
   useEffect(() => {
@@ -73,7 +79,7 @@ function History({ signedIn }: { signedIn: boolean }) {
             {newest
               .filter((a) => toDayKey(new Date(a.startedAt)) === day)
               .map((a) => (
-                <AttemptRow key={a.id} attempt={a} />
+                <AttemptRow key={a.id} attempt={a} completions={completions} />
               ))}
           </ol>
         </section>
@@ -82,7 +88,7 @@ function History({ signedIn }: { signedIn: boolean }) {
   )
 }
 
-function AttemptRow({ attempt: a }: { attempt: Attempt }) {
+function AttemptRow({ attempt: a, completions }: { attempt: Attempt; completions: readonly Completion[] }) {
   const song = SONG_BY_ID.get(a.songId)
   const length = song?.seconds ?? a.reached
   const time = new Date(a.startedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
@@ -96,9 +102,6 @@ function AttemptRow({ attempt: a }: { attempt: Attempt }) {
           {kindLabel(a)}
           {a.pauses > 0 && ` · ${plural(a.pauses, 'break')}`}
         </p>
-        <div className="attempt-bar" aria-hidden="true">
-          <span className={done ? 'done' : ''} style={{ width: `${Math.min(1, a.reached / length) * 100}%` }} />
-        </div>
       </div>
       <div className="attempt-end">
         <p className={`attempt-outcome${done ? ' done' : ''}`}>{OUTCOME[a.outcome]}</p>
@@ -106,6 +109,7 @@ function AttemptRow({ attempt: a }: { attempt: Attempt }) {
           {formatDuration(a.reached)} / {formatDuration(length)}
         </p>
       </div>
+      <PlankTimeline seconds={length} reached={a.reached} breaks={attemptBreaks(a, completions)} breakCount={a.pauses} />
     </li>
   )
 }

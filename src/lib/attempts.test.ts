@@ -36,26 +36,67 @@ describe('attempt history', () => {
   it('records every attempt with how far it got and how it ended', async () => {
     const log = await visit()
     const first = log.beginAttempt({ songId: 'cancelled', kind: 'daily' })
-    log.endAttempt(first, 'gave-up', 83.4, 1)
+    log.endAttempt(first, 'gave-up', 83.4, [{ at: 40.2, ms: 5000 }])
     const second = log.beginAttempt({ songId: 'cancelled', kind: 'daily' })
-    log.endAttempt(second, 'finished', 212, 0)
+    log.endAttempt(second, 'finished', 212, [])
     expect(log.getAttempts()).toMatchObject([
       { id: first, outcome: 'gave-up', reached: 83.4, pauses: 1 },
-      { id: second, outcome: 'finished', reached: 212 },
+      { id: second, outcome: 'finished', reached: 212, pauses: 0 },
     ])
+  })
+
+  it('records where each break was and how long it lasted, and nothing for a plank without one', async () => {
+    const log = await visit()
+    const first = log.beginAttempt({ songId: 'cancelled', kind: 'daily' })
+    log.endAttempt(first, 'finished', 211, [
+      { at: 30.04, ms: 4000.4 },
+      { at: 95.46, ms: 12500 },
+    ])
+    const second = log.beginAttempt({ songId: 'cancelled', kind: 'daily' })
+    log.endAttempt(second, 'finished', 211, [])
+    const [withBreaks, without] = log.getAttempts()
+    expect(withBreaks).toMatchObject({
+      pauses: 2,
+      breaks: [
+        { at: 30, ms: 4000 },
+        { at: 95.5, ms: 12500 },
+      ],
+    })
+    expect(without.pauses).toBe(0)
+    expect(without).not.toHaveProperty('breaks')
   })
 
   it('records a plank the page never came back from as left, where it was last saved', async () => {
     let log = await visit()
     const id = log.beginAttempt({ songId: 'glitch', kind: 'ladder', level: 3 })
     vi.setSystemTime(new Date('2026-09-22T12:00:40Z'))
-    log.saveAttemptProgress(id, 40, 1)
+    log.saveAttemptProgress(id, 40, [{ at: 12.5, ms: 3000 }])
     // The tab dies (battery, crash, the phone closes it). The site is opened again later.
     vi.setSystemTime(new Date('2026-09-22T12:05:00Z'))
     log = await visit()
     expect(log.getAttempts()).toMatchObject([
-      { id, outcome: 'left', reached: 40, pauses: 1, level: 3, endedAt: '2026-09-22T12:00:40.000Z' },
+      {
+        id,
+        outcome: 'left',
+        reached: 40,
+        pauses: 1,
+        breaks: [{ at: 12.5, ms: 3000 }],
+        level: 3,
+        endedAt: '2026-09-22T12:00:40.000Z',
+      },
     ])
+  })
+
+  it('forgets a break that turned out too short to count', async () => {
+    const log = await visit()
+    const id = log.beginAttempt({ songId: 'glitch', kind: 'ladder', level: 3 })
+    // Saved mid-break, then the break ended too soon to be one.
+    log.saveAttemptProgress(id, 20, [{ at: 20, ms: 100 }])
+    log.saveAttemptProgress(id, 22, [])
+    vi.setSystemTime(new Date('2026-09-22T12:05:00Z'))
+    const [left] = (await visit()).getAttempts()
+    expect(left).toMatchObject({ outcome: 'left', reached: 22, pauses: 0 })
+    expect(left).not.toHaveProperty('breaks')
   })
 
   it("leaves an attempt that's still being saved alone: it may be going on in another tab", async () => {
@@ -68,13 +109,23 @@ describe('attempt history', () => {
   it('marks attempts the account has, and adds ones from other devices', async () => {
     const log = await visit()
     const id = log.beginAttempt({ songId: 'cancelled', kind: 'daily' })
-    log.endAttempt(id, 'offline', 95, 0)
+    log.endAttempt(id, 'offline', 95, [])
     const elsewhere = { ...log.getAttempts()[0], id: 'from-my-phone', startedAt: '2026-09-21T08:00:00.000Z' }
     log.mergeAttempts([elsewhere], [id])
     expect(log.getAttempts().map((a) => [a.id, a.synced])).toEqual([
       ['from-my-phone', true],
       [id, true],
     ])
+  })
+
+  it("keeps the breaks timed here when the account's copy has none", async () => {
+    const log = await visit()
+    const id = log.beginAttempt({ songId: 'cancelled', kind: 'daily' })
+    log.endAttempt(id, 'gave-up', 95, [{ at: 60, ms: 8000 }])
+    // The account kept only the count, as it does for an attempt with more breaks than it has room for.
+    const { breaks: _breaks, ...accountCopy } = log.getAttempts()[0]
+    log.mergeAttempts([accountCopy])
+    expect(log.getAttempts()).toMatchObject([{ id, pauses: 1, breaks: [{ at: 60, ms: 8000 }], synced: true }])
   })
 })
 

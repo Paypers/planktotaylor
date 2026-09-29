@@ -28,18 +28,39 @@ export interface Segment {
   ms: number
 }
 
+/** A stretch of a plank. `rest`: the part of the song it didn't reach. */
+export interface TimelinePart {
+  kind: 'hold' | 'pause' | 'rest'
+  /** Seconds into the song. A pause starts and ends at the same point. */
+  from: number
+  to: number
+  /** Song time for a hold or the rest, real time for a pause. */
+  ms: number
+}
+
+/**
+ * The plank in order up to where it got: stretches held and the breaks between them (a break doesn't
+ * use up song), then the rest of the song if it stopped short. A break past `reached` sits at it.
+ */
+export function timelineParts(pauses: readonly Pause[], songSeconds: number, reached = songSeconds): TimelinePart[] {
+  const end = Math.min(reached, songSeconds)
+  const breaks = [...pauses].sort((a, b) => a.at - b.at).map((p) => ({ at: Math.min(p.at, end), ms: p.ms }))
+  const held = (from: number, to: number): TimelinePart[] => (to > from ? [{ kind: 'hold', from, to, ms: (to - from) * 1000 }] : [])
+  const rest: TimelinePart[] = songSeconds > end ? [{ kind: 'rest', from: end, to: songSeconds, ms: (songSeconds - end) * 1000 }] : []
+  return [
+    ...breaks.flatMap((pause, i): TimelinePart[] => [
+      ...held(breaks[i - 1]?.at ?? 0, pause.at),
+      { kind: 'pause', from: pause.at, to: pause.at, ms: pause.ms },
+    ]),
+    ...held(breaks.at(-1)?.at ?? 0, end),
+    ...rest,
+  ]
+}
+
 /** The plank in order: stretches held, and the breaks between them (a break doesn't use up song). */
 export function plankSegments(pauses: readonly Pause[], songSeconds: number): Segment[] {
-  const segments: Segment[] = []
-  let cursor = 0
-  for (const pause of [...pauses].sort((a, b) => a.at - b.at)) {
-    const at = Math.min(pause.at, songSeconds)
-    if (at > cursor) segments.push({ kind: 'hold', ms: (at - cursor) * 1000 })
-    segments.push({ kind: 'pause', ms: pause.ms })
-    cursor = at
-  }
-  if (songSeconds > cursor) segments.push({ kind: 'hold', ms: (songSeconds - cursor) * 1000 })
-  return segments
+  // Held to the end of the song, so there's no rest.
+  return timelineParts(pauses, songSeconds).map(({ kind, ms }) => ({ kind: kind === 'pause' ? 'pause' : 'hold', ms }))
 }
 
 /** "9s", or "1:05" for a long one. */
