@@ -66,6 +66,9 @@ export function plankSegments(pauses: readonly Pause[], songSeconds: number): Se
 /** "9s", or "1:05" for a long one. */
 export const pauseLabel = (ms: number) => (ms < 59_500 ? `${Math.round(ms / 1000)}s` : formatDuration(ms / 1000))
 
+/** "1:12" of song between two points, rounded the way each point is shown, so the stretches add up to the song. */
+export const stretchLabel = (from: number, to: number) => formatDuration(Math.round(to) - Math.round(from))
+
 export function pausedSeconds(pauses: readonly Pause[]): number {
   return pauses.reduce((sum, p) => sum + p.ms, 0) / 1000
 }

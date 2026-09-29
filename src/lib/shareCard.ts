@@ -1,6 +1,6 @@
 import { ALBUMS, LADDER, formatDuration } from '../data/songs'
 import { formatShortDate } from './dates'
-import { pauseLabel, plankHeadline, plankSegments, plankSummary, type ShareInput } from './share'
+import { pauseLabel, plankHeadline, plankSummary, stretchLabel, timelineParts, type ShareInput } from './share'
 
 /** 4:5 portrait: fills a phone screen in chats and stories without being cropped. */
 export const CARD_WIDTH = 1080
@@ -16,6 +16,8 @@ export const COLOR = {
   rule: '#d8cfc1',
   signal: '#c23b22',
   held: '#3a8f5c',
+  // The held green, darker for text on the paper, as pausedInk is for the orange.
+  heldInk: '#2d7049',
   paused: '#e8862a',
   pausedInk: '#a3500d',
 }
@@ -99,7 +101,7 @@ export async function renderShareCard(share: ShareInput): Promise<Blob> {
   text(ctx, wrap(ctx, `${album.title} (${album.year})`, textWidth, 1)[0], textLeft, albumY, albumFont, COLOR.ink2)
   const rowBottom = Math.max(rowTop + sleeve, albumY + 12)
 
-  // The bar: green while held, orange where paused, to scale, each break labelled.
+  // The bar: green while held, orange where paused, to scale, each break and stretch held labelled.
   const barTop = rowBottom + 132
   bar(ctx, share, left, right, barTop)
   text(ctx, plankSummary(share.pauses, song.seconds), left, barTop + 32 + 58, `500 30px ${MONO}`, COLOR.ink2)
@@ -140,29 +142,72 @@ export function toPng(canvas: HTMLCanvasElement): Promise<Blob> {
 function bar(ctx: CanvasRenderingContext2D, share: ShareInput, left: number, right: number, top: number) {
   const height = 32
   const gap = 6
-  const segments = plankSegments(share.pauses, share.song.seconds)
-  const minWidth = (kind: 'hold' | 'pause') => (kind === 'pause' ? 18 : 6)
-  // Every segment gets its minimum, then the rest of the width is shared out by time.
-  const spare = right - left - gap * (segments.length - 1) - segments.reduce((sum, s) => sum + minWidth(s.kind), 0)
-  const totalMs = segments.reduce((sum, s) => sum + s.ms, 0)
-  let x = left
-  let labelEnd = -Infinity
-  ctx.font = `500 28px ${MONO}`
-  for (const segment of segments) {
-    const width = minWidth(segment.kind) + (spare * segment.ms) / totalMs
-    box(ctx, x, top, width, height, 6, segment.kind === 'hold' ? COLOR.held : COLOR.paused)
-    if (segment.kind === 'pause') {
-      // Centred over the break, kept on the card, and skipped if it would run into the last label.
-      const label = pauseLabel(segment.ms)
-      const labelWidth = ctx.measureText(label).width
-      const labelLeft = Math.min(Math.max(x + width / 2 - labelWidth / 2, left), right - labelWidth)
-      if (labelLeft > labelEnd + 12) {
-        text(ctx, label, labelLeft, top - 16, ctx.font, COLOR.pausedInk)
-        labelEnd = labelLeft + labelWidth
-      }
-    }
-    x += width + gap
+  const parts = timelineParts(share.pauses, share.song.seconds)
+  const minWidth = (kind: string) => (kind === 'pause' ? 18 : 6)
+  // Every part gets its minimum, then the rest of the width is shared out by time.
+  const spare = right - left - gap * (parts.length - 1) - parts.reduce((sum, p) => sum + minWidth(p.kind), 0)
+  const totalMs = parts.reduce((sum, p) => sum + p.ms, 0)
+  const widths = parts.map((p) => minWidth(p.kind) + (spare * p.ms) / totalMs)
+  const lefts = widths.map((_, i) => left + widths.slice(0, i).reduce((sum, w) => sum + w + gap, 0))
+  parts.forEach((p, i) => box(ctx, lefts[i], top, widths[i], height, 6, p.kind === 'pause' ? COLOR.paused : COLOR.held))
+
+  const font = `500 28px ${MONO}`
+  ctx.font = font
+  const spans = parts.map((p, i) => ({
+    kind: p.kind === 'pause' ? ('pause' as const) : ('hold' as const),
+    left: lefts[i],
+    right: lefts[i] + widths[i],
+    text: p.kind === 'pause' ? pauseLabel(p.ms) : Math.round(p.to) > Math.round(p.from) ? stretchLabel(p.from, p.to) : '',
+  }))
+  for (const label of barLabels(spans, (value) => ctx.measureText(value).width, left, right)) {
+    text(ctx, label.text, label.left, top - 16, font, label.kind === 'pause' ? COLOR.pausedInk : COLOR.heldInk)
   }
+}
+
+export interface BarLabel {
+  kind: 'hold' | 'pause'
+  text: string
+  left: number
+}
+
+/** Room kept between two labels over the bar. */
+const LABEL_SPACE = 12
+
+/**
+ * Where the labels over the card's bar go. Every break's length first: centred over it, kept on the
+ * card, and skipped if it would run into the one before. Then each stretch held, only where it fits
+ * over its own stretch, clear of those.
+ */
+export function barLabels(
+  spans: readonly { kind: 'hold' | 'pause'; left: number; right: number; text: string }[],
+  measure: (text: string) => number,
+  left: number,
+  right: number,
+): BarLabel[] {
+  const breaks = spans
+    .filter((s) => s.kind === 'pause')
+    .reduce<(BarLabel & { right: number })[]>((placed, s) => {
+      const width = measure(s.text)
+      const at = Math.min(Math.max((s.left + s.right) / 2 - width / 2, left), right - width)
+      const last = placed.at(-1)
+      return last && at <= last.right + LABEL_SPACE ? placed : [...placed, { kind: 'pause', text: s.text, left: at, right: at + width }]
+    }, [])
+  const held = spans.flatMap((s): BarLabel[] => {
+    if (s.kind !== 'hold' || !s.text) return []
+    const width = measure(s.text)
+    // The stretch, less any break label reaching over it from either side.
+    const room = breaks.reduce(
+      (free, b) => {
+        if (b.right + LABEL_SPACE <= free.left || b.left - LABEL_SPACE >= free.right) return free
+        return (b.left + b.right) / 2 < (free.left + free.right) / 2
+          ? { ...free, left: Math.max(free.left, b.right + LABEL_SPACE) }
+          : { ...free, right: Math.min(free.right, b.left - LABEL_SPACE) }
+      },
+      { left: s.left, right: s.right },
+    )
+    return room.right - room.left >= width ? [{ kind: 'hold', text: s.text, left: (room.left + room.right) / 2 - width / 2 }] : []
+  })
+  return [...breaks.map(({ right: _right, ...label }) => label), ...held]
 }
 
 export function text(

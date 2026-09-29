@@ -2,7 +2,7 @@ import { formatDuration } from '../data/songs'
 import type { Attempt } from './attempts'
 import { SAME_PLANK_MS } from './planks'
 import type { Completion, Pause } from './progress'
-import { pauseLabel, pausedSeconds, plankSummary, timelineParts, type TimelinePart } from './share'
+import { pauseLabel, pausedSeconds, plankSummary, stretchLabel, timelineParts, type TimelinePart } from './share'
 
 // A plank's bar in the history and the calendar: to scale, held and paused, with words for each part.
 
@@ -78,9 +78,6 @@ export function partAt(x: number, edges: readonly { left: number; right: number 
   return pool.reduce<number | null>((best, i) => (best === null || distance(i) < distance(best) ? i : best), null)
 }
 
-/** Minutes and seconds between two points in the song, rounded the way each point is shown. */
-const between = (from: number, to: number) => formatDuration(Math.round(to) - Math.round(from))
-
 function words(part: TimelinePart, only: boolean, untimed: string | null): Pick<TimelineEntry, 'title' | 'detail' | 'label'> {
   if (part.kind === 'pause') {
     const title = `Paused ${pauseLabel(part.ms)}`
@@ -88,11 +85,11 @@ function words(part: TimelinePart, only: boolean, untimed: string | null): Pick<
     return { title, detail, label: `${title}. ${detail}` }
   }
   if (part.kind === 'rest') {
-    const title = `${between(part.from, part.to)} to go`
+    const title = `${stretchLabel(part.from, part.to)} to go`
     const detail = `Ended at ${formatDuration(part.from)}`
     return { title, detail, label: `${title}. ${detail}` }
   }
-  const title = `Held ${between(part.from, part.to)}`
+  const title = `Held ${stretchLabel(part.from, part.to)}`
   const note = untimed ?? (only ? 'The whole song, no breaks' : null)
   if (note) return { title, detail: note, label: `${title}. ${note}` }
   const from = formatDuration(part.from)
