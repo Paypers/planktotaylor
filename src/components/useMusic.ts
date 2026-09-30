@@ -69,8 +69,8 @@ export function useMusic(song: Song, enabled: boolean, events: PlayerEvents = {}
     }
   }, [])
 
-  /** "Go": start the song from the top. The timer waits until it's actually playing. */
-  const start = useCallback(() => {
+  /** "Go": start the song from the top (planking together, from where the room is). The timer waits until it's actually playing. */
+  const start = useCallback((from = 0) => {
     const p = player.current
     started.current = true
     clearTimeout(hintTimer.current)
@@ -79,9 +79,12 @@ export function useMusic(song: Song, enabled: boolean, events: PlayerEvents = {}
       if (started.current && state.current !== PlayerState.PLAYING) setHint(TAP_HINT)
     }, 2000)
     if (!p) return
-    p.seekTo(0, true)
+    p.seekTo(from, true)
     p.playVideo()
   }, [])
+
+  /** Moves a song that's playing (or paused after playing) to `seconds` in. */
+  const seek = useCallback((seconds: number) => player.current?.seekTo(seconds, true), [])
 
   const pause = useCallback(() => player.current?.pauseVideo(), [])
 
@@ -105,5 +108,5 @@ export function useMusic(song: Song, enabled: boolean, events: PlayerEvents = {}
     }
   }, [])
 
-  return { mode, hint, failed, onReady, onStateChange, onError, cue, start, pause, resume, stop, position }
+  return { mode, hint, failed, onReady, onStateChange, onError, cue, start, seek, pause, resume, stop, position }
 }

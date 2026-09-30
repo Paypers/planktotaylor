@@ -12,12 +12,14 @@ interface Props {
   onStart: () => void
   onShare?: () => void
   onAgain?: () => void
+  /** Other ways to plank it, after the row's own buttons. */
+  moreActions?: ReactNode
   /** Extra lines under the album: progress, notes. */
   children?: ReactNode
 }
 
 /** One of today's planks, laid out like a tracklist row: sleeve, title, length, action. */
-export function SongRow({ eyebrow, song, done, startLabel, onStart, onShare, onAgain, children }: Props) {
+export function SongRow({ eyebrow, song, done, startLabel, onStart, onShare, onAgain, moreActions, children }: Props) {
   const album = ALBUMS[song.album]
   return (
     <article className="song-row">
@@ -61,6 +63,7 @@ export function SongRow({ eyebrow, song, done, startLabel, onStart, onShare, onA
             )}
           </>
         )}
+        {moreActions}
       </div>
     </article>
   )

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AccountDialog } from './components/AccountDialog'
 import { Avatar } from './components/Avatar'
 import { ConfirmDialog } from './components/ConfirmDialog'
@@ -11,6 +11,7 @@ import { BringPlanksNote, InstallNote } from './components/install/InstallNote'
 import { InstallPage } from './components/install/InstallPage'
 import { Flame, Icon, StarMark } from './components/Icon'
 import { LevelDialog } from './components/LevelDialog'
+import { StartTogether } from './components/live/StartTogether'
 import { MusicDialog } from './components/MusicDialog'
 import { PlankTimer, type FinishSummary, type PlankSession, type PlankShare } from './components/PlankTimer'
 import { RankBadge, RankLink } from './components/Rank'
@@ -41,6 +42,7 @@ import { dailyNumber } from './lib/daily'
 import { collectionOf, eraStamps, stampNews } from './lib/eras'
 import { forgetInvite, keptInvite } from './lib/groups'
 import { isStandalone } from './lib/install'
+import type { TogetherShare } from './lib/live/link'
 import { eraRoute, followLink, hashFor, HELP, HOME, INSTALL, navigate, useRoute, YEAR, type Route } from './lib/route'
 import { playerRank, rankName } from './lib/ranks'
 import { plankSummary, type ShareInput } from './lib/share'
@@ -51,6 +53,10 @@ import { REVIEW_NAME, reviewYear } from './lib/yearInReview'
 import { plankXp, totalXp } from './lib/xp'
 
 const SETTINGS: Route = { page: 'settings', section: null }
+
+// Planking together from a link: loaded when a room's link is opened, so the rest of the site stays light.
+const LivePage = lazy(() => import('./components/live/LivePage').then((m) => ({ default: m.LivePage })))
+const TogetherShareDialog = lazy(() => import('./components/live/TogetherShareDialog').then((m) => ({ default: m.TogetherShareDialog })))
 
 export function App() {
   const data = useAppData()
@@ -64,6 +70,7 @@ export function App() {
   // The setlist level whose details are open.
   const [levelInfo, setLevelInfo] = useState<number | null>(null)
   const [sharing, setSharing] = useState<ShareInput | null>(null)
+  const [sharingTogether, setSharingTogether] = useState<TogetherShare | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
   const route = useRoute()
   const inSettings = route.page === 'settings'
@@ -355,6 +362,7 @@ export function App() {
                 onStart={() => start({ song: daily.song, label: "Today's song", kind: 'daily' })}
                 onShare={dailyDone && (() => shareCompletion(dailyDone))}
                 onAgain={() => start({ song: daily.song, label: "Today's song · extra credit", kind: 'extra' })}
+                moreActions={<StartTogether today={today} />}
               >
                 {dailyDone && <p className="row-note">{plankSummary(dailyDone.pauses ?? [], dailyDone.seconds)}</p>}
                 {dailyStats && dailyStats.planks > 0 && dailyDone && <Together stats={dailyStats} song={daily.song} />}
@@ -445,6 +453,41 @@ export function App() {
             <JoinPage code={route.code} today={today} />
           </main>
         )}
+        {route.page === 'together' && (
+          <main>
+            <Suspense fallback={null}>
+              <LivePage
+                key={`${route.code}/${route.songId}`}
+                code={route.code}
+                songId={route.songId}
+                today={today}
+                defaultName={shownName}
+                renderPlank={(together, link, onClose) => (
+                  <PlankTimer
+                    session={together}
+                    live={link}
+                    prefs={data.prefs}
+                    earningXp={earningXp}
+                    onFinish={finish}
+                    onShare={(plank) => sharePlank(plank)}
+                    onClose={onClose}
+                    onSignIn={offerSignIn}
+                    // Going on to the next level leaves the room's plank screen for one of your own.
+                    onNext={(next) => {
+                      onClose()
+                      start(next)
+                    }}
+                    onOpenEra={(album) => {
+                      onClose()
+                      navigate(eraRoute(album))
+                    }}
+                  />
+                )}
+                onShareTogether={setSharingTogether}
+              />
+            </Suspense>
+          </main>
+        )}
         {route.page === 'eras' && (
           <main>
             <ErasPage album={route.album} completions={data.completions} today={today} onStart={start} />
@@ -532,6 +575,11 @@ export function App() {
         }}
       />
       <ShareDialog share={sharing} onClose={() => setSharing(null)} />
+      {sharingTogether && (
+        <Suspense fallback={null}>
+          <TogetherShareDialog share={sharingTogether} onClose={() => setSharingTogether(null)} />
+        </Suspense>
+      )}
       <HistoryDialog open={historyOpen} onClose={() => setHistoryOpen(false)} signedIn={earningXp} />
     </>
   )

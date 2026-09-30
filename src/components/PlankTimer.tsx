@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { ALBUMS, LADDER, formatDuration, type Album, type AlbumId, type Song } from '../data/songs'
 import { useWakeLock } from '../lib/hooks'
+import { roomMs } from '../lib/live/follow'
+import type { LiveLink } from '../lib/live/link'
 import type { Completion, Pause, PlankResult, Prefs } from '../lib/progress'
 import type { PlayerRank } from '../lib/ranks'
 import { pausedSeconds, plankHeadline } from '../lib/share'
@@ -15,6 +17,9 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { Confetti } from './Confetti'
 import { StampMark } from './EraBadge'
 import { Flame, Icon, LightMark, LightStar } from './Icon'
+import { LiveStrip } from './live/LiveStrip'
+import { PlankedTogether } from './live/PlankedTogether'
+import { useLivePlank } from './live/useLivePlank'
 import { RankBar, RankPlaque } from './Rank'
 import { RankEmblem } from './RankEmblem'
 import { PlankReceipt } from './Receipt'
@@ -91,6 +96,8 @@ interface Props {
   onNext: (session: PlankSession) => void
   /** Close the plank screen and open an album's page in Collect the eras. */
   onOpenEra: (album: AlbumId) => void
+  /** Planking together: the room's clock runs the timer, and Start, Pause and Continue are everyone's. */
+  live?: LiveLink
 }
 
 /**
@@ -140,7 +147,7 @@ function coachLine(elapsed: number, total: number): string {
   return 'Elbows under shoulders. Squeeze everything.'
 }
 
-export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClose, onSignIn, onNext, onOpenEra }: Props) {
+export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClose, onSignIn, onNext, onOpenEra, live }: Props) {
   const { song } = session
   const album = ALBUMS[song.album]
   const total = song.seconds * 1000
@@ -230,6 +237,7 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
   }, [])
 
   const readElapsed = useCallback((): number => {
+    if (live) return roomMs(live.position(), total)
     const now = performance.now()
     if (sourceRef.current === 'video') {
       const pos = musicRef.current.position()
@@ -239,7 +247,7 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
       return Math.min(total, anchor.current.pos * 1000 + drift)
     }
     return clock.current.banked + (phaseRef.current === 'running' ? now - clock.current.startedAt : 0)
-  }, [total])
+  }, [total, live])
 
   const beginPause = (atMs: number) => {
     pauseStart.current ??= { at: atMs / 1000, t: performance.now() }
@@ -271,11 +279,15 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
     attempt.current = null
   }
 
+  /** The plank begins (or carries on after a pause): from here it's on the record. */
+  const beginRecord = () => {
+    attempt.current ??= beginAttempt({ songId: song.id, kind: session.kind, level: session.level })
+  }
+
   const run = () => {
     endPause()
     progress.current = { ms: readElapsed(), at: performance.now() }
-    // The plank begins (or carries on after a pause): from here it's on the record.
-    attempt.current ??= beginAttempt({ songId: song.id, kind: session.kind, level: session.level })
+    beginRecord()
     setPhase('running')
   }
 
@@ -310,12 +322,13 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
     finished.current = true
     endPause()
     endRecord('finished', total)
+    live?.setStatus('done')
     setElapsed(total)
     setPhase('done')
     if (prefs.sounds) sounds.finish()
     navigator.vibrate?.([200, 100, 200])
     setSummary(onFinish(song, pausesRef.current, caughtRef.current))
-  }, [onFinish, prefs.sounds, song, total, setPhase])
+  }, [onFinish, prefs.sounds, song, total, setPhase, live])
 
   /**
    * Each frame of song: a light that's glowed long enough goes, and the next one comes when its time
@@ -353,8 +366,32 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
     if (phase !== 'running') showLight(null)
   }, [phase])
 
+  // Planking together, the room drives the timer. Finished or stepped out, the room carries on without you.
+  const together = useLivePlank(live, music, prefs.sounds, {
+    following: () => !finished.current && phaseRef.current !== 'quit',
+    planking: () => phaseRef.current === 'running',
+    step: (to, fresh) => {
+      if (fresh) {
+        // Someone started another round mid-plank: this one ends where it got to.
+        endRecord('stopped', elapsed)
+        reset()
+        // Planking from the 3-2-1, so someone stepping out during it doesn't end the round for everyone.
+        live?.setStatus('planking')
+      }
+      if (to === 'running') {
+        if (prefs.sounds && phaseRef.current === 'countdown') sounds.go()
+        return run()
+      }
+      setElapsed(readElapsed())
+      // Opened while everyone's paused: the plank has begun.
+      if (to === 'paused') beginRecord()
+      setPhase(to)
+    },
+    pause: () => pause(),
+  })
+
   // The song drives the timer: playing, pausing (even from the video itself) and ending all carry over.
-  events.current = {
+  events.current = together.videoEvents ?? {
     onPlaying: () => {
       playing.current = true
       if (sourceRef.current !== 'video') return
@@ -389,9 +426,9 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
     if (phaseRef.current === 'waiting') run()
   }, [music.mode])
 
-  // 3, 2, 1, go.
+  // 3, 2, 1, go. Planking together, the room counts.
   useEffect(() => {
-    if (phase !== 'countdown') return
+    if (phase !== 'countdown' || live) return
     const timers = [3, 2, 1].map((n, i) =>
       setTimeout(() => {
         setCount(n)
@@ -412,7 +449,7 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
       }, 3000),
     )
     return () => timers.forEach(clearTimeout)
-  }, [phase, prefs.sounds])
+  }, [phase, prefs.sounds, live])
 
   // Redraw every frame; the time itself always comes from the song or the timestamps.
   useEffect(() => {
@@ -468,6 +505,8 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
 
   const start = () => {
     unlockAudio()
+    // Everyone's 3-2-1: this screen follows the room into it.
+    if (live) return live.start()
     music.cue()
     reset()
     setCount(3)
@@ -477,6 +516,8 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
   const pause = () => {
     const ms = readElapsed()
     beginPause(ms)
+    // A break for you alone. Everyone stops, and this screen stops with the room.
+    if (live) return live.pause()
     if (sourceRef.current === 'manual') clock.current.banked = ms
     setElapsed(ms)
     setPhase('paused')
@@ -484,6 +525,8 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
   }
 
   const resume = () => {
+    // Everyone's 3-2-1, then the room carries on and your break (if it was yours) ends.
+    if (live) return live.resume()
     if (sourceRef.current === 'manual') clock.current.startedAt = performance.now()
     // With the song as the clock, the timer holds still until the music is really back.
     else music.resume()
@@ -506,6 +549,7 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
   const endEarly = (reason: 'gave-up' | 'offline' | 'left') => {
     const ms = readElapsed()
     endRecord(reason, ms)
+    live?.setStatus('out')
     pauseStart.current = null
     setElapsed(ms)
     setEndReason(reason)
@@ -517,6 +561,7 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
 
   const stop = () => {
     endRecord('stopped', readElapsed())
+    if (active) live?.setStatus('out')
     music.stop()
     onClose()
   }
@@ -536,7 +581,9 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
       window.removeEventListener('offline', lost)
       window.removeEventListener('pagehide', left)
       // The plank screen went away some other way mid-plank.
-      if (attempt.current) endAttempt(attempt.current, 'stopped', readElapsedRef.current() / 1000, breaksSoFar())
+      if (!attempt.current) return
+      endAttempt(attempt.current, 'stopped', readElapsedRef.current() / 1000, breaksSoFar())
+      live?.setStatus('out')
     }
   }, [])
 
@@ -570,7 +617,7 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
   closeRef.current = close
   const spaceRef = useRef<() => void>(() => {})
   spaceRef.current = () => {
-    if (phase === 'ready' || phase === 'quit') start()
+    if (phase === 'ready' || (phase === 'quit' && !live)) start()
     else if (phase === 'running') pause()
     else if (phase === 'paused') resume()
   }
@@ -593,6 +640,7 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
   }, [])
 
   const synced = source === 'video'
+  const shownCount = live ? together.count : count
   const secondsLeft = Math.ceil((total - elapsed) / 1000)
   const clockLabel = {
     ready: 'Plank length',
@@ -605,24 +653,30 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
   }[phase]
   const clockValue =
     phase === 'countdown'
-      ? String(count)
+      ? String(shownCount)
       : formatDuration(phase === 'ready' || phase === 'waiting' ? song.seconds : phase === 'quit' ? elapsed / 1000 : secondsLeft)
   const coach = {
-    ready: synced
-      ? 'Get into position, then press Start. The timer runs with the song: pause one and both stop.'
-      : "Get into position, then press Start. You'll get a 3-second countdown.",
+    ready: live
+      ? 'Get into position, then press Start. Everyone in the room gets a 3-second countdown.'
+      : synced
+        ? 'Get into position, then press Start. The timer runs with the song: pause one and both stop.'
+        : "Get into position, then press Start. You'll get a 3-second countdown.",
     countdown: 'Get into position.',
     waiting: music.hint ?? 'Starting the song…',
-    running: stalled
-      ? playing.current
-        ? 'Waiting for the song…'
-        : 'Tap ▶ on the video to carry on.'
-      : cheering
-        ? 'Past your best!'
-        : coachLine(elapsed, total),
-    paused: synced ? 'Paused. The song waits with you.' : 'Paused. Take a breath.',
+    running:
+      together.hint ??
+      (stalled
+        ? playing.current
+          ? 'Waiting for the song…'
+          : 'Tap ▶ on the video to carry on.'
+        : cheering
+          ? 'Past your best!'
+          : coachLine(elapsed, total)),
+    paused: live ? 'Paused. Anyone can carry on for everyone.' : synced ? 'Paused. The song waits with you.' : 'Paused. Take a breath.',
     quit: {
-      'gave-up': `of ${formatDuration(song.seconds)}. Every second counts. It's in your plank history. Go again when you're ready.`,
+      'gave-up': live
+        ? `of ${formatDuration(song.seconds)}. Every second counts. It's in your plank history, and the room carries on.`
+        : `of ${formatDuration(song.seconds)}. Every second counts. It's in your plank history. Go again when you're ready.`,
       offline: `of ${formatDuration(song.seconds)}. Losing the connection ends the attempt. It's in your plank history. Go again when you're back online.`,
       left: `of ${formatDuration(song.seconds)}. Leaving the page ends the attempt. It's in your plank history.`,
     }[endReason],
@@ -639,6 +693,7 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
             <Icon name="x" />
           </button>
         </div>
+        {live && phase !== 'done' && <LiveStrip members={together.members} me={live.me} reconnecting={together.reconnecting} />}
 
         {phase === 'done' && summary ? (
           <DoneView
@@ -650,6 +705,7 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
             onSignIn={onSignIn}
             onNext={onNext}
             onOpenEra={onOpenEra}
+            plankedTogether={live && <PlankedTogether members={together.members} me={live.me} />}
           />
         ) : (
           <div className="plank-body">
@@ -666,7 +722,7 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
             <div className="plank-clock" role="timer" aria-label={`${clockLabel} ${clockValue}`}>
               <p className="plank-clock-label">{clockLabel}</p>
               <p
-                key={phase === 'countdown' ? count : 'time'}
+                key={phase === 'countdown' ? shownCount : 'time'}
                 className={`plank-time${clockValue.length > 4 ? ' long' : ''}${phase === 'countdown' ? ' counting' : ''}`}
               >
                 {clockValue}
@@ -718,7 +774,7 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
               Start
             </button>
           )}
-          {phase === 'countdown' && (
+          {phase === 'countdown' && !live && (
             <button type="button" className="btn btn-secondary btn-lg" onClick={cancel}>
               Cancel
             </button>
@@ -744,21 +800,27 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
                 </button>
               ) : (
                 <button type="button" className="btn btn-primary btn-lg" onClick={resume} autoFocus>
-                  Resume
+                  {live ? 'Continue' : 'Resume'}
                 </button>
               )}
             </>
           )}
-          {phase === 'quit' && (
-            <>
-              <button type="button" className="btn btn-secondary btn-lg" onClick={close}>
+          {phase === 'quit' &&
+            (live ? (
+              // The room carries on: back to it, and the next round.
+              <button type="button" className="btn btn-primary btn-lg" onClick={close} autoFocus>
                 Close
               </button>
-              <button type="button" className="btn btn-primary btn-lg" onClick={start} autoFocus>
-                Try again
-              </button>
-            </>
-          )}
+            ) : (
+              <>
+                <button type="button" className="btn btn-secondary btn-lg" onClick={close}>
+                  Close
+                </button>
+                <button type="button" className="btn btn-primary btn-lg" onClick={start} autoFocus>
+                  Try again
+                </button>
+              </>
+            ))}
           {phase === 'done' && summary && (
             <>
               <button type="button" className="btn btn-secondary btn-lg" onClick={() => onShare({ song, pauses, counted: summary.counted, lights: caught })}>
@@ -784,7 +846,7 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
         <p>
           {phase === 'running' || phase === 'paused' ? `You've held ${formatDuration(elapsed / 1000)} so far. ` : ''}
           It only counts if you hold it to the end of the song. Stopping ends this attempt, and it's saved in your
-          plank history.
+          plank history.{live && ' The others carry on.'}
         </p>
       </ConfirmDialog>
 
@@ -827,6 +889,7 @@ function DoneView({
   onSignIn,
   onNext,
   onOpenEra,
+  plankedTogether,
 }: {
   song: Song
   /** What the plank was started for. */
@@ -838,6 +901,8 @@ function DoneView({
   onSignIn?: () => void
   onNext: (session: PlankSession) => void
   onOpenEra: (album: AlbumId) => void
+  /** Planking together: who else has held to the end. */
+  plankedTogether?: ReactNode
 }) {
   const ladder = summary.counted.find((c) => c.mode === 'ladder')
   const daily = summary.counted.some((c) => c.mode === 'daily')
@@ -933,6 +998,7 @@ function DoneView({
       ) : (
         onSignIn && <SaveNote onSignIn={onSignIn} className="done-save" />
       )}
+      {plankedTogether}
 
       {next && (
         <section className="done-next" aria-labelledby="done-next-heading">
@@ -1028,16 +1094,16 @@ interface ShownLight {
 }
 
 /**
- * Somewhere for a light on screen: within the plank's column, clear of the top bar, the timer, the
- * coaching line, the count of lights, the video and the buttons. The light is see-through, so it never
- * sits on words.
+ * Somewhere for a light on screen: within the plank's column, clear of the top bar, who's planking together,
+ * the timer, the coaching line, the count of lights, the video and the buttons. The light is see-through, so
+ * it never sits on words.
  */
 function findLightSpot(plank: HTMLElement | null): { x: number; y: number } | null {
   const column = plank?.querySelector('.plank-inner')?.getBoundingClientRect()
   if (!plank || !column) return null
   const margin = 12
   const area: Box = { left: column.left + margin, top: margin, right: column.right - margin, bottom: window.innerHeight - margin }
-  const avoid: Box[] = [...plank.querySelectorAll('.plank-top, .plank-clock, .plank-coach, .plank-lights-caught, .plank-music, .plank-actions')]
+  const avoid: Box[] = [...plank.querySelectorAll('.plank-top, .live-strip, .plank-clock, .plank-coach, .plank-lights-caught, .plank-music, .plank-actions')]
     .map((el) => el.getBoundingClientRect())
     .filter((r) => r.width > 0 && r.height > 0)
   return placeLight(area, avoid, LIGHT_SIZE)

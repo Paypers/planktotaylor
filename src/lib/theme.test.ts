@@ -255,6 +255,22 @@ describe('routes', () => {
     expect(parseRoute('#group')).toEqual({ page: 'groups' })
   })
 
+  it('reads a room for planking together from the address', () => {
+    expect(parseRoute('#together/ab12cd34ef/cruel-summer')).toEqual({ page: 'together', code: 'ab12cd34ef', songId: 'cruel-summer' })
+    expect(parseRoute('#Together/AB12CD34EF/Cruel-Summer/')).toEqual({ page: 'together', code: 'ab12cd34ef', songId: 'cruel-summer' })
+    expect(hashFor({ page: 'together', code: 'ab12cd34ef', songId: 'cruel-summer' })).toBe('#together/ab12cd34ef/cruel-summer')
+    // No song, or one that isn't out: today's song.
+    expect(parseRoute('#together/ab12cd34ef')).toEqual({ page: 'together', code: 'ab12cd34ef', songId: null })
+    expect(parseRoute('#together/ab12cd34ef/not-a-song')).toEqual({ page: 'together', code: 'ab12cd34ef', songId: null })
+    expect(hashFor({ page: 'together', code: 'ab12cd34ef', songId: null })).toBe('#together/ab12cd34ef')
+    // Anything that can't be a room's code isn't a room.
+    expect(parseRoute('#together/short')).toEqual({ page: 'home' })
+    expect(parseRoute('#together/ab12cd34ef0')).toEqual({ page: 'home' })
+    expect(parseRoute('#together/ab12-d34ef')).toEqual({ page: 'home' })
+    expect(parseRoute('#together/ab12cd34ef/cruel summer')).toEqual({ page: 'home' })
+    expect(parseRoute('#together')).toEqual({ page: 'home' })
+  })
+
   it('takes #discord to Settings → Discord', () => {
     expect(parseRoute('#discord')).toEqual({ page: 'settings', section: 'discord' })
     expect(parseRoute('#Discord/')).toEqual({ page: 'settings', section: 'discord' })

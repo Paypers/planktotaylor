@@ -1,5 +1,6 @@
-import { ALBUMS, LADDER, formatDuration } from '../data/songs'
+import { ALBUMS, LADDER, formatDuration, type Song } from '../data/songs'
 import { formatShortDate } from './dates'
+import type { Pause } from './progress'
 import { pauseLabel, plankHeadline, plankSummary, stretchLabel, timelineParts, type ShareInput } from './share'
 
 /** 4:5 portrait: fills a phone screen in chats and stories without being cropped. */
@@ -79,31 +80,11 @@ export async function renderShareCard(share: ShareInput): Promise<Blob> {
     icon(ctx, STAR, right - countWidth - 50, 590, 36, lightColor(album.color))
   }
 
-  // The song, as a tracklist row: sleeve, title over album, length on the right.
-  const rowTop = 690
-  const sleeve = 132
-  box(ctx, left, rowTop, sleeve, sleeve, 4, album.color)
-  text(ctx, album.short, left + 14, rowTop + sleeve - 16, `600 22px ${SANS}`, album.ink)
-
-  const lengthFont = `500 36px ${MONO}`
-  ctx.font = lengthFont
-  const length = formatDuration(song.seconds)
-  const textLeft = left + sleeve + 32
-  const textWidth = right - ctx.measureText(length).width - 32 - textLeft
-  const titleFont = `600 54px ${DISPLAY}`
-  ctx.font = titleFont
-  const titleLines = wrap(ctx, song.title, textWidth, 3)
-  titleLines.forEach((line, i) => text(ctx, line, textLeft, rowTop + 46 + i * 60, titleFont, COLOR.ink))
-  text(ctx, length, right, rowTop + 46, lengthFont, COLOR.ink, 'right')
-  const albumFont = `400 32px ${SANS}`
-  ctx.font = albumFont
-  const albumY = rowTop + 46 + (titleLines.length - 1) * 60 + 52
-  text(ctx, wrap(ctx, `${album.title} (${album.year})`, textWidth, 1)[0], textLeft, albumY, albumFont, COLOR.ink2)
-  const rowBottom = Math.max(rowTop + sleeve, albumY + 12)
+  const rowBottom = songRow(ctx, song, left, right, 690)
 
   // The bar: green while held, orange where paused, to scale, each break and stretch held labelled.
   const barTop = rowBottom + 132
-  bar(ctx, share, left, right, barTop)
+  bar(ctx, share.pauses, song.seconds, left, right, barTop)
   text(ctx, plankSummary(share.pauses, song.seconds), left, barTop + 32 + 58, `500 30px ${MONO}`, COLOR.ink2)
   if (share.xp) text(ctx, `+${share.xp.toLocaleString()} XP`, right, barTop + 32 + 58, `600 30px ${MONO}`, COLOR.ink, 'right')
 
@@ -139,10 +120,45 @@ export function toPng(canvas: HTMLCanvasElement): Promise<Blob> {
   )
 }
 
-function bar(ctx: CanvasRenderingContext2D, share: ShareInput, left: number, right: number, top: number) {
+const SLEEVE = 132
+const LENGTH_FONT = `500 36px ${MONO}`
+const TITLE_FONT = `600 54px ${DISPLAY}`
+const ALBUM_FONT = `400 32px ${SANS}`
+
+// Where a song row's words go: the title wraps beside the sleeve, clear of the length, and the album sits under it.
+function songRowLayout(ctx: CanvasRenderingContext2D, song: Song, left: number, right: number) {
+  ctx.font = LENGTH_FONT
+  const length = formatDuration(song.seconds)
+  const textLeft = left + SLEEVE + 32
+  const textWidth = right - ctx.measureText(length).width - 32 - textLeft
+  ctx.font = TITLE_FONT
+  const titleLines = wrap(ctx, song.title, textWidth, 3)
+  const albumY = 46 + (titleLines.length - 1) * 60 + 52
+  return { length, textLeft, textWidth, titleLines, albumY, height: Math.max(SLEEVE, albumY + 12) }
+}
+
+/** How tall `songRow` will draw the song, for laying a card out before drawing it. */
+export const songRowHeight = (ctx: CanvasRenderingContext2D, song: Song, left: number, right: number) =>
+  songRowLayout(ctx, song, left, right).height
+
+/** The song as a tracklist row from `top`: sleeve in the album's colour, title over album, length on the right. Returns its bottom. */
+export function songRow(ctx: CanvasRenderingContext2D, song: Song, left: number, right: number, top: number): number {
+  const album = ALBUMS[song.album]
+  const { length, textLeft, textWidth, titleLines, albumY, height } = songRowLayout(ctx, song, left, right)
+  box(ctx, left, top, SLEEVE, SLEEVE, 4, album.color)
+  text(ctx, album.short, left + 14, top + SLEEVE - 16, `600 22px ${SANS}`, album.ink)
+  titleLines.forEach((line, i) => text(ctx, line, textLeft, top + 46 + i * 60, TITLE_FONT, COLOR.ink))
+  text(ctx, length, right, top + 46, LENGTH_FONT, COLOR.ink, 'right')
+  ctx.font = ALBUM_FONT
+  text(ctx, wrap(ctx, `${album.title} (${album.year})`, textWidth, 1)[0], textLeft, top + albumY, ALBUM_FONT, COLOR.ink2)
+  return top + height
+}
+
+/** A plank's bar, 32 high from `top`: green while held, orange where paused, to scale, with each break and stretch held labelled over it. */
+export function bar(ctx: CanvasRenderingContext2D, pauses: readonly Pause[], songSeconds: number, left: number, right: number, top: number) {
   const height = 32
   const gap = 6
-  const parts = timelineParts(share.pauses, share.song.seconds)
+  const parts = timelineParts(pauses, songSeconds)
   const minWidth = (kind: string) => (kind === 'pause' ? 18 : 6)
   // Every part gets its minimum, then the rest of the width is shared out by time.
   const spare = right - left - gap * (parts.length - 1) - parts.reduce((sum, p) => sum + minWidth(p.kind), 0)

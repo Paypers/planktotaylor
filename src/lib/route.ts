@@ -1,5 +1,5 @@
 import { useSyncExternalStore, type MouseEvent } from 'react'
-import { ALBUMS, type AlbumId } from '../data/songs'
+import { ALBUMS, SONG_BY_ID, type AlbumId } from '../data/songs'
 
 // Pages live in the address's #hash, so any static host serves them and Back works.
 // Sign-in links use the hash too (#access_token=…): anything that isn't a page here is left alone.
@@ -15,6 +15,7 @@ export type Route =
   | { page: 'groups' }
   | { page: 'group'; id: string }
   | { page: 'join'; code: string }
+  | { page: 'together'; code: string; songId: string | null }
 
 export const HOME: Route = { page: 'home' }
 export const RANKS: Route = { page: 'ranks' }
@@ -35,6 +36,9 @@ export const groupRoute = (id: string): Route => ({ page: 'group', id })
 
 /** A group's id, as the database makes them. */
 const GROUP_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+/** Planking together: a room's lobby. No song means today's. */
+export const togetherRoute = (code: string, songId: string | null): Route => ({ page: 'together', code, songId })
 
 /** An album's page in Collect the eras. A release that joined an album is on that album's page. */
 export const eraRoute = (album: AlbumId): Route => ({ page: 'eras', album: ALBUMS[album].partOf ?? album })
@@ -61,6 +65,12 @@ export function parseRoute(hash: string): Route {
   // An invite link: #join/<code>. Anything that can't be a code still opens the page, which says so.
   const join = /^#join\/([A-Za-z0-9]{1,64})\/?$/.exec(hash)
   if (join) return { page: 'join', code: join[1].toLowerCase() }
+  // A room: #together/<code>/<song id>, with a code as makeRoomCode makes them. A song that isn't out means today's.
+  const together = /^#together\/([a-z0-9]{10})(?:\/([a-z0-9-]{0,80}))?\/?$/i.exec(hash)
+  if (together) {
+    const songId = together[2]?.toLowerCase() ?? ''
+    return togetherRoute(together[1].toLowerCase(), SONG_BY_ID.has(songId) ? songId : null)
+  }
   const match = /^#settings(?:\/([a-z0-9-]+))?\/?$/i.exec(hash)
   return match ? { page: 'settings', section: match[1]?.toLowerCase() ?? null } : HOME
 }
@@ -72,6 +82,7 @@ export function hashFor(route: Route): string {
   if (route.page === 'groups') return '#groups'
   if (route.page === 'group') return `#group/${route.id}`
   if (route.page === 'join') return `#join/${route.code}`
+  if (route.page === 'together') return `#together/${route.code}${route.songId ? `/${route.songId}` : ''}`
   return route.page === 'settings' ? `#settings${route.section ? `/${route.section}` : ''}` : ''
 }
 

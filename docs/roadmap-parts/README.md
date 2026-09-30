@@ -19,6 +19,7 @@ To build one, hand Claude the file: *"Build docs/roadmap-parts/part-01-quick-win
 | [9](part-09-groups-page.md) | Groups: the group page | Large, second half | 8 | No | | ✓ |
 | [10](part-10-native-app.md) | Native app | Large | 1, 5 | Yes (small, iOS push) | Not doing: the site on the home screen is the app | – |
 | [11](part-11-discord-activity.md) | Discord Activity | Large | 8, 9 | No | Planned: about 80% planking together, 30% with the music inside Discord; test first | |
+| [12](part-12-plank-together.md) | Plank together, from a link | Large | 8, 9 | No | Supabase Realtime; public channels on | ✓ |
 
 **Why it's cut this way**
 

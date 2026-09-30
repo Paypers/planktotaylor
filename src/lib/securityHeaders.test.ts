@@ -17,4 +17,10 @@ describe('security headers', () => {
     expect(scripts.length).toBeGreaterThan(0)
     for (const script of scripts) expect(policy).toContain(`'sha256-${await sha256(script)}'`)
   })
+
+  it("lets requests go to Supabase, its WebSocket included (planking together's rooms), and nowhere else", () => {
+    const policy = /Content-Security-Policy: (.+)/.exec(headers)?.[1] ?? ''
+    const connect = /(?:^|;)\s*connect-src ([^;]+)/.exec(policy)?.[1].trim().split(/\s+/)
+    expect(connect).toEqual(["'self'", 'https://*.supabase.co', 'wss://*.supabase.co'])
+  })
 })

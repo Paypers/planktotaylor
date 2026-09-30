@@ -18,6 +18,7 @@ import { Avatar } from './Avatar'
 import { ConfirmDialog } from './ConfirmDialog'
 import { InviteLink, problemOf } from './Groups'
 import { Flame, HeldMark, Icon } from './Icon'
+import { StartTogether } from './live/StartTogether'
 import { PageTop } from './PageTop'
 
 type Order = 'joined' | 'name'
@@ -230,6 +231,9 @@ function GroupStreak({ group, board, today }: { group: Group; board: BoardMember
             {saved}
           </p>
         )}
+        <div className="button-row together-start">
+          <StartTogether today={today} />
+        </div>
         <p className="fine group-rule">
           {group.kind === 'public'
             ? `The group's day counts when anyone in it planks today's song. A day nobody does ${RULE_TAIL}`

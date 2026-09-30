@@ -3742,6 +3742,24 @@ a {
   padding-top: 24px;
 }
 
+/* Wide screens: the whole plank fits a laptop's screen. The video gives up height first, down to the
+   least YouTube allows. Phones keep it full size and scroll. */
+@media (min-width: 600px) {
+  .plank-inner:has(.video-frame) {
+    height: 100dvh;
+  }
+
+  .plank-inner:has(.video-frame) .plank-music {
+    display: flex;
+    flex-direction: column;
+    min-height: 200px;
+  }
+
+  .plank-inner:has(.video-frame) .video-frame {
+    flex: 1 1 auto;
+  }
+}
+
 /* Aurora lights: soft light in the album's colour drifting behind the plank while the song plays, and
    now and then a light to catch. Faint enough that the timer always reads first. */
 
@@ -4356,6 +4374,129 @@ a {
   }
   .confetti {
     display: none;
+  }
+}
+
+/* Planking together: the plank screen */
+
+/* Everyone in the room, in one row. A full room scrolls sideways inside the row, never the page. */
+.live-strip {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0 0 4px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  list-style: none;
+}
+
+/* Positioned, so the status read out after a name stays inside the row's scrolling instead of widening the screen. */
+.live-chip {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  max-width: 160px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 14px;
+  box-shadow: inset 0 0 0 1px var(--rule);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.live-chip bdi,
+.done-together-names bdi {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Stepped out: still in the room, just quieter. */
+.live-chip.is-out {
+  opacity: 0.5;
+}
+
+/* Planking: a slow glow, like breathing. */
+.live-dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--signal);
+  animation: live-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes live-breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* The connection dropped and is being made again. Quiet: the plank carries on either way. */
+.live-reconnecting {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: 28px;
+  font-size: 14px;
+  font-style: italic;
+  line-height: 20px;
+  color: var(--ink-2);
+}
+
+/* Wide screens: the strip sits in the top bar, between the label and the close button, so it takes no
+   height from the timer or the video. 76px: the column's edge, the close button and a gap. */
+@media (min-width: 600px) {
+  .live-strip {
+    position: absolute;
+    top: env(safe-area-inset-top);
+    right: 76px;
+    align-items: center;
+    max-width: calc(100% - 260px);
+    height: 56px;
+    padding: 0;
+  }
+}
+
+/* On the finished screen: everyone who's held to the end so far. */
+.done-together {
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid var(--rule);
+}
+
+.done-together h3 {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.done-together-names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.done-together-names li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 22px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot {
+    animation: none;
   }
 }
 
@@ -5110,4 +5251,160 @@ a {
 
 .rank-table tr.is-here td {
   background: var(--well);
+}
+
+/* Planking together: the lobby */
+
+.live-lede {
+  margin: 16px 0 0;
+}
+
+.live-lobby,
+.live-results {
+  display: grid;
+  gap: 16px;
+  max-width: 560px;
+}
+
+.live-lobby .fine,
+.live-results .fine {
+  margin-top: 0;
+}
+
+.live-note {
+  font-size: 16px;
+  line-height: 24px;
+}
+
+/* The connection dropped: a line above the room, which carries on underneath. */
+.live-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-2);
+}
+
+.live-retry {
+  margin-top: 12px;
+}
+
+.live-copied {
+  align-self: center;
+  margin-top: 0;
+}
+
+.live-headline {
+  font-family: var(--display);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 34px;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+/* Everyone who held to the end: names only, never who stopped. */
+.live-names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.live-names li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+  overflow-wrap: anywhere;
+}
+
+.live-names svg {
+  color: var(--held);
+}
+
+/* Plank together: under a group's streak, and the box that makes a room. */
+.together-start {
+  margin-top: 16px;
+}
+
+.make-room {
+  display: grid;
+  gap: 12px;
+}
+
+.make-room > p {
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--ink-2);
+}
+
+.make-room > .make-room-which {
+  margin-top: 0;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.make-room-other {
+  justify-self: start;
+}
+
+.song-pick {
+  display: grid;
+  gap: 8px;
+}
+
+.song-pick .search {
+  max-width: none;
+}
+
+.song-pick-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--rule);
+}
+
+.song-pick-list li {
+  border-bottom: 1px solid var(--rule);
+}
+
+.song-pick-item {
+  display: block;
+  width: 100%;
+  padding: 8px 4px;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+
+.song-pick-item:hover {
+  background: var(--well);
+}
+
+.song-pick-item .song-line-title {
+  font-size: 17px;
+  line-height: 22px;
+}
+
+/* Where the room is, for someone watching the round. */
+.live-clock {
+  display: grid;
+  gap: 8px;
+}
+
+.live-clock-text {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  line-height: 20px;
 }

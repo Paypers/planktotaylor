@@ -48,6 +48,9 @@ function client(): Promise<SupabaseClient> {
   return clientPromise
 }
 
+/** The same client, for planking together: its rooms are Realtime channels. */
+export const realtimeClient = (): Promise<SupabaseClient> => client()
+
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error'
 
 /** What a player chose to show: a name and a photo. Both optional. */

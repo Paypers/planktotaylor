@@ -182,7 +182,7 @@ export function HelpPage() {
 
       {accountsEnabled && (
         <Topic id="groups" title="Groups">
-          <dt>Plank together</dt>
+          <dt>Make a group</dt>
           <dd>
             Signed in, make a group in{' '}
             <a href={hashFor(GROUPS)} onClick={(e) => followLink(e, GROUPS)}>
@@ -221,6 +221,39 @@ export function HelpPage() {
           <dd>
             Leave any time, and join again from the link. If whoever made the group leaves, the member who joined first
             looks after it. The last one out takes the group with them.
+          </dd>
+        </Topic>
+      )}
+
+      {accountsEnabled && (
+        <Topic id="together" title="Planking together">
+          <dt>Send a link</dt>
+          <dd>
+            Press Plank together on the home page or a group's page, pick the song (today's song unless you choose
+            another), and send the link. Anyone with it can join, signed in or not. Signed out, you type a name.
+          </dd>
+          <dt>All at once</dt>
+          <dd>
+            Anyone in the room can press Start together: everyone gets the same 3-2-1, and the song starts for everyone at
+            once. If anyone pauses, everyone pauses. It just says Paused, never who. Anyone can carry on, with a 3-2-1 for
+            everyone first.
+          </dd>
+          <dt>Your breaks are your own</dt>
+          <dd>Only the pauses you press count as your breaks. When someone else pauses, you keep your no-break bonus.</dd>
+          <dt>What it counts for</dt>
+          <dd>
+            The same as planking the song alone: today's song keeps your streak, your ladder level climbs, and XP is paid
+            as usual.
+          </dd>
+          <dt>What the room sees</dt>
+          <dd>
+            Your name, and whether you're planking or done. Never your breaks. If you stop early, the rest carry on without
+            you.
+          </dd>
+          <dt>Sharing it</dt>
+          <dd>
+            After the song, share it as one card or text for the whole room: the song, how many of you held to the end and
+            your names, with the room's green and orange bar.
           </dd>
         </Topic>
       )}
