@@ -218,8 +218,8 @@ function GroupStreak({ group, board, today }: { group: Group; board: BoardMember
           {streak.current > 0 && (
             <span className="streak-freezes" title="Group streak freezes left this month">
               <Icon name="snowflake" size={18} />
-              {streak.freezesLeft} left
-              <span className="sr-only"> {streak.freezesLeft === 1 ? 'freeze' : 'freezes'} this month</span>
+              {streak.freezesLeft}
+              <span className="sr-only"> {streak.freezesLeft === 1 ? 'freeze' : 'freezes'}</span> left this month
             </span>
           )}
         </div>

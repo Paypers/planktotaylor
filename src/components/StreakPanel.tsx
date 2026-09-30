@@ -63,8 +63,8 @@ export function StreakPanel({ completions, days, streak, today, onSignIn, rank, 
           {streak.current > 0 && (
             <span className="streak-freezes" title="Streak freezes left this month">
               <Icon name="snowflake" size={18} />
-              {streak.freezesLeft} left
-              <span className="sr-only"> {streak.freezesLeft === 1 ? 'freeze' : 'freezes'} this month</span>
+              {streak.freezesLeft}
+              <span className="sr-only"> {streak.freezesLeft === 1 ? 'freeze' : 'freezes'}</span> left this month
             </span>
           )}
         </div>
