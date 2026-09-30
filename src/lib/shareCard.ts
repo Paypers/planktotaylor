@@ -1,7 +1,7 @@
 import { ALBUMS, LADDER, formatDuration, type Song } from '../data/songs'
 import { formatShortDate } from './dates'
 import type { Pause } from './progress'
-import { pauseLabel, plankHeadline, plankSummary, stretchLabel, timelineParts, type ShareInput } from './share'
+import { pauseLabel, plankHeadline, plankSummary, stretchLabel, timelineParts, togetherLine, type ShareInput } from './share'
 
 /** 4:5 portrait: fills a phone screen in chats and stories without being cropped. */
 export const CARD_WIDTH = 1080
@@ -51,6 +51,8 @@ export async function renderShareCard(share: ShareInput): Promise<Blob> {
   text(ctx, 'Plank to Taylor', left + 62, 127, `600 40px ${SANS}`, COLOR.ink)
   text(ctx, `No. ${share.dailyNumber} · ${formatShortDate(share.day)}`, right, 126, `500 30px ${MONO}`, COLOR.ink2, 'right')
   rule(ctx, left, right, 168, 3, COLOR.ink)
+  // Planked with others: said under the date, where the big number never reaches.
+  if (share.together) text(ctx, togetherLine(share.together), right, 222, `500 30px ${SANS}`, COLOR.ink2, 'right')
 
   // Big, as on the finished screen: the streak with its flame, or for a ladder level with no
   // streak going yet, how far up the ladder you are.

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties, type Reac
 import { ALBUMS, LADDER, formatDuration, type Album, type AlbumId, type Song } from '../data/songs'
 import { useWakeLock } from '../lib/hooks'
 import { roomMs } from '../lib/live/follow'
-import type { LiveLink } from '../lib/live/link'
+import type { LiveLink, LiveMember } from '../lib/live/link'
 import type { Completion, Pause, PlankResult, Prefs } from '../lib/progress'
 import type { PlayerRank } from '../lib/ranks'
 import { pausedSeconds, plankHeadline } from '../lib/share'
@@ -80,6 +80,8 @@ export interface PlankShare {
   counted: Completion[]
   /** Aurora lights caught. */
   lights: number
+  /** Planked together: how many were in the round, you included. */
+  together?: number
 }
 
 interface Props {
@@ -146,6 +148,9 @@ function coachLine(elapsed: number, total: number): string {
   if (elapsed >= total / 4) return 'Hips level. Keep breathing.'
   return 'Elbows under shoulders. Squeeze everything.'
 }
+
+/** Everyone who planked the round: planking, done or stepped out. Not those still in the lobby. */
+const inRound = (members: readonly LiveMember[]) => members.filter((m) => m.status !== 'lobby').length
 
 export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClose, onSignIn, onNext, onOpenEra, live }: Props) {
   const { song } = session
@@ -823,7 +828,7 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
             ))}
           {phase === 'done' && summary && (
             <>
-              <button type="button" className="btn btn-secondary btn-lg" onClick={() => onShare({ song, pauses, counted: summary.counted, lights: caught })}>
+              <button type="button" className="btn btn-secondary btn-lg" onClick={() => onShare({ song, pauses, counted: summary.counted, lights: caught, together: live && inRound(together.members) })}>
                 Share
               </button>
               <button type="button" className="btn btn-primary btn-lg" onClick={onClose} autoFocus>

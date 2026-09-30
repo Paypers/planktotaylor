@@ -253,7 +253,8 @@ export function HelpPage() {
           <dt>Sharing it</dt>
           <dd>
             After the song, share it as one card or text for the whole room: the song, how many of you held to the end and
-            your names, with the room's green and orange bar.
+            your names, with the room's green and orange bar. Your own share says it was planked together, and how many
+            of you.
           </dd>
         </Topic>
       )}

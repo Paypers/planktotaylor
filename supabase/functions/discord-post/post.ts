@@ -1,5 +1,5 @@
 // The Discord daily post, sent by index.ts every 15 minutes (the schedule is in supabase/schema.sql). Each
-// channel whose time has come gets today's song at 8:00, or at 21:00 how everyone did (or, for a channel
+// channel whose time has come gets today's song at 8:00, or at 23:59 how everyone did (or, for a channel
 // that posts a group, how the group did), in its time zone, each with a card drawn under it. When and what
 // come from the site itself (../_shared/site.js, built from src/lib/discord.ts by
 // `npm run functions:build`); today's song comes from the live site's daily.json.
@@ -51,7 +51,10 @@ export interface Deps {
   /** A card as a PNG. */
   draw(card: Card): Promise<Uint8Array>
   post(row: WebhookRow, message: object, picture: Uint8Array | null): Promise<PostResult>
-  markSent(row: WebhookRow, kind: Kind, day: string): Promise<void>
+  /** Marks the post sent before it goes, unless another check already has: false then. */
+  claim(row: WebhookRow, kind: Kind, day: string): Promise<boolean>
+  /** Hands a claimed post back, for the next check to try again. */
+  release(row: WebhookRow, kind: Kind): Promise<void>
   remove(row: WebhookRow): Promise<void>
   wait(seconds: number): Promise<void>
   /** Milliseconds since the check began. */
@@ -139,30 +142,34 @@ export async function postDue(deps: Deps, now = new Date()): Promise<Report> {
     }
     await Promise.all(
       due.slice(i, i + AT_ONCE).map(async ({ row, kind, day }) => {
+        // Checks run every minute and one can outlast the next, so a post is claimed before it goes.
+        if (!(await deps.claim(row, kind, day).catch(() => false))) return
+        const release = () => deps.release(row, kind).catch((error) => console.error('Discord post not released', row.id, String(error)))
         try {
           const { message, picture, card } = await postFor(row, kind, day)
           if (!message) {
             report.quiet++
-            await deps.markSent(row, kind, day)
             return
           }
           const result = await postWithWaits(deps, row, withMentions(message, row.mention), picture)
           if (result.status === 'sent') {
             report.sent++
             if (card && !picture) report.plain++
-            await deps.markSent(row, kind, day)
           } else if (result.status === 'gone') {
             report.removed++
             await deps.remove(row)
           } else if (result.status === 'wait') {
             report.later++
+            await release()
           } else {
             report.failed++
             console.error('Discord post not sent', row.id, result.detail)
+            await release()
           }
         } catch (error) {
           report.failed++
           console.error('Discord post not sent', row.id, hideTokens(String(error)))
+          await release()
         }
       }),
     )
@@ -219,11 +226,18 @@ export function liveDeps(env: (name: string) => string | undefined): Deps {
     group: (id, day) => loadGroupBoard(db, id, day),
     draw: (card) => drawCard(card, site, need('SUPABASE_URL')),
     post: (row, message, picture) => postTo(row.url, message, fetch, picture),
-    async markSent(row, kind, day) {
-      const { error } = await db
-        .from('discord_webhooks')
-        .update(kind === 'morning' ? { last_morning: day } : { last_night: day })
-        .eq('id', row.id)
+    async claim(row, kind, day) {
+      // Only while the column still holds what this check read: otherwise another check got there first.
+      const column = kind === 'morning' ? 'last_morning' : 'last_night'
+      const before = row[column]
+      const update = db.from('discord_webhooks').update({ [column]: day }).eq('id', row.id)
+      const { data, error } = await (before === null ? update.is(column, null) : update.eq(column, before)).select('id')
+      if (error) throw error
+      return data.length > 0
+    },
+    async release(row, kind) {
+      const column = kind === 'morning' ? 'last_morning' : 'last_night'
+      const { error } = await db.from('discord_webhooks').update({ [column]: row[column] }).eq('id', row.id)
       if (error) throw error
     },
     async remove(row) {

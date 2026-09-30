@@ -12,8 +12,8 @@ import { togetherTime, toughestStretch, type DailyStats } from './together'
 
 /** The morning post, today's song, in the server's time zone. */
 export const MORNING_POST = '08:00'
-/** The night post, how everyone did today. */
-export const NIGHT_POST = '21:00'
+/** The night post, how everyone did today: at the day's last minute, so the numbers are the whole day's. */
+export const NIGHT_POST = '23:59'
 /** Webhooks each player can add. schema.sql has the same limit: keep them in step. */
 export const WEBHOOKS_EACH = 3
 /** The longest name a webhook can have in the site's list. */

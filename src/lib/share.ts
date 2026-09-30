@@ -97,7 +97,12 @@ export interface ShareInput {
   xp?: number
   /** Aurora lights caught. Only lights caught are ever shown: never the ones missed. */
   lights?: number
+  /** Planked together from a link: how many were in the round, you included. */
+  together?: number
 }
+
+/** "Planked together · 4 of us", for a plank done with others. */
+export const togetherLine = (together: number) => `Planked together · ${together} of us`
 
 /** The finished screen's headline, also printed on the share card. */
 export function plankHeadline(daily: boolean, level?: number, release?: string): string {
@@ -110,7 +115,7 @@ export function plankHeadline(daily: boolean, level?: number, release?: string):
 
 export const siteLink = () => window.location.origin + import.meta.env.BASE_URL
 
-export function shareText({ dailyNumber, streak, song, daily, level, release, pauses, xp, lights }: ShareInput): string {
+export function shareText({ dailyNumber, streak, song, daily, level, release, pauses, xp, lights, together }: ShareInput): string {
   const what =
     daily && level
       ? `Today's song + level ${level}`
@@ -124,6 +129,7 @@ export function shareText({ dailyNumber, streak, song, daily, level, release, pa
   return [
     `Plank to Taylor #${dailyNumber}${streak > 0 ? ` 🔥${streak}` : ''}`,
     `${what} · ${song.title}`,
+    ...(together ? [togetherLine(together)] : []),
     plankBar(pauses, song.seconds),
     plankSummary(pauses, song.seconds) + (xp ? ` · +${xp.toLocaleString()} XP` : '') + (lights ? ` · ✨ ${lights}` : ''),
     // The invite: most apps turn this into a preview card (see the og: tags in index.html).

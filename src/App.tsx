@@ -151,7 +151,7 @@ export function App() {
   }, [today])
 
   // Opens the share box for one plank: what it counted for, how it went, and the streak.
-  const sharePlank = ({ song, pauses, counted, lights }: PlankShare, day = today) => {
+  const sharePlank = ({ song, pauses, counted, lights, together }: PlankShare, day = today) => {
     setSharing({
       dailyNumber: dailyNumber(day),
       day,
@@ -164,6 +164,7 @@ export function App() {
       release: ALBUMS[song.album].afterLaunch && !counted.some((c) => c.mode !== 'era') ? ALBUMS[song.album].short : undefined,
       pauses,
       lights: lights || undefined,
+      together: together && together > 1 ? together : undefined,
     })
   }
 

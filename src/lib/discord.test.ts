@@ -163,28 +163,29 @@ describe('when posts go', () => {
   // New York is UTC-4 in September.
   const at = (utc: string) => new Date(`2026-09-24T${utc}:00Z`)
 
-  it('posts the song at 8:00 and the stats at 21:00, where the server is', () => {
+  it('posts the song at 8:00 and the stats at 23:59, where the server is', () => {
     expect(duePost(row(), at('11:59'))).toBeNull()
     expect(duePost(row(), at('12:00'))).toEqual({ kind: 'morning', day: '2026-09-24' })
     expect(duePost(row(), at('12:59'))).toEqual({ kind: 'morning', day: '2026-09-24' })
     expect(duePost(row(), at('13:00'))).toBeNull()
-    expect(duePost(row(), at('01:00'))).toEqual({ kind: 'night', day: '2026-09-23' })
-    expect(duePost(row(), at('01:45'))).toEqual({ kind: 'night', day: '2026-09-23' })
-    expect(duePost(row(), at('02:00'))).toBeNull()
+    expect(duePost(row(), at('03:58'))).toBeNull()
+    expect(duePost(row(), at('03:59'))).toEqual({ kind: 'night', day: '2026-09-23' })
+    // Midnight is the next day: that day's night post isn't due until its own 23:59.
+    expect(duePost(row(), at('04:00'))).toBeNull()
   })
 
   it('once a day each', () => {
     expect(duePost(row({ last_morning: '2026-09-24' }), at('12:15'))).toBeNull()
     expect(duePost(row({ last_morning: '2026-09-23' }), at('12:15'))).toEqual({ kind: 'morning', day: '2026-09-24' })
-    expect(duePost(row({ last_night: '2026-09-23' }), at('01:15'))).toBeNull()
+    expect(duePost(row({ last_night: '2026-09-23' }), at('03:59'))).toBeNull()
   })
 
   it('in zones a quarter or half hour off', () => {
     // Kathmandu is UTC+5:45: 8:00 there is 02:15 UTC.
     expect(duePost(row({ time_zone: 'Asia/Kathmandu' }), at('02:15'))).toEqual({ kind: 'morning', day: '2026-09-24' })
     expect(duePost(row({ time_zone: 'Asia/Kathmandu' }), at('02:00'))).toBeNull()
-    // India is UTC+5:30: 21:00 there is 15:30 UTC.
-    expect(duePost(row({ time_zone: 'Asia/Kolkata' }), at('15:30'))).toEqual({ kind: 'night', day: '2026-09-24' })
+    // India is UTC+5:30: 23:59 there is 18:29 UTC.
+    expect(duePost(row({ time_zone: 'Asia/Kolkata' }), at('18:29'))).toEqual({ kind: 'night', day: '2026-09-24' })
   })
 
   it('never for a zone it doesn\'t know', () => {
@@ -205,7 +206,7 @@ describe('what the posts say', () => {
 
   it('the welcome says when, and whose time', () => {
     expect(welcomePost(SITE, 'America/New_York').content).toBe(
-      "**Plank to Taylor** will post here every day: today's song at 8 am, and how everyone did at 9 pm (New York time).\n" +
+      "**Plank to Taylor** will post here every day: today's song at 8 am, and how everyone did at 11:59 pm (New York time).\n" +
         `Plank along: <${SITE}>`,
     )
   })
