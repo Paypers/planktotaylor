@@ -1,7 +1,7 @@
 import { LADDER } from '../data/songs'
 import { accountsEnabled } from '../lib/account'
 import { clockTime } from '../lib/dates'
-import { MENTIONS_EACH, MORNING_POST, NIGHT_POST, WEBHOOKS_EACH } from '../lib/discord'
+import { MENTIONS_EACH, MORNING_POST, WEBHOOKS_EACH } from '../lib/discord'
 import { DISCORD, ERAS, followLink, GROUPS, hashFor, INSTALL, RANKS } from '../lib/route'
 import { remindersAvailable } from '../lib/push'
 import { LIGHT_XP } from '../lib/xp'
@@ -283,7 +283,7 @@ export function HelpPage() {
           <dt>Daily post</dt>
           <dd>
             Add Plank to Taylor to a Discord server and it posts in a channel every day: today's song at{' '}
-            {clockTime(MORNING_POST)}, and how everyone did at {clockTime(NIGHT_POST)}, in the server's time zone. Each
+            {clockTime(MORNING_POST)}, and how everyone did just after midnight, once the day's over, in the server's time zone. Each
             post comes with a card.
           </dd>
           <dt>Adding it</dt>

@@ -1,5 +1,5 @@
 // The Discord daily post, sent by index.ts every 15 minutes (the schedule is in supabase/schema.sql). Each
-// channel whose time has come gets today's song at 8:00, or at 23:59 how everyone did (or, for a channel
+// channel whose time has come gets today's song at 8:00, or just after midnight how the day before went (or, for a channel
 // that posts a group, how the group did), in its time zone, each with a card drawn under it. When and what
 // come from the site itself (../_shared/site.js, built from src/lib/discord.ts by
 // `npm run functions:build`); today's song comes from the live site's daily.json.
@@ -142,7 +142,7 @@ export async function postDue(deps: Deps, now = new Date()): Promise<Report> {
     }
     await Promise.all(
       due.slice(i, i + AT_ONCE).map(async ({ row, kind, day }) => {
-        // Checks run every minute and one can outlast the next, so a post is claimed before it goes.
+        // A slow check can still be running when the next starts, so a post is claimed before it goes.
         if (!(await deps.claim(row, kind, day).catch(() => false))) return
         const release = () => deps.release(row, kind).catch((error) => console.error('Discord post not released', row.id, String(error)))
         try {

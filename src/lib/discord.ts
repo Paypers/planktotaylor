@@ -1,5 +1,5 @@
 import type { ScheduledSong } from './daily'
-import type { DayKey } from './dates'
+import { addDays, type DayKey } from './dates'
 import { groupStreak, type BoardMember, type GroupKind } from './groups'
 import { localClock, timeHasCome } from './reminders'
 import { togetherTime, toughestStretch, type DailyStats } from './together'
@@ -12,8 +12,8 @@ import { togetherTime, toughestStretch, type DailyStats } from './together'
 
 /** The morning post, today's song, in the server's time zone. */
 export const MORNING_POST = '08:00'
-/** The night post, how everyone did today: at the day's last minute, so the numbers are the whole day's. */
-export const NIGHT_POST = '23:59'
+/** The night post, how everyone did: just after midnight, for the day just gone, so every plank of it counts. */
+export const NIGHT_POST = '00:00'
 /** Webhooks each player can add. schema.sql has the same limit: keep them in step. */
 export const WEBHOOKS_EACH = 3
 /** The longest name a webhook can have in the site's list. */
@@ -113,12 +113,14 @@ export interface WebhookRow {
 
 export type PostKind = 'morning' | 'night'
 
-/** The post due in this channel now, if any: its time has come (within the last hour) and it hasn't gone today. */
+/** The post due in this channel now, if any: its time has come (within the last hour) and it hasn't gone for its day. */
 export function duePost(row: WebhookRow, now: Date): { kind: PostKind; day: DayKey } | null {
   const clock = localClock(now, row.time_zone)
   if (!clock) return null
   if (timeHasCome(clock.minute, MORNING_POST) && row.last_morning !== clock.day) return { kind: 'morning', day: clock.day }
-  if (timeHasCome(clock.minute, NIGHT_POST) && row.last_night !== clock.day) return { kind: 'night', day: clock.day }
+  // The night post is the day before's, sent once it's over.
+  const yesterday = addDays(clock.day, -1)
+  if (timeHasCome(clock.minute, NIGHT_POST) && row.last_night !== yesterday) return { kind: 'night', day: yesterday }
   return null
 }
 
@@ -170,7 +172,7 @@ const mmss = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.rou
 /** The message a channel gets when it's added, which is also the check that the webhook works. */
 export function welcomePost(site: string, timeZone: string): DiscordMessage {
   return message(site, [
-    `**Plank to Taylor** will post here every day: today's song at ${hourName(MORNING_POST)}, and how everyone did at ${hourName(NIGHT_POST)} (${zoneName(timeZone)} time).`,
+    `**Plank to Taylor** will post here every day: today's song at ${hourName(MORNING_POST)}, and how everyone did just after midnight (${zoneName(timeZone)} time).`,
     `Plank along: <${site}>`,
   ])
 }
@@ -185,19 +187,19 @@ export function morningPost(site: string, song: ScheduledSong | null): DiscordMe
 }
 
 /**
- * The night post: how everyone did today, the friendly version from the daily card. Planks held with no
+ * The night post: how everyone did the day before, the friendly version from the daily card. Planks held with no
  * breaks are a count, never a share, and there are no break counts. Null when nobody's planked yet.
  */
 export function nightPost(site: string, song: ScheduledSong | null, stats: DailyStats): DiscordMessage | null {
   if (stats.planks === 0) return null
-  const who = `${stats.planks.toLocaleString('en-US')} ${stats.planks === 1 ? 'person has' : 'people have'}`
+  const who = `${stats.planks.toLocaleString('en-US')} ${stats.planks === 1 ? 'person' : 'people'}`
   const toughest = song ? toughestStretch(stats, song.seconds) : null
   const lines = [
-    `**How everyone did today:** ${who} planked ${song ? plain(song.title) : "today's song"}`,
+    `**How everyone did yesterday:** ${who} planked ${song ? plain(song.title) : "the day's song"}`,
     stats.seconds > 0 && `Together: ${togetherTime(stats.seconds)} of planking`,
     stats.noBreak > 0 && `${stats.noBreak.toLocaleString('en-US')} held it all the way through`,
     toughest !== null && `Toughest stretch: around ${mmss(toughest)}`,
-    `Still time to plank along: <${site}>`,
+    `Plank along today: <${site}>`,
   ]
   return message(site, lines.filter((line): line is string => typeof line === 'string'))
 }
@@ -321,7 +323,7 @@ export function groupNightPost(site: string, night: GroupNight): DiscordMessage 
   if (night.held.length + night.planked.length === 0) return null
   const name = plain(night.name)
   const lines = [
-    night.streak > 0 ? `**${name}: a ${night.streak}-day group streak.** Here's how today went:` : `**${name}.** Here's how today went:`,
+    night.streak > 0 ? `**${name}: a ${night.streak}-day group streak.** Here's how yesterday went:` : `**${name}.** Here's how yesterday went:`,
     night.held.length > 0 && `All the way through: ${names(night.held)}`,
     night.planked.length > 0 && `Planked it: ${names(night.planked)}`,
     `Plank along: <${site}>`,

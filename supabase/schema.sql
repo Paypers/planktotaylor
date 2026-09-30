@@ -267,7 +267,7 @@ create trigger push_subscriptions_limit before insert on public.push_subscriptio
   for each row execute function public.push_subscriptions_limit();
 
 -- The Discord daily post: channels whose webhook a signed-in player added (Settings → Discord). Each gets
--- today's song at 8:00 and how everyone did at 23:59 in its time zone, from the discord-post Edge
+-- today's song at 8:00 and how everyone did just after midnight (the day before's, once it's over) in its time zone, from the discord-post Edge
 -- Function. A webhook's address is a secret (anyone who has it can post in that channel), so only the
 -- discord-add function writes one, after checking it with Discord, and nobody can read one back through
 -- the API: players see and change only the other columns of their own, and can remove them.
@@ -781,9 +781,8 @@ grant execute on function public.remove_from_group(uuid, uuid) to authenticated;
 grant execute on function public.group_board(uuid, date) to authenticated;
 grant execute on function public.group_invite(text, date) to anon, authenticated;
 
--- The schedules: every 15 minutes, call the send-reminders function (only when anyone has reminders on),
--- and every minute the discord-post function (only when any channel has the daily post), since the night
--- post goes at 23:59. They need the pg_cron and
+-- The schedules: every 15 minutes, call the send-reminders function (only when anyone has reminders on)
+-- and the discord-post function (only when any channel has the daily post). They need the pg_cron and
 -- pg_net extensions (Database → Extensions) and two secrets in Vault, reminders_url and reminders_secret
 -- (`npm run vapid` prints the lines). The Discord one is called at the same address with its own name on
 -- the end, and with the same secret. Until the extensions are on, this does nothing, so the rest of the
@@ -803,7 +802,7 @@ begin
       )
       where exists (select 1 from public.push_subscriptions)
     $job$);
-    perform cron.schedule('discord-post', '* * * * *', $job$
+    perform cron.schedule('discord-post', '*/15 * * * *', $job$
       select net.http_post(
         url := regexp_replace((select decrypted_secret from vault.decrypted_secrets where name = 'reminders_url'), 'send-reminders/?$', 'discord-post'),
         headers := jsonb_build_object(

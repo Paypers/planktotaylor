@@ -110,7 +110,7 @@ export async function renderTogetherCard(share: TogetherShare): Promise<Blob> {
   const numberWidth = ctx.measureText(String(count)).width
   text(ctx, String(count), left - 8, 400, numberFont, COLOR.ink)
   heldMark(ctx, left + numberWidth + 18, 292, 50)
-  text(ctx, count === 1 ? 'planked it' : 'planked together', left + numberWidth + 16, 393, `500 44px ${SANS}`, COLOR.ink2)
+  text(ctx, count === 1 ? 'person planked it' : 'people planked together', left + numberWidth + 16, 393, `500 44px ${SANS}`, COLOR.ink2)
 
   songRow(ctx, song, left, right, rowTop)
 

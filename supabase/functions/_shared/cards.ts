@@ -236,7 +236,7 @@ async function layout(card: Card, host: string, photoOf: (link: string | null) =
             'div',
             { flexDirection: 'column', paddingBottom: 4, fontSize: 16, color: COLOR.ink2, flexShrink: 1 },
             el('div', { flexWrap: 'wrap', columnGap: 5 }, el('div', {}, 'planked'), el('div', { color: COLOR.ink, fontWeight: 600 }, title)),
-            el('div', {}, 'today'),
+            el('div', {}, 'yesterday'),
           ),
         ),
         facts.length > 0 && el('div', { gap: 16, padding: '14px 0', borderTop: `1px solid ${COLOR.rule}` }, ...facts),
@@ -247,7 +247,7 @@ async function layout(card: Card, host: string, photoOf: (link: string | null) =
             el('div', { height: 10, background: COLOR.well }, ...card.heat.map((o) => el('div', { flexGrow: 1, flexBasis: 0, background: COLOR.ink, opacity: o }))),
             el('div', { fontSize: 13, color: COLOR.ink2 }, `Toughest stretch: around ${card.toughest}`),
           ),
-        footer(`${card.planks.toLocaleString('en-US')} ${card.planks === 1 ? 'plank' : 'planks'} today`, host),
+        footer(`${card.planks.toLocaleString('en-US')} ${card.planks === 1 ? 'plank' : 'planks'} yesterday`, host),
       ),
       height,
     ]
@@ -298,7 +298,7 @@ async function layout(card: Card, host: string, photoOf: (link: string | null) =
       ),
       held.length > 0 && row(heldMark(18), 'All the way through', held),
       planked.length > 0 && row(plainMark(18), 'Planked it', planked),
-      footer(`${count} planked today`, host),
+      footer(`${count} planked yesterday`, host),
     ),
     height,
   ]
@@ -308,7 +308,7 @@ async function layout(card: Card, host: string, photoOf: (link: string | null) =
 
 /** Every word on a card, for the fonts: only the letters used are fetched. */
 function textOf(card: Card): string {
-  const parts: string[] = [card.top, 'Today\'s song How everyone did planked today of planking, together held it all the way through Toughest stretch: around', '0123456789+:,.·']
+  const parts: string[] = [card.top, 'Today\'s song How everyone did planked today yesterday of planking, together held it all the way through Toughest stretch: around', '0123456789+:,.·']
   if (card.song) parts.push(card.song.title, card.song.album, card.song.short, card.song.length)
   if (card.kind === 'everyone') parts.push(card.together ?? '', card.toughest ?? '')
   if (card.kind === 'group') parts.push(card.group, 'day group streak All the way through Planked it', ...[...card.held, ...card.planked].map((p) => p.name))

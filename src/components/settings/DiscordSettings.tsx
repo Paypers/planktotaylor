@@ -19,7 +19,6 @@ import {
   MENTIONS_EACH,
   mentionsIn,
   MORNING_POST,
-  NIGHT_POST,
   WEBHOOKS_EACH,
   webhookAddress,
   zoneName,
@@ -54,7 +53,7 @@ function timeZones(chosen: string[]): string[] {
 const zoneOption = (zone: string) => zone.replace(/_/g, ' ').replace(/\//g, ' / ')
 
 /** When the posts go, in the server's time. */
-const postTimes = (zone: string) => `${clockTime(MORNING_POST)} and ${clockTime(NIGHT_POST)}, ${zoneName(zone)} time`
+const postTimes = (zone: string) => `${clockTime(MORNING_POST)} and just after midnight, ${zoneName(zone)} time`
 
 /** Settings → Discord: a daily post in a Discord server, through a channel's webhook. */
 export function DiscordSettings() {
@@ -178,7 +177,7 @@ export function DiscordSettings() {
         <h3 id="discord-heading">Daily post in your server</h3>
         <p>
           Add a channel and Plank to Taylor posts there every day: today's song at {clockTime(MORNING_POST)}, and how
-          everyone did at {clockTime(NIGHT_POST)}, in the server's time zone. There's nothing to install.
+          everyone did just after midnight, once the day's over, in the server's time zone. There's nothing to install.
         </p>
 
         {loading ? (
@@ -423,7 +422,7 @@ function NightChoice({ webhook, groups, onChange }: { webhook: DiscordWebhook; g
 
   return (
     <fieldset className="kind-choice night-choice">
-      <legend>At {clockTime(NIGHT_POST)}, post</legend>
+      <legend>Just after midnight, post</legend>
       <label className="kind-option">
         <input type="radio" name={name} checked={webhook.group_id === null} onChange={() => onChange(null)} />
         <span>

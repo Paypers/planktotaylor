@@ -26,7 +26,7 @@ describe("the room's share as text", () => {
     expect(togetherText(room(3))).toBe(
       [
         'Plank to Taylor #8 · Planked together',
-        'Cruel Summer · 3 of us',
+        'Cruel Summer · 3 people',
         '🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩',
         '2:59 plank, no breaks',
         'Ana, Ben and Cleo',
@@ -39,7 +39,7 @@ describe("the room's share as text", () => {
     expect(togetherText(room(2, TWO_BREAKS))).toBe(
       [
         'Plank to Taylor #8 · Planked together',
-        'Cruel Summer · 2 of us',
+        'Cruel Summer · 2 people',
         '🟩🟩🟩🟩🟧🟩🟩🟩🟩🟧🟩🟩',
         '2:59 plank · 2 pauses, 1:19 · 4:18 total',
         'Ana and Ben',
@@ -55,18 +55,18 @@ describe("the room's share as text", () => {
 
   it('names nine as the first three and how many more', () => {
     const lines = togetherText(room(9, TWO_BREAKS)).split('\n')
-    expect(lines[1]).toBe('Cruel Summer · 9 of us')
+    expect(lines[1]).toBe('Cruel Summer · 9 people')
     expect(lines[4]).toBe('Ana, Ben, Cleo and 6 more')
   })
 
   it('names twelve the same way', () => {
     const lines = togetherText(room(12)).split('\n')
-    expect(lines[1]).toBe('Cruel Summer · 12 of us')
+    expect(lines[1]).toBe('Cruel Summer · 12 people')
     expect(lines[4]).toBe('Ana, Ben, Cleo and 9 more')
   })
 
   it('leaves out the names when nobody held to the end', () => {
-    expect(togetherText(room(0))).not.toMatch(/of us|\n\n/)
+    expect(togetherText(room(0))).not.toMatch(/people|\n\n/)
   })
 })
 

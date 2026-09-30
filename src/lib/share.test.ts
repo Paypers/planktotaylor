@@ -19,7 +19,7 @@ describe('the shared text', () => {
   it('says a plank was done together, and how many of you', () => {
     const lines = shareText(share({ together: 4 })).split('\n')
     expect(lines[1]).toBe("Today's song · Style")
-    expect(lines[2]).toBe('Planked together · 4 of us')
+    expect(lines[2]).toBe('Planked together · 4 people')
   })
 
   it('says nothing of it planked alone', () => {

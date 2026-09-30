@@ -30,7 +30,7 @@ export function togetherText({ song, day, finishers, pauses }: TogetherShare): s
   // One alone might have had company who stopped early, so this never says "just me" or "1 of us".
   return [
     `Plank to Taylor #${dailyNumber(day)} · ${count === 1 ? 'Planked it' : 'Planked together'}`,
-    count > 1 ? `${song.title} · ${count} of us` : song.title,
+    count > 1 ? `${song.title} · ${count} people` : song.title,
     plankBar(pauses, song.seconds),
     plankSummary(pauses, song.seconds),
     namesList(finishers),

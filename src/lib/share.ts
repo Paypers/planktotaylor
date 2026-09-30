@@ -101,8 +101,8 @@ export interface ShareInput {
   together?: number
 }
 
-/** "Planked together · 4 of us", for a plank done with others. */
-export const togetherLine = (together: number) => `Planked together · ${together} of us`
+/** "Planked together · 4 people", for a plank done with others. */
+export const togetherLine = (together: number) => `Planked together · ${together} people`
 
 /** The finished screen's headline, also printed on the share card. */
 export function plankHeadline(daily: boolean, level?: number, release?: string): string {

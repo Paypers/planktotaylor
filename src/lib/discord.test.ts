@@ -130,7 +130,7 @@ describe('pinging people', () => {
   it("names in a post still can't ping anyone", () => {
     const stats = { planks: 1, noBreak: 0, seconds: 0, slices: Array(20).fill(0) }
     const sneaky = withMentions(nightPost(SITE, { ...style, title: `@everyone <@${BEN}>` }, stats)!, `<@${ANA}>`)
-    expect(sneaky.content.split('\n')[0]).toBe(`<@${ANA}> **How everyone did today:** 1 person has planked \\@everyone \\<\\@${BEN}\\>`)
+    expect(sneaky.content.split('\n')[0]).toBe(`<@${ANA}> **How everyone did yesterday:** 1 person planked \\@everyone \\<\\@${BEN}\\>`)
     expect(sneaky.allowed_mentions).toEqual({ parse: [], users: [ANA], roles: [] })
   })
 })
@@ -163,29 +163,31 @@ describe('when posts go', () => {
   // New York is UTC-4 in September.
   const at = (utc: string) => new Date(`2026-09-24T${utc}:00Z`)
 
-  it('posts the song at 8:00 and the stats at 23:59, where the server is', () => {
+  it("posts the song at 8:00, and the day before's stats just after midnight, where the server is", () => {
     expect(duePost(row(), at('11:59'))).toBeNull()
     expect(duePost(row(), at('12:00'))).toEqual({ kind: 'morning', day: '2026-09-24' })
     expect(duePost(row(), at('12:59'))).toEqual({ kind: 'morning', day: '2026-09-24' })
     expect(duePost(row(), at('13:00'))).toBeNull()
-    expect(duePost(row(), at('03:58'))).toBeNull()
-    expect(duePost(row(), at('03:59'))).toEqual({ kind: 'night', day: '2026-09-23' })
-    // Midnight is the next day: that day's night post isn't due until its own 23:59.
-    expect(duePost(row(), at('04:00'))).toBeNull()
+    // 23:59 in New York: the day isn't over yet.
+    expect(duePost(row(), at('03:59'))).toBeNull()
+    // Midnight: the 23rd is over, so its numbers go out.
+    expect(duePost(row(), at('04:00'))).toEqual({ kind: 'night', day: '2026-09-23' })
+    expect(duePost(row(), at('04:45'))).toEqual({ kind: 'night', day: '2026-09-23' })
+    expect(duePost(row(), at('05:00'))).toBeNull()
   })
 
   it('once a day each', () => {
     expect(duePost(row({ last_morning: '2026-09-24' }), at('12:15'))).toBeNull()
     expect(duePost(row({ last_morning: '2026-09-23' }), at('12:15'))).toEqual({ kind: 'morning', day: '2026-09-24' })
-    expect(duePost(row({ last_night: '2026-09-23' }), at('03:59'))).toBeNull()
+    expect(duePost(row({ last_night: '2026-09-23' }), at('04:15'))).toBeNull()
   })
 
   it('in zones a quarter or half hour off', () => {
     // Kathmandu is UTC+5:45: 8:00 there is 02:15 UTC.
     expect(duePost(row({ time_zone: 'Asia/Kathmandu' }), at('02:15'))).toEqual({ kind: 'morning', day: '2026-09-24' })
     expect(duePost(row({ time_zone: 'Asia/Kathmandu' }), at('02:00'))).toBeNull()
-    // India is UTC+5:30: 23:59 there is 18:29 UTC.
-    expect(duePost(row({ time_zone: 'Asia/Kolkata' }), at('18:29'))).toEqual({ kind: 'night', day: '2026-09-24' })
+    // India is UTC+5:30: midnight there is 18:30 UTC, when the 24th is over.
+    expect(duePost(row({ time_zone: 'Asia/Kolkata' }), at('18:30'))).toEqual({ kind: 'night', day: '2026-09-24' })
   })
 
   it('never for a zone it doesn\'t know', () => {
@@ -206,7 +208,7 @@ describe('what the posts say', () => {
 
   it('the welcome says when, and whose time', () => {
     expect(welcomePost(SITE, 'America/New_York').content).toBe(
-      "**Plank to Taylor** will post here every day: today's song at 8 am, and how everyone did at 11:59 pm (New York time).\n" +
+      "**Plank to Taylor** will post here every day: today's song at 8 am, and how everyone did just after midnight (New York time).\n" +
         `Plank along: <${SITE}>`,
     )
   })
@@ -233,11 +235,11 @@ describe('what the posts say', () => {
     const busy = nightPost(SITE, style, stats({ planks: 1412, noBreak: 187, seconds: 1412 * 231, slices }))
     expect(busy?.content).toBe(
       [
-        '**How everyone did today:** 1,412 people have planked Style',
+        '**How everyone did yesterday:** 1,412 people planked Style',
         'Together: 91 hours of planking',
         '187 held it all the way through',
         'Toughest stretch: around 2:40',
-        `Still time to plank along: <${SITE}>`,
+        `Plank along today: <${SITE}>`,
       ].join('\n'),
     )
     // Never a count of breaks or a share of anything.
@@ -248,9 +250,9 @@ describe('what the posts say', () => {
     const one = nightPost(SITE, style, stats({ planks: 1, seconds: 231, slices: [5, ...Array(19).fill(0)] }))
     expect(one?.content).toBe(
       [
-        '**How everyone did today:** 1 person has planked Style',
+        '**How everyone did yesterday:** 1 person planked Style',
         'Together: 4 minutes of planking',
-        `Still time to plank along: <${SITE}>`,
+        `Plank along today: <${SITE}>`,
       ].join('\n'),
     )
   })
@@ -338,7 +340,7 @@ describe("a group's night", () => {
     const night = groupNight({ name: 'Old *friends*', kind: 'public' }, board, today)
     expect(groupNightPost(SITE, night)?.content).toBe(
       [
-        "**Old \\*friends\\*: a 24-day group streak.** Here's how today went:",
+        "**Old \\*friends\\*: a 24-day group streak.** Here's how yesterday went:",
         'All the way through: Ana, Dee',
         'Planked it: Ben',
         `Plank along: <${SITE}>`,
@@ -352,7 +354,7 @@ describe("a group's night", () => {
     const sneaky = [member('[Free Nitro](https://phish.example)', [today], true), member('@everyone\n# Big news https://x.example', [today], false)]
     const night = groupNight({ name: '<@123>\n> quoted', kind: 'public' }, sneaky, today)
     expect(groupNightPost(SITE, night)?.content.split('\n')).toEqual([
-      "**\\<\\@123\\> \\> quoted: a 1-day group streak.** Here's how today went:",
+      "**\\<\\@123\\> \\> quoted: a 1-day group streak.** Here's how yesterday went:",
       'All the way through: \\[Free Nitro\\](https\\://phish.example)',
       'Planked it: \\@everyone # Big news https\\://x.example',
       `Plank along: <${SITE}>`,
