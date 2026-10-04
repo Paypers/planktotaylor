@@ -41,7 +41,7 @@ interface LiveAttempt extends Omit<Attempt, 'endedAt' | 'outcome'> {
 const LOG_KEY = 'plank-to-taylor:attempts'
 const LIVE_KEY = 'plank-to-taylor:attempt-live'
 /** Kept in this browser; the account keeps them all. */
-const KEEP = 300
+export const ATTEMPTS_KEPT = 300
 /** A live attempt not saved for this long was abandoned (its tab closed, crashed or was put down). */
 const STALE_MS = 15_000
 
@@ -68,7 +68,7 @@ const listeners = new Set<() => void>()
 const endedListeners = new Set<() => void>()
 
 function commit(next: Attempt[]) {
-  log = [...next].sort((a, b) => a.startedAt.localeCompare(b.startedAt)).slice(-KEEP)
+  log = [...next].sort((a, b) => a.startedAt.localeCompare(b.startedAt)).slice(-ATTEMPTS_KEPT)
   write(LOG_KEY, log)
   listeners.forEach((fn) => fn())
 }

@@ -16,6 +16,7 @@ import type { PlayerRank } from '../lib/ranks'
 import { followLink, GROUPS, hashFor } from '../lib/route'
 import { Avatar } from './Avatar'
 import { Dialog } from './Dialog'
+import { ProfileStats } from './ProfileStats'
 import { RankCard } from './Rank'
 
 const SYNC_TEXT = {
@@ -137,6 +138,8 @@ function ProfileForm({ rank, onClose }: { rank: PlayerRank | null; onClose: () =
           <RankCard rank={rank} linked onOpen={onClose} />
         </section>
       )}
+
+      <ProfileStats />
 
       <section className="dialog-section">
         <p className="muted">{SYNC_TEXT[sync]}</p>

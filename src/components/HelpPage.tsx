@@ -181,6 +181,12 @@ export function HelpPage() {
               device you sign in on. Which theme shows is up to each device. Progress from before you signed in comes
               along too.
             </dd>
+            <dt>Your planks in numbers</dt>
+            <dd>
+              Your profile adds up your planks: time planked (every second, finished or not), planks held to the end and
+              how many with no breaks, your longest stretch without a break, the longest and shortest songs you've held,
+              and the song you've planked most. Nothing counts the goes that ended early.
+            </dd>
           </Topic>
         </>
       )}

@@ -2566,6 +2566,49 @@ a {
   padding-top: 4px;
 }
 
+/* Your planks in numbers, in the profile: a label, then the number, then the song when there is one. */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.stat {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+}
+
+.stat dt {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-2);
+}
+
+.stat dd {
+  display: grid;
+  margin: 0;
+}
+
+.stat-value {
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 28px;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.stat-note {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
 .switch-row {
   display: flex;
   align-items: center;
