@@ -25,6 +25,7 @@ import {
   type Invite,
 } from '../lib/groups'
 import { refreshGroups, useMyGroups } from '../lib/myGroups'
+import { usePlankingNow } from '../lib/plankingNow/channels'
 import type { Completion } from '../lib/progress'
 import { followLink, groupRoute, hashFor, navigate } from '../lib/route'
 import { siteLink } from '../lib/share'
@@ -73,7 +74,7 @@ export function GroupsPage({ today, completions }: { today: DayKey; completions:
         <section className="section grid" aria-labelledby="groups-signed-out">
           <div className="section-rule" />
           <div className="section-label">
-            <h2 id="groups-signed-out">Plank together</h2>
+            <h2 id="groups-signed-out">Groups with friends</h2>
           </div>
           <div className="section-body">
             <p className="groups-lede">
@@ -151,11 +152,20 @@ interface CardsProps {
 }
 
 function GroupCards({ groups, boards, me, today, completions }: CardsProps) {
+  const { byGroup } = usePlankingNow()
   return (
     <ul className="group-list">
       {groups.map((group) => {
         const board = boards.get(group.id)
-        return <GroupCard key={group.id} group={group} board={board && withMine(board, me, completions, today)} today={today} />
+        return (
+          <GroupCard
+            key={group.id}
+            group={group}
+            board={board && withMine(board, me, completions, today)}
+            today={today}
+            planking={byGroup.get(group.id) ?? 0}
+          />
+        )
       })}
     </ul>
   )
@@ -169,8 +179,8 @@ function todayLine(board: BoardMember[], today: DayKey): string {
   return `${planked} of ${members} ${planked === 1 ? 'has' : 'have'} planked today`
 }
 
-/** A group in a line or two, linking to its page. */
-function GroupCard({ group, board, today }: { group: Group; board: BoardMember[] | undefined; today: DayKey }) {
+/** A group in a line or two, linking to its page. `planking`: how many in it are planking right now. */
+function GroupCard({ group, board, today, planking }: { group: Group; board: BoardMember[] | undefined; today: DayKey; planking: number }) {
   const streak = board ? groupStreak(group.kind, board, today) : null
   const kind = group.kind === 'public' ? 'Public' : 'Private'
   return (
@@ -180,6 +190,7 @@ function GroupCard({ group, board, today }: { group: Group; board: BoardMember[]
           <span className="group-card-name">{group.name}</span>
           <span className="group-meta">
             {kind} · {board ? todayLine(board, today) : `${group.members} ${group.members === 1 ? 'member' : 'members'}`}
+            {planking > 0 && <span className="group-planking"> · {planking} planking now</span>}
           </span>
         </span>
         {streak && streak.current > 0 && (

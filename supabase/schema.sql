@@ -894,3 +894,29 @@ drop trigger if exists plank_attempts_limit on public.plank_attempts;
 create trigger plank_attempts_limit after insert on public.plank_attempts
   referencing new table as added
   for each statement execute function public.rows_each_limit('20000');
+
+-- Planking now: each group has a private Realtime channel, group-planking:<group id>, where members' devices
+-- say they're planking (Realtime presence: their user id, and until when). Only the group's members can join
+-- it, see who's planking in it, or say they are. Nothing is stored: presence lasts while the device is there.
+create or replace function public.planking_channel_member(p_topic text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select case
+    when p_topic ~ '^group-planking:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      then public.in_group(substr(p_topic, 16)::uuid)
+    else false
+  end
+$$;
+revoke all on function public.planking_channel_member(text) from public;
+grant execute on function public.planking_channel_member(text) to authenticated;
+
+drop policy if exists "group members see who's planking" on realtime.messages;
+create policy "group members see who's planking" on realtime.messages for select to authenticated
+  using (realtime.messages.extension = 'presence' and public.planking_channel_member(realtime.topic()));
+drop policy if exists "group members say they're planking" on realtime.messages;
+create policy "group members say they're planking" on realtime.messages for insert to authenticated
+  with check (realtime.messages.extension = 'presence' and public.planking_channel_member(realtime.topic()));

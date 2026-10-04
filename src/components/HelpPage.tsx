@@ -193,7 +193,7 @@ export function HelpPage() {
             <a href={hashFor(GROUPS)} onClick={(e) => followLink(e, GROUPS)}>
               Groups
             </a>{' '}
-            (from your profile) and share its invite link. Anyone with the link can join: up to 50 members, and 10 groups
+            (the people icon at the top) and share its invite link. Anyone with the link can join: up to 50 members, and 10 groups
             each. You'll need a name to show the group. Your groups show on the home page, under Today.
           </dd>
           <dt>The group page</dt>
@@ -208,6 +208,12 @@ export function HelpPage() {
             partway through a day never breaks it. A public group's day counts when anyone in it has. A day that doesn't
             count uses one of the group's freezes, on the same rules as yours: 3 a month, at most 2 days in a row. Private or
             public is chosen when the group is made, so the streak always means the same thing.
+          </dd>
+          <dt>Planking now</dt>
+          <dd>
+            While anyone in your group has the plank screen on, the group shows how many are planking right now: on its
+            page, on its card, and on the people icon at the top. It shows how many, not who, and a break still counts as
+            planking, so nobody's pauses show. Only the group's members can see it.
           </dd>
           <dt>This month</dt>
           <dd>
@@ -235,7 +241,8 @@ export function HelpPage() {
           <dt>Send a link</dt>
           <dd>
             Press Plank together on the home page or a group's page, pick the song (today's song unless you choose
-            another), and send the link. Anyone with it can join, signed in or not. Signed out, you type a name.
+            another), and send the link. Anyone with it can join, signed in or not. Signed out, you type a name. A room
+            isn't a group: it has its own link, and lasts only while someone's in it.
           </dd>
           <dt>All at once</dt>
           <dd>

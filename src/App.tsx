@@ -5,6 +5,7 @@ import { ConfirmDialog } from './components/ConfirmDialog'
 import { ErasPage } from './components/ErasPage'
 import { GroupPage } from './components/GroupPage'
 import { GroupsPage, HomeGroups, JoinPage } from './components/Groups'
+import { GroupsLink } from './components/GroupsLink'
 import { HistoryDialog } from './components/HistoryDialog'
 import { HelpPage } from './components/HelpPage'
 import { BringPlanksNote, InstallNote } from './components/install/InstallNote'
@@ -253,15 +254,17 @@ export function App() {
             <StarMark size={18} />
             <span>Plank to Taylor</span>
           </a>
-          <nav className="header-actions" aria-label="Account and settings">
+          <nav className="header-actions" aria-label="Groups, account and settings">
             <span className="streak-pill" title={streakTitle}>
               <Flame size={20} lit={streak.doneToday} />
               <span className="streak-pill-num">{streak.current}</span>
               <span className="sr-only">-day streak</span>
             </span>
+            {accountsEnabled && <GroupsLink today={today} current={route.page === 'groups' || route.page === 'group'} />}
             <a
               href={hashFor(HELP)}
-              className="icon-btn"
+              // On phones it makes way for Groups. The footer links to it too.
+              className={accountsEnabled ? 'icon-btn header-help' : 'icon-btn'}
               onClick={(e) => followLink(e, HELP)}
               aria-label="How it works"
               aria-current={route.page === 'help' ? 'page' : undefined}
@@ -532,6 +535,11 @@ export function App() {
                 and it opens like an app.
               </p>
             )}
+            <p>
+              <a href={hashFor(HELP)} onClick={(e) => followLink(e, HELP)}>
+                How it works
+              </a>
+            </p>
             <p>A fan project. Not affiliated with Taylor Swift, her label or YouTube.</p>
           </div>
         </footer>

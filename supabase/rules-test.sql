@@ -117,6 +117,28 @@ begin
 end;
 $$;
 
+-- Planking now: only the group's members join its Realtime channel.
+do $$
+begin
+  assert public.planking_channel_member('group-planking:' || current_setting('test.gym')), 'Ben joins the group''s planking channel';
+  assert not public.planking_channel_member('group-planking:' || gen_random_uuid()), 'but not a group he isn''t in';
+  assert not public.planking_channel_member('plank-together:' || current_setting('test.gym')), 'or any other channel by this rule';
+  assert not public.planking_channel_member('group-planking:not-a-group'), 'and a made-up topic is just refused';
+end;
+$$;
+select public.rules_test_as('cat');
+do $$
+begin
+  assert not public.planking_channel_member('group-planking:' || current_setting('test.gym')), 'Cat can''t join the group''s planking channel';
+end;
+$$;
+select public.rules_test_as('anon');
+do $$
+begin
+  assert not public.planking_channel_member('group-planking:' || current_setting('test.gym')), 'signed out, never';
+end;
+$$;
+
 -- Cat isn't in it, and sees none of it.
 select public.rules_test_as('cat');
 do $$

@@ -11,6 +11,8 @@ import {
   type GroupToday,
 } from '../lib/groups'
 import { refreshGroups, useMyGroups } from '../lib/myGroups'
+import { usePlankingNow } from '../lib/plankingNow/channels'
+import { plankingNowLine } from '../lib/plankingNow/presence'
 import type { Completion } from '../lib/progress'
 import { followLink, GROUPS, hashFor, navigate } from '../lib/route'
 import { FREEZES_PER_MONTH, MAX_MISSED_IN_A_ROW, streakInfo, type StreakInfo } from '../lib/streaks'
@@ -113,6 +115,7 @@ export function GroupPage({ id, today, completions }: Props) {
       {board ? (
         <>
           <GroupStreak group={group} board={board} today={today} />
+          <PlankTogether groupId={group.id} today={today} />
           <Today group={group} board={board} me={user.id} today={today} onRemove={(member) => setAsking({ what: 'remove', member })} />
           {group.kind === 'public' && <ThisMonth board={board} today={today} />}
         </>
@@ -231,14 +234,37 @@ function GroupStreak({ group, board, today }: { group: Group; board: BoardMember
             {saved}
           </p>
         )}
-        <div className="button-row together-start">
-          <StartTogether today={today} />
-        </div>
         <p className="fine group-rule">
           {group.kind === 'public'
             ? `The group's day counts when anyone in it planks today's song. A day nobody does ${RULE_TAIL}`
             : `The group's day counts when everyone who joined before it has planked today's song. A day someone misses ${RULE_TAIL}`}
         </p>
+      </div>
+    </section>
+  )
+}
+
+/**
+ * How many in the group are planking right now, and a room to plank in together. The room is its own thing,
+ * not the group's: it has its own link, which anyone can open.
+ */
+function PlankTogether({ groupId, today }: { groupId: string; today: DayKey }) {
+  const now = usePlankingNow().byGroup.get(groupId)
+  return (
+    <section className="section grid" aria-labelledby="group-together">
+      <div className="section-rule" />
+      <div className="section-label">
+        <h2 id="group-together">Plank together</h2>
+        {now !== undefined && <p className="label-meta">{plankingNowLine(now)}</p>}
+      </div>
+      <div className="section-body">
+        <p className="groups-lede">
+          Make a room and send its link to the group. Everyone who opens it planks the same song at the same moment.
+        </p>
+        <div className="button-row">
+          <StartTogether today={today} />
+        </div>
+        <p className="fine">A room isn't part of the group: it has its own link, and anyone you send it to can join.</p>
       </div>
     </section>
   )

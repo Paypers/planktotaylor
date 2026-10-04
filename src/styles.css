@@ -351,6 +351,41 @@ a {
   background: var(--well);
 }
 
+/* On phones the help icon makes way for Groups, so the site's name still fits. It's in the footer too. */
+.header-actions .header-help {
+  display: none;
+}
+
+@media (min-width: 480px) {
+  .header-actions .header-help {
+    display: inline-grid;
+  }
+}
+
+/* Groups: a count on the icon when anyone in your groups is planking now. */
+.groups-link {
+  position: relative;
+}
+
+.planking-badge {
+  position: absolute;
+  top: 2px;
+  right: -2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border: 2px solid var(--paper);
+  border-radius: 9px;
+  background: var(--button);
+  color: var(--button-ink);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 14px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 @media (min-width: 760px) {
   .header-actions {
     gap: 8px;
@@ -4847,6 +4882,11 @@ a {
   color: var(--ink-2);
 }
 
+.group-planking {
+  color: var(--ink);
+  font-weight: 600;
+}
+
 .group-card-streak {
   display: flex;
   flex-shrink: 0;
@@ -5511,11 +5551,7 @@ a {
   color: var(--held);
 }
 
-/* Plank together: under a group's streak, and the box that makes a room. */
-.together-start {
-  margin-top: 16px;
-}
-
+/* Plank together: the box that makes a room. */
 .make-room {
   display: grid;
   gap: 12px;

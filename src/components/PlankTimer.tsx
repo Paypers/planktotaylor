@@ -9,6 +9,7 @@ import { pausedSeconds, plankHeadline } from '../lib/share'
 import { beginAttempt, endAttempt, getAttempts, ghostFor, saveAttemptProgress, type AttemptKind, type AttemptOutcome } from '../lib/attempts'
 import type { Collection, StampNews } from '../lib/eras'
 import { LIGHT_SHOW_MS, LIGHT_SIZE, lightTimes, placeLight, type Box } from '../lib/lights'
+import { useTellGroupsImPlanking } from '../lib/plankingNow/channels'
 import { sounds, unlockAudio } from '../lib/sound'
 import { getData } from '../lib/store'
 import { LIGHT_XP, MARATHON_SECONDS, type XpAward } from '../lib/xp'
@@ -239,6 +240,8 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
   useWakeLock(active)
   // From the end of the 3-2-1: the video on top, the timer and buttons in the middle, lyrics below.
   const focus = phase === 'waiting' || phase === 'running' || phase === 'paused'
+  // Your groups see you as planking now for as long, breaks included: a pause never shows.
+  useTellGroupsImPlanking(focus, song.seconds)
   // Only with the video: its position is what keeps the words in time.
   const lyrics = useLyrics(song, prefs.lyrics && music.mode === 'video')
 
