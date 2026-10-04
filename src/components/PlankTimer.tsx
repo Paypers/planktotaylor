@@ -241,6 +241,21 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
     return () => document.body.classList.remove('no-scroll')
   }, [])
 
+  // Phones only play sound inside a tap. Any tap here unlocks the beeps and primes the song, so both
+  // can start later from the countdown or the room.
+  useEffect(() => {
+    const onTap = () => {
+      unlockAudio()
+      musicRef.current.prime()
+    }
+    window.addEventListener('pointerup', onTap, true)
+    window.addEventListener('keydown', onTap, true)
+    return () => {
+      window.removeEventListener('pointerup', onTap, true)
+      window.removeEventListener('keydown', onTap, true)
+    }
+  }, [])
+
   const readElapsed = useCallback((): number => {
     if (live) return roomMs(live.position(), total)
     const now = performance.now()
@@ -401,11 +416,11 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
       playing.current = true
       if (sourceRef.current !== 'video') return
       const current = phaseRef.current
-      if (current === 'ready' || current === 'countdown') {
-        // They pressed play on the video itself: the plank starts with the song.
-        reset()
-        run()
-      } else if (current === 'waiting' || current === 'paused') {
+      // Played from the video itself: the same 3-2-1 as Start, and the song waits for it. That tap also
+      // lets phones start the song from the countdown.
+      if (current === 'ready') start()
+      else if (current === 'countdown') musicRef.current.cue()
+      else if (current === 'waiting' || current === 'paused') {
         run()
       }
     },
@@ -664,7 +679,7 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
     ready: live
       ? 'Get into position, then press Start. Everyone in the room gets a 3-second countdown.'
       : synced
-        ? 'Get into position, then press Start. The timer runs with the song: pause one and both stop.'
+        ? 'Get into position, then press Start or tap ▶ on the video: either way, a 3-second countdown. The timer runs with the song.'
         : "Get into position, then press Start. You'll get a 3-second countdown.",
     countdown: 'Get into position.',
     waiting: music.hint ?? 'Starting the song…',

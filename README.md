@@ -45,8 +45,8 @@ To refresh it (after adding an album, say), run `npm run sync:youtube` with a Yo
 How playback behaves:
 - **The timer follows the song.** It reads the song's position from the player instead of keeping its own time. After the 3-second countdown the song starts, and the plank clock only moves while the song plays. Ads and buffering don't count.
 - **Pausing either one pauses both:** the Pause button, a tap on the video, or the phone's own media controls. Every pause is recorded (where in the song, and for how long) so it can be shared. Breaks under a second are ignored.
-- Some phones, iPhones especially, only let a video start from a tap on the video itself. Until the song plays, the screen waits and says "Tap ▶ on the video". A "Start without music" button runs the timer on its own instead.
-- Pressing play on the video yourself works too: the plank starts with the song.
+- Some phones, iPhones especially, only let a video start inside a tap. Any tap on the plank screen primes the video (plays and pauses it at once), so the countdown or the room can start it afterwards. If it still doesn't play, the screen waits and says "Tap ▶ on the video". A "Start without music" button runs the timer on its own instead.
+- Pressing play on the video yourself works too: it gets the same 3-2-1 as Start, with the song paused and rewound until the countdown ends.
 - YouTube's scrubber is hidden, so nobody can skip ahead and cut a plank short.
 - The video loads on the privacy-enhanced `youtube-nocookie.com` player.
 - If a track ever stops allowing embedding, the screen switches to a "Play on YouTube" link.

@@ -107,16 +107,9 @@ export function useLivePlank(live: LiveLink | undefined, music: ReturnType<typeo
     return () => clearInterval(timer)
   }, [ends, withSounds])
 
-  // The countdown's sounds need audio unlocked, which takes a tap on this page. Often the lobby's already did.
+  // The countdown's sounds need audio unlocked. Often the lobby's tap already did; if not, the plank screen's next tap does.
   useEffect(() => {
-    if (!live) return
-    unlockAudio()
-    window.addEventListener('pointerup', unlockAudio, true)
-    window.addEventListener('keydown', unlockAudio, true)
-    return () => {
-      window.removeEventListener('pointerup', unlockAudio, true)
-      window.removeEventListener('keydown', unlockAudio, true)
-    }
+    if (live) unlockAudio()
   }, [live])
 
   // The song follows the room, so the player's own play and pause mean something else here.

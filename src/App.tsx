@@ -46,6 +46,7 @@ import type { TogetherShare } from './lib/live/link'
 import { eraRoute, followLink, hashFor, HELP, HOME, INSTALL, navigate, useRoute, YEAR, type Route } from './lib/route'
 import { playerRank, rankName } from './lib/ranks'
 import { plankSummary, type ShareInput } from './lib/share'
+import { unlockAudio } from './lib/sound'
 import { getData, recordPlank, setLadderLevel, useAppData } from './lib/store'
 import { streakInfo } from './lib/streaks'
 import { breakSlots, type DailyStats } from './lib/together'
@@ -231,7 +232,11 @@ export function App() {
     setRestarting(false)
   }
 
-  const start = (next: PlankSession) => setSession(next)
+  const start = (next: PlankSession) => {
+    // Inside the tap that opens the plank screen, so a plank started from the video still has its beeps on phones.
+    unlockAudio()
+    setSession(next)
+  }
   // Without an account, progress lives in this browser: say so quietly where there's something to keep.
   const offerSignIn = accountsEnabled && !user ? () => setDialog('account') : undefined
   const dateline = fromDayKey(today).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })

@@ -16,7 +16,7 @@ export function HelpPage() {
 
       <Topic id="plank" title="Planking">
         <dt>Start</dt>
-        <dd>Get into position and press Start. After a 3-second countdown the song plays, and the timer runs with it.</dd>
+        <dd>Get into position and press Start, or tap ▶ on the video. After a 3-second countdown the song plays, and the timer runs with it.</dd>
         <dt>Hold</dt>
         <dd>A plank counts when you hold it to the end of the song. There's no skipping ahead.</dd>
         <dt>Breaks</dt>

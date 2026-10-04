@@ -25,7 +25,8 @@ export function MusicDialog({ open, prefs, onClose }: { open: boolean; prefs: Pr
         {VIDEOS_READY ? (
           <p>
             The plank screen plays the album version of the song from YouTube (Taylor's Version where there is one) and
-            starts it when the countdown hits zero. Some phones only let it start from a tap, so if it doesn't, tap ▶.
+            starts it when the countdown hits zero. Some phones only let it start from a tap on the video: tap ▶ instead of
+            Start, and you still get the countdown.
           </p>
         ) : (
           <p>The plank screen links to the song on YouTube. Start it playing, then press Start.</p>
