@@ -5516,6 +5516,16 @@ a {
   margin-top: 0;
 }
 
+.live-total {
+  font-size: 18px;
+  line-height: 26px;
+}
+
+.live-total strong {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
 .live-headline {
   font-family: var(--display);
   font-size: 28px;

@@ -15,6 +15,10 @@ describe('messages between devices in a room', () => {
       round: 2,
       n: 5,
     })
+    // How far they got, for the room's total: kept when it's a time, dropped when it isn't.
+    expect(readMessage({ type: 'status', from: 'abc123', status: 'out', round: 2, n: 6, held: 61 })).toMatchObject({ held: 61 })
+    expect(readMessage({ type: 'status', from: 'abc123', status: 'out', round: 2, n: 6, held: -5 })).not.toHaveProperty('held')
+    expect(readMessage({ type: 'status', from: 'abc123', status: 'out', round: 2, n: 6, held: 'lots' })).not.toHaveProperty('held')
     const state = {
       type: 'state',
       from: 'abc123',

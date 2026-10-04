@@ -49,6 +49,8 @@ export interface StatusNews {
   status: LiveStatus
   round: number
   n: number
+  /** Seconds planked this round, when done or out. Older devices don't send it. */
+  held?: number
 }
 
 export type RoomMessage = Command | Sync | Hello | Snapshot | StatusNews
@@ -78,7 +80,9 @@ export function readMessage(value: unknown): RoomMessage | null {
   if (m.type === 'hello') return { type: 'hello', from }
   if (m.type === 'status') {
     const status = STATUSES.find((s) => s === m.status)
-    return status && isCount(m.round) && isCount(m.n) ? { type: 'status', from, status, round: m.round, n: m.n } : null
+    if (!status || !isCount(m.round) || !isCount(m.n)) return null
+    const held = isUpTo(m.held, DAY_MS / 1000) ? { held: m.held } : {}
+    return { type: 'status', from, status, round: m.round, n: m.n, ...held }
   }
   if (!isCount(m.seq)) return null
   const seq = m.seq

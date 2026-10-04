@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { findSongs } from './songSearch'
 import type { LiveMember, LiveStatus } from './link'
-import { heldThisRound, roomProgress, roomView } from './view'
+import { heldThisRound, roomProgress, roomView, roundTotal, timeThisRound } from './view'
 
 describe("the room's page", () => {
   it('shows the lobby, then the round from outside, then how it went', () => {
@@ -21,6 +21,25 @@ describe("the room's page", () => {
     expect(later.members.map((m) => m.id)).toEqual(['a', 'b'])
     expect(heldThisRound(later, 1, [person('a', 'done', 1)])).toBe(later)
     expect(heldThisRound(later, 2, [person('a', 'lobby', 1)])).toEqual({ round: 2, members: [] })
+  })
+})
+
+describe("the round's time together", () => {
+  const person = (id: string, status: LiveStatus, held?: number): LiveMember => ({ id, name: id, status, joinedAt: 1, ...(held === undefined ? {} : { held }) })
+
+  it('adds up everyone who finished or stepped out, keeping those who leave, and starts each round afresh', () => {
+    const first = timeThisRound({ round: 0, seconds: new Map() }, 1, [person('a', 'done', 200), person('b', 'planking'), person('c', 'out', 61)])
+    expect(roundTotal(first)).toBe('4:21')
+    // c has left the room; b finishes.
+    const later = timeThisRound(first, 1, [person('a', 'done', 200), person('b', 'done', 200)])
+    expect(roundTotal(later)).toBe('7:41')
+    expect(timeThisRound(later, 1, [person('a', 'done', 200)])).toBe(later)
+    expect(roundTotal(timeThisRound(later, 2, [person('a', 'lobby')]))).toBe('0:00')
+  })
+
+  it('says a long total in hours', () => {
+    const many = timeThisRound({ round: 0, seconds: new Map() }, 1, Array.from({ length: 20 }, (_, i) => person(`p${i}`, 'done', 613)))
+    expect(roundTotal(many)).toBe('3 hours 24 minutes')
   })
 })
 

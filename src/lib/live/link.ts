@@ -14,6 +14,8 @@ export interface LiveMember {
   status: LiveStatus
   /** Epoch ms. The longest in the room is the host, who keeps everyone's clock in step. */
   joinedAt: number
+  /** Seconds of the song they planked this round, once they're done or stepped out. For the room's total, never shown on its own. */
+  held?: number
 }
 
 /**
@@ -56,6 +58,7 @@ export interface LiveLink {
   pause: () => void
   /** Everyone gets a 3-2-1, then carries on from where the room paused. */
   resume: () => void
+  /** Done or out, it also says how far into the song this device got, on the room's clock. */
   setStatus: (status: LiveStatus) => void
   /** 'reconnecting' while this device has lost the room and is joining it again. Its plank carries on either way. */
   getConnection: () => 'open' | 'reconnecting'

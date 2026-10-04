@@ -262,6 +262,13 @@ export function HelpPage() {
             Your name, and whether you're planking or done. Never your breaks. If you stop early, the rest carry on without
             you.
           </dd>
+          <dt>At the end</dt>
+          <dd>
+            Finish and you'll wait for the others. Once the last one is through (anyone who leaves the room counts as
+            through), you all see who held to the end, in the order you joined the room, never who finished first, and the
+            time you planked together: everyone's time added up, breaks left out, including anyone who stopped early,
+            without saying who.
+          </dd>
           <dt>Sharing it</dt>
           <dd>
             After the song, share it as one card or text for the whole room: the song, how many of you held to the end and

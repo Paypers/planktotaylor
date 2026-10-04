@@ -1,4 +1,5 @@
 import { formatDuration } from '../../data/songs'
+import { togetherTime } from '../together'
 import type { LiveMember, LivePhase, LiveStatus } from './link'
 import { addFinishers } from './strip'
 
@@ -26,6 +27,26 @@ export function heldThisRound(held: Held, round: number, members: readonly LiveM
   const kept = held.round === round ? held.members : []
   const listed = addFinishers(kept, members)
   return held.round === round && listed === held.members ? held : { round, members: listed }
+}
+
+/** The seconds each person planked in a round, as they report them. */
+export interface RoundTime {
+  round: number
+  seconds: ReadonlyMap<string, number>
+}
+
+/** Keeps everyone's time once they've said it, so someone who then leaves the room still counts. A new round starts empty. */
+export function timeThisRound(kept: RoundTime, round: number, members: readonly LiveMember[]): RoundTime {
+  const seconds = new Map(kept.round === round ? kept.seconds : [])
+  const changed = members.filter((m) => m.held !== undefined && seconds.get(m.id) !== m.held)
+  changed.forEach((m) => seconds.set(m.id, m.held!))
+  return kept.round === round && changed.length === 0 ? kept : { round, seconds }
+}
+
+/** Everyone's time added up, whoever stopped where: "11:32", or "2 hours 5 minutes" once it's long. */
+export function roundTotal(time: RoundTime): string {
+  const total = [...time.seconds.values()].reduce((sum, s) => sum + s, 0)
+  return total < 3600 ? formatDuration(Math.round(total)) : togetherTime(total)
 }
 
 /** Where the room is, for someone watching: "1:12 of 2:59", paused, or counting in. */

@@ -9,6 +9,7 @@ export interface HeardStatus {
   status: LiveStatus
   round: number
   n: number
+  held?: number
 }
 
 /** What a device tells the room about itself. */
@@ -29,7 +30,8 @@ function readPresence(id: string, value: unknown): Presence | null {
     Number.isSafeInteger(p.round) &&
     (p.round as number) >= 0
   const n = Number.isSafeInteger(p.n) && (p.n as number) >= 0 ? (p.n as number) : 0
-  return valid ? { id, name: p.name as string, status, joinedAt: p.joinedAt as number, round: p.round as number, n } : null
+  const held = typeof p.held === 'number' && Number.isFinite(p.held) && p.held >= 0 ? { held: p.held } : {}
+  return valid ? { id, name: p.name as string, status, joinedAt: p.joinedAt as number, round: p.round as number, n, ...held } : null
 }
 
 /**
@@ -50,7 +52,7 @@ export function readPresences(state: Record<string, readonly unknown[]>): Presen
 export function withLatestStatus(presences: readonly Presence[], heard: ReadonlyMap<string, HeardStatus>): Presence[] {
   return presences.map((p) => {
     const news = heard.get(p.id)
-    return news && news.n > p.n ? { ...p, status: news.status, round: news.round, n: news.n } : p
+    return news && news.n > p.n ? { ...p, status: news.status, round: news.round, n: news.n, held: news.held } : p
   })
 }
 
@@ -97,7 +99,7 @@ export function joinTime(others: readonly Presence[], now: number): number {
 export function sameMembers(a: readonly LiveMember[], b: readonly LiveMember[]): boolean {
   return (
     a.length === b.length &&
-    a.every((m, i) => m.id === b[i].id && m.name === b[i].name && m.status === b[i].status && m.joinedAt === b[i].joinedAt)
+    a.every((m, i) => m.id === b[i].id && m.name === b[i].name && m.status === b[i].status && m.joinedAt === b[i].joinedAt && m.held === b[i].held)
   )
 }
 
@@ -106,5 +108,9 @@ export function roomMembers(presences: readonly Presence[], round: number): Live
   return [...presences]
     .sort(byArrival)
     .slice(0, MAX_MEMBERS)
-    .map((p) => ({ id: p.id, name: cleanName(p.name) || 'Someone', status: p.round < round ? 'lobby' : p.status, joinedAt: p.joinedAt }))
+    .map((p) => {
+      const earlier = p.round < round
+      const member: LiveMember = { id: p.id, name: cleanName(p.name) || 'Someone', status: earlier ? 'lobby' : p.status, joinedAt: p.joinedAt }
+      return !earlier && p.held !== undefined ? { ...member, held: p.held } : member
+    })
 }

@@ -4,7 +4,7 @@ import type { RoomLink } from '../../lib/live/channel'
 import type { DayKey } from '../../lib/dates'
 import type { LiveLink, TogetherShare } from '../../lib/live/link'
 import { togetherSession } from '../../lib/live/session'
-import { heldThisRound, roomView, type Held } from '../../lib/live/view'
+import { heldThisRound, roomView, timeThisRound, type Held, type RoundTime } from '../../lib/live/view'
 import { getData } from '../../lib/store'
 import type { PlankSession } from '../PlankTimer'
 import { Lobby } from './Lobby'
@@ -32,6 +32,10 @@ export function RoomStage({ link, code, song, today, renderPlank, onShareTogethe
   const [held, setHeld] = useState<Held>({ round: state.round, members: [] })
   const nowHeld = heldThisRound(held, state.round, members)
   if (nowHeld !== held) setHeld(nowHeld)
+  // Everyone's time this round, kept like the finishers when they leave.
+  const [time, setTime] = useState<RoundTime>({ round: state.round, seconds: new Map() })
+  const nowTime = timeThisRound(time, state.round, members)
+  if (nowTime !== time) setTime(nowTime)
 
   // A round that started with this device in the room opens its plank screen, once. What it counts for
   // is worked out as it starts, so finishing it can't change it midway.
@@ -58,6 +62,7 @@ export function RoomStage({ link, code, song, today, renderPlank, onShareTogethe
           link={link}
           members={members}
           finishers={nowHeld.members}
+          time={nowTime}
           state={state}
           song={song}
           today={today}

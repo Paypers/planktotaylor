@@ -140,7 +140,8 @@ function openRoom(code: string, name: string, songSeconds: number, report: (stat
     else if (message.type !== 'sync' && message.type !== 'hello' && message.type !== 'state') quietly(channel.httpSend(EVENT, message))
   }
 
-  const sayStatus = () => send({ type: 'status', from: me, status: mine.status, round: mine.round, n: mine.n })
+  const sayStatus = () =>
+    send({ type: 'status', from: me, status: mine.status, round: mine.round, n: mine.n, ...(mine.held !== undefined ? { held: mine.held } : {}) })
 
   function markReady() {
     clearTimeout(waitTimer)
@@ -159,7 +160,9 @@ function openRoom(code: string, name: string, songSeconds: number, report: (stat
   function setStatus(status: LiveStatus) {
     const round = room.state.round
     if (mine.status === status && mine.round === round) return
-    mine = { ...mine, status, round, n: mine.n + 1 }
+    // How far this device got, on the room's clock, so breaks never count. Done is the whole song.
+    const held = status === 'done' ? songSeconds : status === 'out' ? Math.round(position(room.state, now(), songSeconds)) : undefined
+    mine = { id: mine.id, name: mine.name, joinedAt: mine.joinedAt, status, round, n: mine.n + 1, ...(held !== undefined ? { held } : {}) }
     if (mine.joinedAt) {
       sayStatus()
       presence.set(mine)
