@@ -193,6 +193,7 @@ function readPrefs(value: unknown, fallback: Prefs): Prefs | null {
     music: typeof v.music === 'boolean' ? v.music : fallback.music,
     sounds: typeof v.sounds === 'boolean' ? v.sounds : fallback.sounds,
     lights: typeof v.lights === 'boolean' ? v.lights : fallback.lights,
+    lyrics: typeof v.lyrics === 'boolean' ? v.lyrics : fallback.lyrics,
     volume: typeof v.volume === 'number' && v.volume >= 0 && v.volume <= MAX_VOLUME ? v.volume : fallback.volume,
     ...(typeof v.updatedAt === 'string' ? { updatedAt: v.updatedAt } : {}),
   }

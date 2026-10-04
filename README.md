@@ -52,6 +52,16 @@ How playback behaves:
 - If a track ever stops allowing embedding, the screen switches to a "Play on YouTube" link.
 - **Testing locally:** open the site at `http://localhost:5173`, not `http://127.0.0.1:5173`. YouTube plays her tracks on `localhost` but blocks them on `127.0.0.1` (error 150), and then you'd only see the "Play on YouTube" link.
 - **No quota involved:** the player needs no API key and has no limits. The key and its daily quota are only for `npm run sync:youtube`, which looks the tracks up once.
+- **Focus:** once the 3-2-1 ends, the plank screen rearranges: the video on top, the timer and buttons together in the middle, and lyrics (if they're on) below. It's done with CSS `order`, since moving the video's frame in the page would reload it.
+
+## Lyrics (LRCLIB) and the kill switch
+
+Lyrics are **off until each person turns them on** (Settings → Plank). They show under the buttons while you plank, with the line being sung lit up, and only when the song plays from the video, since the video's position keeps them in time. The code is in [src/lib/lyrics/](src/lib/lyrics/) and [src/components/lyrics/](src/components/lyrics/).
+
+- **Where they come from:** [LRCLIB](https://lrclib.net), a free, community-run database of timed lyrics. It looks up the exact recording first (title, album and length), then searches, keeping only recordings within 2 seconds of the song's length, so the timing fits. It isn't licensed by the publishers, and this site doesn't license the lyrics either. That's said in full beside the switch, and in one line under the lyrics.
+- **Nothing is kept:** lyrics are fetched by the visitor's browser while they're shown, held in memory for that visit, and never saved in the repo, the build, the browser or the account. They never appear in shares, cards or Discord posts.
+- **Privacy:** with lyrics on, the browser asks `lrclib.net` for each song (with no referrer). LRCLIB sees the visitor's IP address and the song. It's the only extra address in the CSP's `connect-src`.
+- **The kill switch:** [public/lyrics.json](public/lyrics.json). Set `"enabled": false` and push, and once the deploy is live, lyrics are gone for everyone. Every plank screen checks it (served with `no-cache`), and it fails closed: if the file is missing or unreadable, there are no lyrics. Settings then says lyrics aren't available, and people's own choice is kept for if they come back. To remove them for good, also take `https://lrclib.net` out of the CSP in `public/_headers`, which blocks the requests even for an old copy of the page.
 
 ## Optional: accounts, sync and the global counter (Supabase)
 

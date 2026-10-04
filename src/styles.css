@@ -3783,6 +3783,162 @@ a {
   }
 }
 
+/* Focus, from the end of the 3-2-1: the video on top, the timer and buttons together in the middle,
+   lyrics in what's left. Reordered, never moved: moving the video's frame would reload it. */
+.plank.focus .plank-inner {
+  height: 100dvh;
+  animation: focus-in 0.35s ease;
+}
+
+@keyframes focus-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.plank.focus .plank-music {
+  order: 1;
+  flex: none;
+  min-height: 0;
+  margin-top: 4px;
+}
+
+.plank.focus .plank-music .video-frame {
+  flex: none;
+  max-height: 34dvh;
+}
+
+.plank.focus .plank-body {
+  order: 2;
+  text-align: center;
+}
+
+.plank.focus .plank-song {
+  display: none;
+}
+
+.plank.focus .plank-clock {
+  margin-top: 16px;
+}
+
+.plank.focus .plank-time {
+  font-size: clamp(56px, 18vw, 96px);
+}
+
+.plank.focus .plank-time.long {
+  font-size: clamp(48px, 15vw, 80px);
+}
+
+.plank.focus .plank-progress {
+  margin-top: 12px;
+}
+
+.plank.focus .plank-coach {
+  margin-top: 12px;
+  font-size: 16px;
+  line-height: 22px;
+}
+
+.plank.focus .plank-actions {
+  order: 3;
+  justify-content: center;
+  grid-auto-columns: minmax(0, 168px);
+  margin-top: 16px;
+  padding-top: 0;
+}
+
+/* No lyrics: the timer and buttons sit in the middle of the space under the video. */
+.plank.focus:not(:has(.plank-lyrics)) .plank-body {
+  margin-top: auto;
+}
+
+.plank.focus:not(:has(.plank-lyrics)) .plank-actions {
+  margin-bottom: auto;
+}
+
+.plank-lyrics {
+  order: 4;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 160px;
+  margin-top: 24px;
+}
+
+/* Lines fade out at the top and bottom edges as they scroll past. */
+.lyrics-lines {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  margin: 0;
+  padding: 24px 0 0;
+  overflow-y: auto;
+  list-style: none;
+  text-align: center;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(transparent, #000 18%, #000 72%, transparent);
+  mask-image: linear-gradient(transparent, #000 18%, #000 72%, transparent);
+}
+
+/* Room for the last lines to scroll up to where the line being sung sits. As padding, it would
+   count towards the list's height and push the box off the screen. */
+.lyrics-lines::after {
+  content: '';
+  display: block;
+  height: 40vh;
+}
+
+.lyrics-lines li {
+  padding: 6px 0;
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 26px;
+  opacity: 0.4;
+  overflow-wrap: anywhere;
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+
+.lyrics-lines li.past {
+  opacity: 0.22;
+}
+
+.lyrics-lines li.current {
+  opacity: 1;
+  transform: scale(1.04);
+}
+
+/* Without times there's no line being sung: every line reads the same. */
+.lyrics-lines:not(.synced) li {
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.lyrics-credit {
+  flex-shrink: 0;
+  padding-top: 8px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-2);
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plank.focus .plank-inner {
+    animation: none;
+  }
+
+  .lyrics-lines li {
+    transition: none;
+  }
+
+  .lyrics-lines li.current {
+    transform: none;
+  }
+}
+
 /* Aurora lights: soft light in the album's colour drifting behind the plank while the song plays, and
    now and then a light to catch. Faint enough that the timer always reads first. */
 

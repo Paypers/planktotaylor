@@ -159,6 +159,8 @@ describe('account sync', () => {
     expect(store.getData().prefs.lights).toBe(true)
     // And before there was a volume slider: as loud as the cues were made.
     expect(store.getData().prefs.volume).toBe(1)
+    // And before there were lyrics: off, as for everyone until they choose them.
+    expect(store.getData().prefs.lyrics).toBe(false)
   })
 
   it('saves settings changed while signed in to the account, and sends nothing while signed out', async () => {

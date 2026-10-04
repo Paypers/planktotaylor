@@ -18,6 +18,8 @@ import { Confetti } from './Confetti'
 import { StampMark } from './EraBadge'
 import { Flame, Icon, LightMark, LightStar } from './Icon'
 import { LiveStrip } from './live/LiveStrip'
+import { PlankLyrics } from './lyrics/PlankLyrics'
+import { useLyrics } from './lyrics/useLyrics'
 import { PlankedTogether } from './live/PlankedTogether'
 import { useLivePlank } from './live/useLivePlank'
 import { RankBar, RankPlaque } from './Rank'
@@ -235,6 +237,10 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
 
   const active = phase === 'countdown' || phase === 'waiting' || phase === 'running' || phase === 'paused'
   useWakeLock(active)
+  // From the end of the 3-2-1: the video on top, the timer and buttons in the middle, lyrics below.
+  const focus = phase === 'waiting' || phase === 'running' || phase === 'paused'
+  // Only with the video: its position is what keeps the words in time.
+  const lyrics = useLyrics(song, prefs.lyrics && music.mode === 'video')
 
   useEffect(() => {
     document.body.classList.add('no-scroll')
@@ -704,7 +710,7 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
   }[phase]
 
   return (
-    <div ref={root} className="plank" role="dialog" aria-modal="true" aria-label={`Plank to ${song.title}`}>
+    <div ref={root} className={`plank${focus ? ' focus' : ''}`} role="dialog" aria-modal="true" aria-label={`Plank to ${song.title}`}>
       {prefs.lights && <Aurora album={album} on={phase === 'running'} />}
       <div className="plank-inner">
         <div className="plank-top">
@@ -852,6 +858,7 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
             </>
           )}
         </div>
+        {focus && lyrics && <PlankLyrics lyrics={lyrics} seconds={elapsed / 1000} />}
       </div>
 
       <ConfirmDialog
@@ -1116,14 +1123,14 @@ interface ShownLight {
 /**
  * Somewhere for a light on screen: within the plank's column, clear of the top bar, who's planking together,
  * the timer, the coaching line, the count of lights, the video and the buttons. The light is see-through, so
- * it never sits on words.
+ * it never sits on words. Lyrics fill most of what's left, so it keeps off only the line being sung.
  */
 function findLightSpot(plank: HTMLElement | null): { x: number; y: number } | null {
   const column = plank?.querySelector('.plank-inner')?.getBoundingClientRect()
   if (!plank || !column) return null
   const margin = 12
   const area: Box = { left: column.left + margin, top: margin, right: column.right - margin, bottom: window.innerHeight - margin }
-  const avoid: Box[] = [...plank.querySelectorAll('.plank-top, .live-strip, .plank-clock, .plank-coach, .plank-lights-caught, .plank-music, .plank-actions')]
+  const avoid: Box[] = [...plank.querySelectorAll('.plank-top, .live-strip, .plank-clock, .plank-coach, .plank-lights-caught, .plank-music, .plank-actions, .lyrics-lines .current, .lyrics-credit')]
     .map((el) => el.getBoundingClientRect())
     .filter((r) => r.width > 0 && r.height > 0)
   return placeLight(area, avoid, LIGHT_SIZE)

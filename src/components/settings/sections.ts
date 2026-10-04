@@ -21,7 +21,7 @@ export interface SettingsSection {
 // moving one is moving its entry.
 export const SECTIONS: SettingsSection[] = [
   { id: 'appearance', label: 'Appearance', summary: 'Theme and colors', icon: 'palette', Content: AppearanceSettings },
-  { id: 'plank', label: 'Plank', summary: 'Aurora lights', icon: 'sparkles', Content: PlankSettings },
+  { id: 'plank', label: 'Plank', summary: 'Aurora lights and lyrics', icon: 'sparkles', Content: PlankSettings },
   // Only on a site with reminders set up (see "Daily reminders" in the README).
   ...(remindersAvailable
     ? [{ id: 'reminders', label: 'Reminders', summary: 'A nudge to plank each day', icon: 'bell' as const, Content: ReminderSettings }]

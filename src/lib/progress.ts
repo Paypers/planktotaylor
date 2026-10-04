@@ -50,6 +50,8 @@ export interface Prefs {
   lights: boolean
   /** How loud the beeps and chimes are: 1 as they were made, 0 silent, up to MAX_VOLUME. Settings saved before there was a slider don't have it: 1. */
   volume: number
+  /** Lyrics under the plank screen's buttons. Off until each person turns them on: they're community-made and unlicensed. */
+  lyrics: boolean
   /** When they were last changed, on any device. Absent until they are: the account's copy wins. */
   updatedAt?: string
 }
@@ -66,7 +68,7 @@ export function emptyData(): AppData {
     v: 1,
     completions: [],
     ladder: { level: 1, updatedAt: new Date(0).toISOString() },
-    prefs: { music: true, sounds: true, lights: true, volume: 1 },
+    prefs: { music: true, sounds: true, lights: true, volume: 1, lyrics: false },
   }
 }
 
