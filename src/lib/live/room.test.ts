@@ -14,6 +14,7 @@ import {
   roundIsOver,
   settle,
   snapshot,
+  STRETCH_MS,
   syncFor,
   tick,
   type Room,
@@ -23,6 +24,7 @@ import {
 const SONG = 200
 
 const start = (seq: number, from: string, round = 1): Command => ({ type: 'start', seq, from, round })
+const stretch = (seq: number, from: string, round = 1): Command => ({ type: 'start', seq, from, round, stretch: true })
 const pause = (seq: number, from: string, at: number): Command => ({ type: 'pause', seq, from, at })
 const resume = (seq: number, from: string, at: number): Command => ({ type: 'resume', seq, from, at })
 const sync = (seq: number, at: number): Sync => ({ type: 'sync', seq, from: 'host', at })
@@ -161,6 +163,55 @@ describe("the room's clock", () => {
   })
 })
 
+describe('stretching together first', () => {
+  /** Started with a stretch at 0: the 3-2-1 from 60 000, the song from 63 000. */
+  const stretching = () => arrive(newRoom(), [stretch(1, 'a'), 0])
+
+  it('stretches for a minute, then counts down, then runs from the top', () => {
+    const room = stretching()
+    expect(room.state).toMatchObject({ phase: 'stretch', at: 0, stretchEnds: STRETCH_MS, countdownEnds: STRETCH_MS + 3000, round: 1 })
+    expect(room.here).toBe(1)
+    expect(tick(room, STRETCH_MS - 1)).toBe(room)
+    expect(tick(room, STRETCH_MS).state).toMatchObject({ phase: 'countdown', stretchEnds: null, countdownEnds: STRETCH_MS + 3000 })
+    // Late to tick, straight through the 3-2-1: running since it ended.
+    expect(tick(room, STRETCH_MS + 3400).state).toMatchObject({ phase: 'running', since: STRETCH_MS + 3000, countdownEnds: null })
+    expect(position(room.state, 30_000)).toBe(0)
+    expect(position(room.state, STRETCH_MS + 4500)).toBe(1.5)
+  })
+
+  it('sends a Start that stretches first, and has no Pause during the stretch', () => {
+    const pressed = press(newRoom(), 'stretch', 'a', 0, SONG)
+    expect(pressed?.command).toEqual({ type: 'start', seq: 1, from: 'a', round: 1, stretch: true })
+    expect(pressed?.room.state.phase).toBe('stretch')
+    expect(press(pressed!.room, 'pause', 'a', 10_000, SONG)).toBeNull()
+    expect(press(pressed!.room, 'stretch', 'a', 10_000, SONG)).toBeNull()
+    expect(arrive(stretching(), [pause(2, 'b', 0), 10_000]).state.phase).toBe('stretch')
+  })
+
+  it('settles a Start and a Stretch pressed at once the same way on every device', () => {
+    const onA = arrive(newRoom(), [start(1, 'a'), 0], [stretch(1, 'b'), 80])
+    const onB = arrive(newRoom(), [stretch(1, 'b'), 0], [start(1, 'a'), 80])
+    expect(onA.state.phase).toBe('stretch')
+    expect(onB.state.phase).toBe('stretch')
+    expect(onA.last).toEqual(onB.last)
+  })
+
+  it('lets someone arriving during the stretch into the round, part way through it', () => {
+    const snap = snapshot(stretching(), 'a', 20_000)
+    expect(snap).toMatchObject({ phase: 'stretch', stretchLeftMs: 40_000, countdownLeftMs: 3000 })
+    const joined = adopt(newRoom(), snap, 1000)
+    expect(joined.state).toMatchObject({ phase: 'stretch', stretchEnds: 41_000, countdownEnds: 44_000, round: 1 })
+    expect(joined.here).toBe(1)
+    // Arriving in the 3-2-1 after it is too late: they watch.
+    expect(adopt(newRoom(), snapshot(stretching(), 'a', STRETCH_MS + 1000), 1000).here).toBeNull()
+  })
+
+  it('ends when everyone steps out during the stretch', () => {
+    const over = settle(stretching(), [member('a', 'out')], 10_000, SONG)
+    expect(over.state).toMatchObject({ phase: 'over', at: 0, stretchEnds: null, countdownEnds: null })
+  })
+})
+
 describe("keeping in step with the host's clock", () => {
   const run = tick(running(), 3000)
 
@@ -230,7 +281,7 @@ describe('joining a room mid-round', () => {
     const host = arrive(running(), [pause(2, 'b', 40), 43_000], [resume(3, 'a', 40), 50_000])
     // 5 seconds later on the host; the newcomer's clock reads 1000.
     const snap = snapshot(tick(host, 55_000), 'a', 55_000)
-    expect(snap).toMatchObject({ type: 'state', seq: 3, by: 'a', phase: 'running', at: 42, countdownLeftMs: 0, round: 1 })
+    expect(snap).toMatchObject({ type: 'state', seq: 3, by: 'a', phase: 'running', at: 42, stretchLeftMs: 0, countdownLeftMs: 0, round: 1 })
     const joined = adopt(newRoom(), snap, 1000)
     expect(joined.state).toMatchObject({ phase: 'running', at: 42, since: 1000, pauses: [{ at: 40, ms: 10_000 }], round: 1 })
     expect(position(joined.state, 2000)).toBe(43)

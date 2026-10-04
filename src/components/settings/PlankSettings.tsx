@@ -22,6 +22,18 @@ export function PlankSettings() {
           Missing one costs nothing. Turned off, there are no lights and no light XP.
         </p>
       </section>
+      <section className="settings-group" aria-labelledby="stretch-heading">
+        <h3 id="stretch-heading">Stretching together</h3>
+        <p>
+          Planking together, whoever starts can choose to stretch first: a minute of gentle stretches, the same on everyone's
+          screen, then the 3-2-1.
+        </p>
+        <label className="switch-row">
+          <input type="checkbox" checked={prefs.stretch} onChange={(e) => setPrefs({ stretch: e.target.checked })} />
+          <span>Stretch along with the room</span>
+        </label>
+        <p className="fine">Turned off, you skip the stretch and get the 3-2-1 with everyone. You can change it during a stretch too.</p>
+      </section>
       <LyricsSetting on={prefs.lyrics} />
     </>
   )

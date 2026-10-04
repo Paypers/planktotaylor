@@ -6,6 +6,8 @@ import type { Command, Snapshot, Sync } from './messages'
 
 /** The 3-2-1 before the song starts, or carries on after a pause. */
 export const COUNTDOWN_MS = 3000
+/** The stretch together before the 3-2-1, when whoever pressed Start chose one. */
+export const STRETCH_MS = 60_000
 /** How often the host sends its place in the song while planking. */
 export const SYNC_EVERY_MS = 4000
 // Further out than this, a device moves back into step with the host. Any closer, a jump would be worse.
@@ -35,9 +37,10 @@ export interface Room extends Settled {
   before: Settled | null
 }
 
-export type Press = 'start' | 'pause' | 'resume'
+/** Stretch is a Start with the stretch first. */
+export type Press = 'start' | 'stretch' | 'pause' | 'resume'
 
-export const LOBBY: LiveState = { phase: 'lobby', at: 0, since: 0, countdownEnds: null, pauses: [], round: 0 }
+export const LOBBY: LiveState = { phase: 'lobby', at: 0, since: 0, stretchEnds: null, countdownEnds: null, pauses: [], round: 0 }
 
 export const newRoom = (): Room => ({ state: LOBBY, last: { seq: 0, from: '' }, pauseStart: null, here: null, highest: 0, before: null })
 
@@ -46,10 +49,12 @@ export function compareStamps(a: Stamp, b: Stamp): number {
   return a.seq - b.seq || (a.from < b.from ? -1 : a.from > b.from ? 1 : 0)
 }
 
-/** A 3-2-1 that has run out is running: from `at`, since the moment it ended. */
+/** A stretch that has run out is the 3-2-1, and a 3-2-1 that has run out is running: from `at`, since the moment it ended. */
 export function advance(state: LiveState, now: number): LiveState {
-  if (state.phase !== 'countdown' || state.countdownEnds === null || now < state.countdownEnds) return state
-  return { ...state, phase: 'running', since: state.countdownEnds, countdownEnds: null }
+  const stretched = state.phase === 'stretch' && state.stretchEnds !== null && now >= state.stretchEnds
+  const counting: LiveState = stretched ? { ...state, phase: 'countdown', stretchEnds: null } : state
+  if (counting.phase !== 'countdown' || counting.countdownEnds === null || now < counting.countdownEnds) return counting
+  return { ...counting, phase: 'running', since: counting.countdownEnds, countdownEnds: null }
 }
 
 export function tick(room: Room, now: number): Room {
@@ -77,9 +82,10 @@ function step(base: Settled, command: Command, now: number, songSeconds: number)
   const last = { seq: command.seq, from: command.from }
   if (command.type === 'start') {
     if (command.round <= state.round) return null
-    const ends = now + COUNTDOWN_MS
+    const stretchEnds = command.stretch ? now + STRETCH_MS : null
+    const ends = (stretchEnds ?? now) + COUNTDOWN_MS
     return {
-      state: { phase: 'countdown', at: 0, since: ends, countdownEnds: ends, pauses: [], round: command.round },
+      state: { phase: stretchEnds === null ? 'countdown' : 'stretch', at: 0, since: ends, stretchEnds, countdownEnds: ends, pauses: [], round: command.round },
       last,
       pauseStart: null,
       here: command.round,
@@ -112,15 +118,16 @@ export function receive(room: Room, command: Command, now: number, songSeconds: 
   return { ...next, highest: Math.max(room.highest, command.seq), before: base }
 }
 
-/** This device's Start, Pause or Continue: the room with it applied, and the command to send. Null when it does nothing now. */
+/** This device's Start, Stretch, Pause or Continue: the room with it applied, and the command to send. Null when it does nothing now. */
 export function press(room: Room, what: Press, me: string, now: number, songSeconds: number): { room: Room; command: Command } | null {
   const seq = room.highest + 1
   const state = advance(room.state, now)
+  const starting = what === 'start' || what === 'stretch'
   // A Start from elsewhere is taken mid-round (they saw the round end first), but this device's own waits for it.
-  if (what === 'start' && state.phase !== 'lobby' && state.phase !== 'over') return null
+  if (starting && state.phase !== 'lobby' && state.phase !== 'over') return null
   const command: Command =
-    what === 'start'
-      ? { type: 'start', seq, from: me, round: state.round + 1 }
+    starting
+      ? { type: 'start', seq, from: me, round: state.round + 1, ...(what === 'stretch' ? { stretch: true as const } : {}) }
       : { type: what, seq, from: me, at: what === 'pause' ? position(state, now, songSeconds) : state.at }
   const next = receive(room, command, now, songSeconds)
   return next.last === room.last ? null : { room: next, command }
@@ -153,6 +160,7 @@ export function snapshot(room: Room, from: string, now: number): Snapshot {
     by: room.last.from,
     phase: state.phase,
     at: songTime(state, now),
+    stretchLeftMs: state.stretchEnds === null ? 0 : Math.min(STRETCH_MS, Math.max(0, state.stretchEnds - now)),
     countdownLeftMs: state.countdownEnds === null ? 0 : Math.min(COUNTDOWN_MS, Math.max(0, state.countdownEnds - now)),
     pausedMs: state.phase === 'paused' && room.pauseStart !== null ? Math.max(0, now - room.pauseStart) : 0,
     pauses: state.pauses,
@@ -160,17 +168,21 @@ export function snapshot(room: Room, from: string, now: number): Snapshot {
   }
 }
 
-/** The host's room, taken when it's further on than this device's: joining, or after missing a command. */
+/**
+ * The host's room, taken when it's further on than this device's: joining, or after missing a command. Arriving
+ * during the stretch is in time for the round: nobody's planking yet.
+ */
 export function adopt(room: Room, snap: Snapshot, now: number): Room {
   const last = { seq: snap.seq, from: snap.by }
   if (compareStamps(last, room.last) <= 0) return withHighest(room, snap.seq)
   const { phase, at, pauses, round } = snap
-  const ends = phase === 'countdown' ? now + snap.countdownLeftMs : null
+  const stretchEnds = phase === 'stretch' ? now + snap.stretchLeftMs : null
+  const ends = stretchEnds !== null ? stretchEnds + COUNTDOWN_MS : phase === 'countdown' ? now + snap.countdownLeftMs : null
   return {
-    state: { phase, at, since: ends ?? now, countdownEnds: ends, pauses, round },
+    state: { phase, at, since: ends ?? now, stretchEnds, countdownEnds: ends, pauses, round },
     last,
     pauseStart: phase === 'paused' ? now - snap.pausedMs : null,
-    here: room.here,
+    here: phase === 'stretch' ? round : room.here,
     highest: Math.max(room.highest, snap.seq),
     before: null,
   }
@@ -190,5 +202,5 @@ export function settle(room: Room, members: readonly LiveMember[], now: number, 
   const current = tick(room, now)
   if (!roundIsOver(current.state, members, now, songSeconds)) return current
   const at = position(current.state, now, songSeconds)
-  return { ...current, state: { ...current.state, phase: 'over', at, since: now, countdownEnds: null }, pauseStart: null }
+  return { ...current, state: { ...current.state, phase: 'over', at, since: now, stretchEnds: null, countdownEnds: null }, pauseStart: null }
 }

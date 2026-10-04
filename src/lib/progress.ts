@@ -52,6 +52,8 @@ export interface Prefs {
   volume: number
   /** Lyrics under the plank screen's buttons. Off until each person turns them on: they're community-made and unlicensed. */
   lyrics: boolean
+  /** Stretch along when a room planking together stretches first. Off: skip it, and wait for the 3-2-1. Settings saved before there was a stretch don't have it: on. */
+  stretch: boolean
   /** When they were last changed, on any device. Absent until they are: the account's copy wins. */
   updatedAt?: string
 }
@@ -68,7 +70,7 @@ export function emptyData(): AppData {
     v: 1,
     completions: [],
     ladder: { level: 1, updatedAt: new Date(0).toISOString() },
-    prefs: { music: true, sounds: true, lights: true, volume: 1, lyrics: false },
+    prefs: { music: true, sounds: true, lights: true, volume: 1, lyrics: false, stretch: true },
   }
 }
 

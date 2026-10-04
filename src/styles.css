@@ -3800,6 +3800,12 @@ a {
   line-height: 26px;
 }
 
+/* Stretching together: the move's name in the coaching line, how to do it after. */
+.stretch-how {
+  font-weight: 400;
+  color: var(--ink-2);
+}
+
 .plank-music {
   display: grid;
   gap: 8px;

@@ -41,12 +41,15 @@ export interface Followed {
   round: number
 }
 
+/** Where the plank screen can follow the room to: anywhere but between planks. */
+export type RoomStepTo = Exclude<LivePhase, 'lobby' | 'over'>
+
 /**
  * What the plank screen does when the room changes. `fresh` is a plank new to this screen: it's only just
  * opened, or someone started another round. Null when there's nothing to do: the room only put its clock
  * right, or it's between planks.
  */
-export function roomStep(followed: Followed | null, room: LiveState): { to: 'countdown' | 'running' | 'paused'; fresh: boolean } | null {
+export function roomStep(followed: Followed | null, room: LiveState): { to: RoomStepTo; fresh: boolean } | null {
   if (room.phase === 'lobby' || room.phase === 'over') return null
   const fresh = followed === null || followed.round !== room.round
   if (!fresh && followed.phase === room.phase) return null

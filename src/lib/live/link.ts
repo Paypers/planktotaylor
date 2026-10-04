@@ -20,12 +20,13 @@ export interface LiveMember {
 
 /**
  * lobby      waiting for someone to press Start
+ * stretch    a minute's stretch together before the 3-2-1, when whoever started chose one
  * countdown  3, 2, 1: before the song starts, or before it carries on after a pause
  * running    planking
  * paused     someone paused, so everyone has stopped
  * over       everyone has finished or stepped out. Start again goes back to countdown.
  */
-export type LivePhase = 'lobby' | 'countdown' | 'running' | 'paused' | 'over'
+export type LivePhase = 'lobby' | 'stretch' | 'countdown' | 'running' | 'paused' | 'over'
 
 /** The room's plank as this device sees it. Times are this device's `performance.now()`. */
 export interface LiveState {
@@ -33,7 +34,9 @@ export interface LiveState {
   /** Where the room is in the song, in seconds, as of `since`. */
   at: number
   since: number
-  /** In countdown: when it ends and the song starts (or carries on) from `at`. */
+  /** In stretch: when it ends and the 3-2-1 begins. */
+  stretchEnds: number | null
+  /** In stretch or countdown: when the 3-2-1 ends and the song starts (or carries on) from `at`. */
   countdownEnds: number | null
   /** The breaks the room has taken this round, whoever paused. */
   pauses: Pause[]
@@ -54,6 +57,8 @@ export interface LiveLink {
   position: () => number
   /** Everyone's 3-2-1 begins, and the song starts from the top. */
   start: () => void
+  /** Everyone stretches together for a minute first, then the 3-2-1. Each person can skip the stretch for themselves. */
+  stretch: () => void
   /** Everyone stops where this device is now. The plank screen records the break itself: only for whoever pressed it. */
   pause: () => void
   /** Everyone gets a 3-2-1, then carries on from where the room paused. */

@@ -121,7 +121,8 @@ function openRoom(code: string, name: string, songSeconds: number, report: (stat
     room = next
     if (newRound) updateMembers()
     clearTimeout(countdownTimer)
-    const ends = room.state.countdownEnds
+    // The stretch ending starts the 3-2-1, and the 3-2-1 ending starts the song: each straight away.
+    const ends = room.state.stretchEnds ?? room.state.countdownEnds
     if (ends !== null) countdownTimer = setTimeout(() => setRoom(tick(room, now())), Math.max(0, ends - now()) + 5)
     notify()
   }
@@ -317,6 +318,7 @@ function openRoom(code: string, name: string, songSeconds: number, report: (stat
     getState: () => room.state,
     position: () => position(room.state, now(), songSeconds),
     start: () => act('start'),
+    stretch: () => act('stretch'),
     pause: () => act('pause'),
     resume: () => act('resume'),
     setStatus,

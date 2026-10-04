@@ -45,6 +45,8 @@ export const sounds = {
   lastThirty: () => [880, 880, 1174.66].forEach((f, i) => tone(f, i * 0.16, i === 2 ? 0.35 : 0.14, 0.18)),
   /** An aurora light has appeared: a soft, high bell, held. */
   light: () => [1046.5, 1567.98].forEach((f) => tone(f, 0, 1.1, 0.07)),
+  /** On to the next move of a stretch together: one soft, low note. */
+  stretch: () => tone(523.25, 0, 0.45, 0.14),
   /** Past your best on this song: a quick high sparkle. */
   pastBest: () => [1318.51, 1567.98, 2093].forEach((f, i) => tone(f, i * 0.08, 0.28, 0.12)),
 }

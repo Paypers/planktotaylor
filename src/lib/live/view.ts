@@ -49,8 +49,9 @@ export function roundTotal(time: RoundTime): string {
   return total < 3600 ? formatDuration(Math.round(total)) : togetherTime(total)
 }
 
-/** Where the room is, for someone watching: "1:12 of 2:59", paused, or counting in. */
-export function roomProgress(phase: LivePhase, seconds: number, songSeconds: number): string {
+/** Where the room is, for someone watching: "1:12 of 2:59", paused, counting in, or stretching with `stretchLeft` seconds to go. */
+export function roomProgress(phase: LivePhase, seconds: number, songSeconds: number, stretchLeft = 0): string {
+  if (phase === 'stretch') return `Stretching first: the 3-2-1 in ${formatDuration(Math.ceil(stretchLeft))}`
   const where = `${formatDuration(Math.floor(seconds))} of ${formatDuration(songSeconds)}`
   if (phase === 'paused') return `Paused at ${where}`
   if (phase === 'countdown') return seconds < 1 ? 'Starting: 3, 2, 1…' : `Carrying on from ${where}`

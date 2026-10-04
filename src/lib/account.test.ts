@@ -161,6 +161,8 @@ describe('account sync', () => {
     expect(store.getData().prefs.volume).toBe(1)
     // And before there were lyrics: off, as for everyone until they choose them.
     expect(store.getData().prefs.lyrics).toBe(false)
+    // And before stretching together: stretching along.
+    expect(store.getData().prefs.stretch).toBe(true)
   })
 
   it('saves settings changed while signed in to the account, and sends nothing while signed out', async () => {

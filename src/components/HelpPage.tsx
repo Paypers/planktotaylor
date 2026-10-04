@@ -256,6 +256,13 @@ export function HelpPage() {
             once. If anyone pauses, everyone pauses. It just says Paused, never who. Anyone can carry on, with a 3-2-1 for
             everyone first.
           </dd>
+          <dt>Stretch first</dt>
+          <dd>
+            Press Stretch first instead, and everyone gets a minute of gentle stretches before the 3-2-1, the same move on
+            every screen at the same moment. Not up for it? Skip the stretch for yourself (or turn it off in Settings →
+            Plank): you wait, and get the 3-2-1 with everyone. Someone who arrives during the stretch is in time for the
+            round.
+          </dd>
           <dt>Your breaks are your own</dt>
           <dd>Only the pauses you press count as your breaks. When someone else pauses, you keep your no-break bonus.</dd>
           <dt>What it counts for</dt>

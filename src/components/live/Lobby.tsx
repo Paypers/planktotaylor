@@ -15,9 +15,10 @@ interface Props {
 
 /** Waiting to start: the song, who's here, and the link to bring more. Anyone can press Start. */
 export function Lobby({ link, members, code, song }: Props) {
-  const start = () => {
+  const start = (stretch: boolean) => {
     unlockAudio()
-    link.start()
+    if (stretch) link.stretch()
+    else link.start()
   }
   return (
     <>
@@ -31,11 +32,17 @@ export function Lobby({ link, members, code, song }: Props) {
           <SongLine song={song} />
           <p className="live-note">Anyone can pause for everyone. Only your own pauses count as your breaks.</p>
           <div className="button-row">
-            <button type="button" className="btn btn-primary" onClick={start}>
+            <button type="button" className="btn btn-primary" onClick={() => start(false)}>
               Start together
             </button>
+            <button type="button" className="btn btn-secondary" onClick={() => start(true)}>
+              Stretch first
+            </button>
           </div>
-          <p className="fine">Everyone here gets a 3-2-1, and the song starts at the same moment for all of you.</p>
+          <p className="fine">
+            Everyone here gets a 3-2-1, and the song starts at the same moment for all of you. Stretch first adds a minute of
+            gentle stretches together before it. Anyone can skip the stretch for themselves.
+          </p>
         </div>
       </section>
       <RoomPeople members={members} me={link.me} />

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { DRIFT_SECONDS, SEEK_GAP_MS, SEEK_SETTLE_MS, countdownLeft, roomMs, roomStep, shouldSeek, videoPauseIsMine } from './follow'
 import type { LiveState } from './link'
 
-const room = (fields: Partial<LiveState>): LiveState => ({ phase: 'running', at: 0, since: 0, countdownEnds: null, pauses: [], round: 1, ...fields })
+const room = (fields: Partial<LiveState>): LiveState => ({ phase: 'running', at: 0, since: 0, stretchEnds: null, countdownEnds: null, pauses: [], round: 1, ...fields })
 
 describe("the timer on the room's clock", () => {
   it('reads the room in ms, within the song', () => {
@@ -87,6 +87,12 @@ describe('following the room', () => {
   it('ignores the room only putting its clock right', () => {
     expect(roomStep({ phase: 'running', round: 1 }, room({ phase: 'running', at: 42, since: 9_000 }))).toBeNull()
     expect(roomStep({ phase: 'paused', round: 1 }, room({ phase: 'paused', at: 42 }))).toBeNull()
+  })
+
+  it('stretches first, then follows into the 3-2-1', () => {
+    expect(roomStep({ phase: 'lobby', round: 0 }, room({ phase: 'stretch', round: 1 }))).toEqual({ to: 'stretch', fresh: true })
+    expect(roomStep(null, room({ phase: 'stretch' }))).toEqual({ to: 'stretch', fresh: true })
+    expect(roomStep({ phase: 'stretch', round: 1 }, room({ phase: 'countdown' }))).toEqual({ to: 'countdown', fresh: false })
   })
 
   it('starts fresh for another round', () => {

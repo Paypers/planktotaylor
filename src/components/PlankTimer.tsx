@@ -11,7 +11,7 @@ import type { Collection, StampNews } from '../lib/eras'
 import { LIGHT_SHOW_MS, LIGHT_SIZE, lightTimes, placeLight, type Box } from '../lib/lights'
 import { useTellGroupsImPlanking } from '../lib/plankingNow/channels'
 import { sounds, unlockAudio } from '../lib/sound'
-import { getData } from '../lib/store'
+import { getData, setPrefs } from '../lib/store'
 import { LIGHT_XP, MARATHON_SECONDS, type XpAward } from '../lib/xp'
 import { youtubeUrl } from '../lib/youtube'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -22,6 +22,7 @@ import { LiveStrip } from './live/LiveStrip'
 import { PlankLyrics } from './lyrics/PlankLyrics'
 import { useLyrics } from './lyrics/useLyrics'
 import { PlankedTogether } from './live/PlankedTogether'
+import { StretchGuide } from './live/StretchGuide'
 import { useLivePlank } from './live/useLivePlank'
 import { RankBar, RankPlaque } from './Rank'
 import { RankEmblem } from './RankEmblem'
@@ -107,6 +108,7 @@ interface Props {
 
 /**
  * ready      waiting for Start
+ * stretch    planking together: the room's stretching before its 3-2-1
  * countdown  3, 2, 1
  * waiting    countdown over, waiting for the song to actually play
  * running    planking
@@ -114,7 +116,7 @@ interface Props {
  * done       held to the end
  * quit       ended early: gave up, went offline or left
  */
-type Phase = 'ready' | 'countdown' | 'waiting' | 'running' | 'paused' | 'done' | 'quit'
+type Phase = 'ready' | 'stretch' | 'countdown' | 'waiting' | 'running' | 'paused' | 'done' | 'quit'
 
 /**
  * video   the timer reads the song's position, so the two can never drift apart
@@ -236,7 +238,7 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
   const chimed = useRef({ halfway: false, lastThirty: false })
   const finished = useRef(false)
 
-  const active = phase === 'countdown' || phase === 'waiting' || phase === 'running' || phase === 'paused'
+  const active = phase === 'stretch' || phase === 'countdown' || phase === 'waiting' || phase === 'running' || phase === 'paused'
   useWakeLock(active)
   // From the end of the 3-2-1: the video on top, the timer and buttons in the middle, lyrics below.
   const focus = phase === 'waiting' || phase === 'running' || phase === 'paused'
@@ -638,9 +640,10 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
     }
   }, [stalled, phase])
 
-  // Mid-plank, ask first. The song and the timer carry on while you decide.
-  const close = () => (active ? setAskingToStop(true) : stop())
-  const confirming = askingToStop && active
+  // Mid-plank, ask first. The song and the timer carry on while you decide. The stretch isn't on the record yet: no need.
+  const asks = active && phase !== 'stretch'
+  const close = () => (asks ? setAskingToStop(true) : stop())
+  const confirming = askingToStop && asks
 
   const closeRef = useRef(close)
   closeRef.current = close
@@ -673,6 +676,7 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
   const secondsLeft = Math.ceil((total - elapsed) / 1000)
   const clockLabel = {
     ready: 'Plank length',
+    stretch: 'Stretching',
     countdown: 'Get ready',
     waiting: 'Starting the song',
     running: 'Time left',
@@ -690,6 +694,7 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
       : synced
         ? 'Get into position, then press Start or tap ▶ on the video: either way, a 3-second countdown. The timer runs with the song.'
         : "Get into position, then press Start. You'll get a 3-second countdown.",
+    stretch: '',
     countdown: 'Get into position.',
     waiting: music.hint ?? 'Starting the song…',
     running:
@@ -748,37 +753,43 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
               </div>
             </div>
 
-            <div className="plank-clock" role="timer" aria-label={`${clockLabel} ${clockValue}`}>
-              <p className="plank-clock-label">{clockLabel}</p>
-              <p
-                key={phase === 'countdown' ? shownCount : 'time'}
-                className={`plank-time${clockValue.length > 4 ? ' long' : ''}${phase === 'countdown' ? ' counting' : ''}`}
-              >
-                {clockValue}
-              </p>
-            </div>
-
-            <div className={`plank-progress${ghost !== null ? ' has-ghost' : ''}`}>
-              <div className="plank-bar">
-                <div className="bar">
-                  <span style={{ width: `${Math.min(1, elapsed / total) * 100}%`, background: album.color }} />
+            {phase === 'stretch' ? (
+              <StretchGuide ends={together.stretchEnds ?? performance.now()} joining={prefs.stretch} withSounds={prefs.sounds} color={album.color} />
+            ) : (
+              <>
+                <div className="plank-clock" role="timer" aria-label={`${clockLabel} ${clockValue}`}>
+                  <p className="plank-clock-label">{clockLabel}</p>
+                  <p
+                    key={phase === 'countdown' ? shownCount : 'time'}
+                    className={`plank-time${clockValue.length > 4 ? ' long' : ''}${phase === 'countdown' ? ' counting' : ''}`}
+                  >
+                    {clockValue}
+                  </p>
                 </div>
-                {ghost !== null && <GhostMarker at={ghost} length={song.seconds} passed={passedGhost} />}
-              </div>
-              <div className="plank-progress-times">
-                <span>{formatDuration(elapsed / 1000)}</span>
-                {pauses.length > 0 && (
-                  <span className="plank-pauses">
-                    {pauses.length} {pauses.length === 1 ? 'pause' : 'pauses'}, {formatDuration(pausedSeconds(pauses))}
-                  </span>
-                )}
-                <span>{formatDuration(song.seconds)}</span>
-              </div>
-            </div>
 
-            <p className="plank-coach" aria-live="polite">
-              {coach}
-            </p>
+                <div className={`plank-progress${ghost !== null ? ' has-ghost' : ''}`}>
+                  <div className="plank-bar">
+                    <div className="bar">
+                      <span style={{ width: `${Math.min(1, elapsed / total) * 100}%`, background: album.color }} />
+                    </div>
+                    {ghost !== null && <GhostMarker at={ghost} length={song.seconds} passed={passedGhost} />}
+                  </div>
+                  <div className="plank-progress-times">
+                    <span>{formatDuration(elapsed / 1000)}</span>
+                    {pauses.length > 0 && (
+                      <span className="plank-pauses">
+                        {pauses.length} {pauses.length === 1 ? 'pause' : 'pauses'}, {formatDuration(pausedSeconds(pauses))}
+                      </span>
+                    )}
+                    <span>{formatDuration(song.seconds)}</span>
+                  </div>
+                </div>
+
+                <p className="plank-coach" aria-live="polite">
+                  {coach}
+                </p>
+              </>
+            )}
             {prefs.lights && phase === 'ready' && (
               <p className="plank-lights-note" style={{ '--glow': album.color } as CSSProperties}>
                 <LightMark />
@@ -801,6 +812,12 @@ export function PlankTimer({ session, prefs, earningXp, onFinish, onShare, onClo
           {phase === 'ready' && (
             <button type="button" className="btn btn-primary btn-lg" onClick={start} autoFocus>
               Start
+            </button>
+          )}
+          {phase === 'stretch' && (
+            // Each person's own: the room stretches on either way.
+            <button type="button" className="btn btn-secondary btn-lg" onClick={() => setPrefs({ stretch: !prefs.stretch })}>
+              {prefs.stretch ? 'Skip the stretch' : 'Stretch along'}
             </button>
           )}
           {phase === 'countdown' && !live && (

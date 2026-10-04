@@ -25,7 +25,7 @@ export function RoomStage({ link, code, song, today, renderPlank, onShareTogethe
   const state = useSyncExternalStore(link.subscribe, link.getState)
   const members = useSyncExternalStore(link.subscribe, link.getMembers)
   const here = link.startedHere()
-  const live = state.phase === 'countdown' || state.phase === 'running' || state.phase === 'paused'
+  const live = state.phase === 'stretch' || state.phase === 'countdown' || state.phase === 'running' || state.phase === 'paused'
   const [plank, setPlank] = useState<{ round: number; session: PlankSession } | null>(null)
   const opened = useRef(0)
 

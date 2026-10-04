@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { countdownLeft, roomStep, shouldSeek, videoPauseIsMine, type Followed } from '../../lib/live/follow'
+import { countdownLeft, roomStep, shouldSeek, videoPauseIsMine, type Followed, type RoomStepTo } from '../../lib/live/follow'
 import type { LiveLink, LiveMember } from '../../lib/live/link'
 import { sounds, unlockAudio } from '../../lib/sound'
 import type { PlayerEvents, useMusic } from '../useMusic'
@@ -10,8 +10,8 @@ export interface LivePlankHandlers {
   following: () => boolean
   /** Your timer is running. */
   planking: () => boolean
-  /** The room began a 3-2-1, is planking, or has paused. Fresh: a plank new to this screen. */
-  step: (to: 'countdown' | 'running' | 'paused', fresh: boolean) => void
+  /** The room began a stretch or a 3-2-1, is planking, or has paused. Fresh: a plank new to this screen. */
+  step: (to: RoomStepTo, fresh: boolean) => void
   /** You paused the video itself: the same as pressing Pause. */
   pause: () => void
 }
@@ -52,7 +52,7 @@ export function useLivePlank(live: LiveLink | undefined, music: ReturnType<typeo
     musicRef.current.seek(at)
   }, [live])
 
-  // The room changed: the plank screen follows, and the song stops for a 3-2-1 or a pause and carries on
+  // The room changed: the plank screen follows, and the song stops for a stretch, a 3-2-1 or a pause and carries on
   // from where the room is. After the render settles, so React's development double-mount follows it once.
   useEffect(() => {
     if (!live || !room) return
@@ -123,7 +123,7 @@ export function useLivePlank(live: LiveLink | undefined, music: ReturnType<typeo
         // Started late by a tap on the video (phones), or after a move: into step with the room.
         if (phase === 'running') keepInStep()
         // Played from the video while everyone's stopped: it waits with them.
-        else if (phase === 'countdown' || phase === 'paused') musicRef.current.pause()
+        else if (phase === 'stretch' || phase === 'countdown' || phase === 'paused') musicRef.current.pause()
       },
       onPaused: () => {
         const wasPlaying = playing.current
@@ -142,6 +142,8 @@ export function useLivePlank(live: LiveLink | undefined, music: ReturnType<typeo
     reconnecting: connection === 'reconnecting',
     /** The countdown's 3, 2 or 1. */
     count,
+    /** While the room stretches: when the stretch ends, on this device's clock. */
+    stretchEnds: room?.phase === 'stretch' ? room.stretchEnds : null,
     /** The song hasn't started (phones want a tap on the video), but the timer has. */
     hint: running && music.mode === 'video' && music.hint ? TAP_HINT : null,
     /** The player's events while planking together: null planking alone. */

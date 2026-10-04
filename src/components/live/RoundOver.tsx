@@ -36,9 +36,10 @@ export function RoundOver({ link, members, finishers, time, state, song, today, 
         ? `${finishers[0].id === link.me ? 'You' : finishers[0].name} planked ${song.title}`
         : "That's the round"
   const share = () => onShareTogether({ song, day: today, finishers: finishers.map((m) => m.name), pauses: state.pauses })
-  const again = () => {
+  const again = (stretch: boolean) => {
     unlockAudio()
-    link.start()
+    if (stretch) link.stretch()
+    else link.start()
   }
 
   return (
@@ -74,8 +75,11 @@ export function RoundOver({ link, members, finishers, time, state, song, today, 
                   Share together
                 </button>
               )}
-              <button type="button" className="btn btn-secondary" onClick={again}>
+              <button type="button" className="btn btn-secondary" onClick={() => again(false)}>
                 Start again
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => again(true)}>
+                Stretch first
               </button>
             </div>
           ) : (

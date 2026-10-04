@@ -49,6 +49,7 @@ describe('where the room is, for someone watching', () => {
     expect(roomProgress('paused', 72.9, 179)).toBe('Paused at 1:12 of 2:59')
     expect(roomProgress('countdown', 0, 179)).toBe('Starting: 3, 2, 1…')
     expect(roomProgress('countdown', 72.9, 179)).toBe('Carrying on from 1:12 of 2:59')
+    expect(roomProgress('stretch', 0, 179, 41.2)).toBe('Stretching first: the 3-2-1 in 0:42')
   })
 })
 
