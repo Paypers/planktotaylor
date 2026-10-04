@@ -1,4 +1,10 @@
+import { getData } from './store'
+
 // Tiny synthesized cues so you can hear the countdown, how far along you are, and the finish with your face to the floor.
+
+/** The volume slider's top: twice as loud as the cues were made. Even the finish's overlapping notes stay clear of clipping. */
+export const MAX_VOLUME = 2
+
 let ctx: AudioContext | null = null
 
 /** Must run inside a tap/click; browsers keep audio locked until then. */
@@ -12,14 +18,17 @@ export function unlockAudio() {
 }
 
 function tone(frequency: number, delay: number, duration: number, volume = 0.18) {
-  if (!ctx) return
+  // Every cue goes through here, so this is the one place the volume setting applies.
+  const peak = volume * getData().prefs.volume
+  // A ramp can't reach 0, so a muted cue isn't played at all.
+  if (!ctx || peak <= 0) return
   const start = ctx.currentTime + delay
   const osc = ctx.createOscillator()
   const gain = ctx.createGain()
   osc.type = 'sine'
   osc.frequency.value = frequency
   gain.gain.setValueAtTime(0.0001, start)
-  gain.gain.exponentialRampToValueAtTime(volume, start + 0.02)
+  gain.gain.exponentialRampToValueAtTime(peak, start + 0.02)
   gain.gain.exponentialRampToValueAtTime(0.0001, start + duration)
   osc.connect(gain).connect(ctx.destination)
   osc.start(start)

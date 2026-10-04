@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { SONGS } from '../data/songs'
 import type { Prefs } from '../lib/progress'
+import { MAX_VOLUME, sounds, unlockAudio } from '../lib/sound'
 import { setPrefs } from '../lib/store'
 import { Dialog } from './Dialog'
 
@@ -16,6 +18,7 @@ export function MusicDialog({ open, prefs, onClose }: { open: boolean; prefs: Pr
         <input type="checkbox" checked={prefs.sounds} onChange={(e) => setPrefs({ sounds: e.target.checked })} />
         <span>Beeps and chimes: the countdown, halfway, the last 30 seconds and the finish</span>
       </label>
+      <VolumeSlider volume={prefs.volume} mutedBySetting={!prefs.sounds} />
 
       <div className="dialog-section">
         <h3>How it plays</h3>
@@ -29,5 +32,39 @@ export function MusicDialog({ open, prefs, onClose }: { open: boolean; prefs: Pr
         )}
       </div>
     </Dialog>
+  )
+}
+
+/**
+ * How loud the beeps and chimes are. Saved on letting go rather than at every step, since each save
+ * goes to the account too. A beep at the new level lets you hear it.
+ */
+function VolumeSlider({ volume, mutedBySetting }: { volume: number; mutedBySetting: boolean }) {
+  const [dragging, setDragging] = useState<number | null>(null)
+  const shown = dragging ?? volume
+  const save = () => {
+    if (dragging === null) return
+    setPrefs({ volume: dragging })
+    setDragging(null)
+    unlockAudio()
+    sounds.tick()
+  }
+  return (
+    <label className="volume-row">
+      <span>Volume</span>
+      <input
+        type="range"
+        min={0}
+        max={MAX_VOLUME}
+        step={0.05}
+        value={shown}
+        disabled={mutedBySetting}
+        onChange={(e) => setDragging(Number(e.target.value))}
+        onPointerUp={save}
+        onKeyUp={save}
+        onBlur={save}
+      />
+      <output>{Math.round(shown * 100)}%</output>
+    </label>
   )
 }

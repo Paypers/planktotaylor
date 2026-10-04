@@ -16,6 +16,7 @@ import {
 } from './progress'
 import { forgetAttempts, getAttempts, mergeAttempts, onAttemptEnded, type Attempt, type AttemptKind, type AttemptOutcome } from './attempts'
 import { applyPrefs, getData, onPlankRecorded, onPrefsChanged, replaceProgress } from './store'
+import { MAX_VOLUME } from './sound'
 import { accountThemes, applyAccountThemes, onThemeSaved, readSaved, type AccountThemes } from './theme'
 import { readStats, type DailyStats } from './together'
 import type { AddProblem } from './discord'
@@ -192,6 +193,7 @@ function readPrefs(value: unknown, fallback: Prefs): Prefs | null {
     music: typeof v.music === 'boolean' ? v.music : fallback.music,
     sounds: typeof v.sounds === 'boolean' ? v.sounds : fallback.sounds,
     lights: typeof v.lights === 'boolean' ? v.lights : fallback.lights,
+    volume: typeof v.volume === 'number' && v.volume >= 0 && v.volume <= MAX_VOLUME ? v.volume : fallback.volume,
     ...(typeof v.updatedAt === 'string' ? { updatedAt: v.updatedAt } : {}),
   }
 }

@@ -2547,6 +2547,29 @@ a {
   accent-color: var(--ink);
 }
 
+.volume-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 4ch;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  font-weight: 500;
+}
+
+.volume-row input {
+  width: 100%;
+  accent-color: var(--ink);
+}
+
+.volume-row output {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.volume-row:has(input:disabled) {
+  opacity: 0.5;
+}
+
 .field {
   display: grid;
   gap: 6px;
