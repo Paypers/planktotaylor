@@ -53,14 +53,17 @@ export function TodayMark({ friend }: { friend: Friend }) {
   )
 }
 
-/** A friend in a line: photo and status, name, what they're doing, and today's tick. Opens their card. */
-export function FriendRow({ friend, now, onOpen }: { friend: Friend; now: number; onOpen: () => void }) {
+/**
+ * A friend in a line: photo and status, name, what they're doing, and today's tick. Opens their card. `compact`
+ * for the friends rail, where the name and line stay on one line each.
+ */
+export function FriendRow({ friend, now, onOpen, compact = false }: { friend: Friend; now: number; onOpen: () => void; compact?: boolean }) {
   const status = friendStatus(friend)
   const activity = activityLine(friend, now)
   return (
     <li>
-      <button type="button" className="friend-row" onClick={onOpen}>
-        <StatusAvatar name={friend.name} url={friend.avatar_url} size={36} status={status} />
+      <button type="button" className={compact ? 'friend-row compact' : 'friend-row'} onClick={onOpen}>
+        <StatusAvatar name={friend.name} url={friend.avatar_url} size={compact ? 32 : 36} status={status} />
         <span className="member-text">
           <span className="member-name">{friend.name}</span>
           <span className="member-notes">

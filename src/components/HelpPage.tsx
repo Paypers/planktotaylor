@@ -3,7 +3,7 @@ import { accountsEnabled } from '../lib/account'
 import { clockTime } from '../lib/dates'
 import { MENTIONS_EACH, MORNING_POST, WEBHOOKS_EACH } from '../lib/discord'
 import { DISCORD, ERAS, followLink, FRIENDS, friendsRoute, GROUPS, hashFor, INSTALL, RANKS } from '../lib/route'
-import { FRIENDS_EACH, REQUESTS_A_DAY, REQUESTS_WAITING } from '../lib/friends'
+import { FRIENDS_EACH, RAIL_FRIENDS, REQUESTS_A_DAY, REQUESTS_WAITING } from '../lib/friends'
 
 const FRIEND_SETTINGS = { page: 'settings', section: 'friends' } as const
 import { remindersAvailable } from '../lib/push'
@@ -253,7 +253,7 @@ export function HelpPage() {
             <a href={hashFor(FRIENDS)} onClick={(e) => followLink(e, FRIENDS)}>
               your friends
             </a>{' '}
-            (from your profile) and{' '}
+            (the smiley at the top, or the list down the right on a computer) and{' '}
             <a href={hashFor(friendsRoute('add'))} onClick={(e) => followLink(e, friendsRoute('add'))}>
               Add a friend
             </a>
@@ -266,6 +266,13 @@ export function HelpPage() {
             Accept or decline under Pending. Declining is quiet: they aren't told, and their request just goes. Two people who
             ask each other at once are friends straight away. Up to {FRIENDS_EACH} friends each, with up to{' '}
             {REQUESTS_WAITING} of your requests waiting at once and {REQUESTS_A_DAY} sent a day.
+          </dd>
+          <dt>Who's around</dt>
+          <dd>
+            On a computer, your friends are down the right of the page: whoever's planking now first, then who's online, then
+            who was on most recently, up to {RAIL_FRIENDS}, with any requests waiting at the top. On a phone, the smiley at the
+            top shows how many are online, with a red dot when a request is waiting. A green dot means a friend has the site
+            open; "Planking now" means their plank screen is on, breaks included.
           </dd>
           <dt>A friend's card</dt>
           <dd>

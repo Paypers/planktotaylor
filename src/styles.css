@@ -351,6 +351,18 @@ a {
   background: var(--well);
 }
 
+/* Most phones (390px and up) fit the site's name beside Friends and Groups with the buttons a little narrower:
+   still full height to tap, the icons the same size. */
+@media (max-width: 413px) {
+  .header-actions .icon-btn {
+    width: 30px;
+  }
+  .streak-pill {
+    gap: 4px;
+    padding: 0 2px;
+  }
+}
+
 /* On phones the help icon makes way for Groups, so the site's name still fits. It's in the footer too. */
 .header-actions .header-help {
   display: none;
@@ -5917,4 +5929,185 @@ a {
   align-items: center;
   gap: 12px;
   margin-bottom: 16px;
+}
+
+/* The friends rail: down the right on a computer, like Discord's member list, with the page's content moved
+   left to make room. The header stays across the top. Narrower, the header's Friends button does its job. */
+
+.friends-rail {
+  display: none;
+}
+
+.friends-link {
+  position: relative;
+}
+
+.online-badge {
+  position: absolute;
+  top: 2px;
+  right: -2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border: 2px solid var(--paper);
+  border-radius: 9px;
+  background: var(--held);
+  color: var(--paper);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 14px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.request-dot {
+  position: absolute;
+  bottom: 3px;
+  right: 1px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--paper);
+  border-radius: 50%;
+  background: var(--signal);
+}
+
+@media (min-width: 1200px) {
+  .page.with-rail {
+    max-width: 1620px;
+  }
+
+  .with-rail .page-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    align-items: start;
+  }
+
+  .with-rail .friends-link {
+    display: none;
+  }
+
+  .friends-rail {
+    position: sticky;
+    top: 0;
+    display: grid;
+    align-content: start;
+    gap: 12px;
+    max-height: 100vh;
+    padding: 32px var(--margin) 32px 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+}
+
+.rail-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ink);
+}
+
+.rail-head h2 {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.rail-head h2 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.rail-head h2 a:hover {
+  text-decoration: underline;
+}
+
+.rail-note {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-2);
+}
+
+.rail-requests {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 4px;
+  background: var(--well);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.rail-requests svg {
+  margin-left: auto;
+  color: var(--ink-2);
+}
+
+.rail-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* In the rail: a tighter row, the name and what they're doing each kept to one line. */
+.friend-row.compact {
+  gap: 10px;
+  min-height: 52px;
+  padding: 8px 6px;
+  border-bottom: 0;
+  border-radius: 4px;
+}
+
+.friend-row.compact:hover {
+  background: var(--well);
+}
+
+.friend-row.compact:hover .member-name {
+  text-decoration: none;
+}
+
+.friend-row.compact .member-name,
+.friend-row.compact .member-notes {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.friend-row.compact .member-name {
+  font-size: 15px;
+  line-height: 20px;
+}
+
+.friend-row.compact .member-today {
+  min-width: 20px;
+}
+
+.rail-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+  font-size: 14px;
+}
+
+.rail-links a {
+  color: var(--ink-2);
+}
+
+.rail-links .rail-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--held);
+  font-weight: 600;
+  text-decoration: none;
 }

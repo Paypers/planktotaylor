@@ -10,6 +10,8 @@ export const FRIENDS_EACH = 200
 /** Requests waiting at once, and sent a day, at most. schema.sql has the same limits. */
 export const REQUESTS_WAITING = 50
 export const REQUESTS_A_DAY = 30
+/** Friends shown in the rail on a computer, at most: the rest are on the friends page. */
+export const RAIL_FRIENDS = 10
 /** How often the site checks in while it's in view. Friends count as online for 2 minutes after (schema.sql). */
 export const CHECK_IN_MS = 45_000
 

@@ -4,7 +4,9 @@ import { Avatar } from './components/Avatar'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { ErasPage } from './components/ErasPage'
 import { FriendLinkPage } from './components/friends/FriendLinkPage'
+import { FriendsLink } from './components/friends/FriendsLink'
 import { FriendsPage } from './components/friends/FriendsPage'
+import { FriendsRail } from './components/friends/FriendsRail'
 import { GroupPage } from './components/GroupPage'
 import { GroupsPage, HomeGroups, JoinPage } from './components/Groups'
 import { GroupsLink } from './components/GroupsLink'
@@ -45,6 +47,7 @@ import { dailyNumber } from './lib/daily'
 import { collectionOf, eraStamps, stampNews } from './lib/eras'
 import { forgetFriendCode, keptFriendCode, showFriendCode } from './lib/friends'
 import { forgetInvite, keptInvite } from './lib/groups'
+import { useMyFriends } from './lib/myFriends'
 import { isStandalone } from './lib/install'
 import type { TogetherShare } from './lib/live/link'
 import { eraRoute, followLink, hashFor, HELP, HOME, INSTALL, navigate, useRoute, YEAR, type Route } from './lib/route'
@@ -78,6 +81,8 @@ export function App() {
   const [sharingTogether, setSharingTogether] = useState<TogetherShare | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
   const route = useRoute()
+  // Signed in, the site checks in with friends on every page, so they see you online.
+  const friendsNow = useMyFriends(today).now
   const inSettings = route.page === 'settings'
   const onHome = route.page === 'home'
   const homeScroll = useRef(0)
@@ -248,11 +253,14 @@ export function App() {
   }
   // Without an account, progress lives in this browser: say so quietly where there's something to keep.
   const offerSignIn = accountsEnabled && !user ? () => setDialog('account') : undefined
+  // The friends rail, down the right on a computer (styles.css), on every page but those with their own list of
+  // people (friends, a room) or that take the whole screen (Your Plank Year).
+  const rail = accountsEnabled && user !== null && friendsNow !== null && !['friends', 'friend', 'together', 'year'].includes(route.page)
   const dateline = fromDayKey(today).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
 
   return (
     <>
-      <div className="page">
+      <div className={rail ? 'page with-rail' : 'page'}>
         <header className="site-header">
           <a
             className="brand"
@@ -268,6 +276,7 @@ export function App() {
               <span className="streak-pill-num">{streak.current}</span>
               <span className="sr-only">-day streak</span>
             </span>
+            {accountsEnabled && <FriendsLink today={today} current={route.page === 'friends' || route.page === 'friend'} />}
             {accountsEnabled && <GroupsLink today={today} current={route.page === 'groups' || route.page === 'group'} />}
             <a
               href={hashFor(HELP)}
@@ -328,239 +337,243 @@ export function App() {
               ))}
           </nav>
         </header>
+        <div className="page-columns">
+          <div className="page-main">
+            {/* Home stays mounted behind settings, so the setlist comes back as it was left. */}
+            <main hidden={!onHome}>
+              <section className="masthead grid">
+                <div className="masthead-meta">
+                  <p>{dateline}</p>
+                  <p>Daily No. {daily.number}</p>
+                </div>
+                <div className="masthead-body">
+                  <h1 className="headline">Hold a plank for the length of a Taylor Swift song.</h1>
+                  <p className="lede">
+                    Everyone gets the same song each day: plank it to keep your streak. Your ladder climbs her whole catalog,
+                    shortest song to longest, as fast as you like.
+                  </p>
+                </div>
+              </section>
 
-        {/* Home stays mounted behind settings, so the setlist comes back as it was left. */}
-        <main hidden={!onHome}>
-          <section className="masthead grid">
-            <div className="masthead-meta">
-              <p>{dateline}</p>
-              <p>Daily No. {daily.number}</p>
-            </div>
-            <div className="masthead-body">
-              <h1 className="headline">Hold a plank for the length of a Taylor Swift song.</h1>
-              <p className="lede">
-                Everyone gets the same song each day: plank it to keep your streak. Your ladder climbs her whole catalog,
-                shortest song to longest, as fast as you like.
-              </p>
-            </div>
-          </section>
+              {promo && (
+                <section className="section grid year-promo" aria-labelledby="year-heading">
+                  <div className="section-rule" />
+                  <div className="section-label">
+                    <h2 id="year-heading">{REVIEW_NAME}</h2>
+                    <p className="label-meta">{promoYear}</p>
+                  </div>
+                  <div className="section-body year-promo-body">
+                    <p>
+                      Your {promoYear} in planks is here: the time you held, your top album, your longest hold and more, with a card to
+                      share for each.
+                    </p>
+                    <a className="btn btn-primary" href={hashFor(YEAR)} onClick={(e) => followLink(e, YEAR)}>
+                      Open {REVIEW_NAME}
+                    </a>
+                  </div>
+                </section>
+              )}
 
-          {promo && (
-            <section className="section grid year-promo" aria-labelledby="year-heading">
-              <div className="section-rule" />
-              <div className="section-label">
-                <h2 id="year-heading">{REVIEW_NAME}</h2>
-                <p className="label-meta">{promoYear}</p>
+              <section className="section grid" aria-labelledby="today-heading">
+                <div className="section-rule" />
+                <div className="section-label">
+                  <h2 id="today-heading">Today</h2>
+                  <p className="label-meta">{daily.done ? 'Streak safe' : "Today's song to go"}</p>
+                </div>
+                <div className="section-body today-list">
+                  <SongRow
+                    eyebrow="Today's song · the same for everyone"
+                    song={daily.song}
+                    done={daily.done}
+                    startLabel="Start plank"
+                    onStart={() => start({ song: daily.song, label: "Today's song", kind: 'daily' })}
+                    onShare={dailyDone && (() => shareCompletion(dailyDone))}
+                    onAgain={() => start({ song: daily.song, label: "Today's song · extra credit", kind: 'extra' })}
+                    moreActions={<StartTogether today={today} />}
+                  >
+                    {dailyDone && <p className="row-note">{plankSummary(dailyDone.pauses ?? [], dailyDone.seconds)}</p>}
+                    {dailyStats && dailyStats.planks > 0 && dailyDone && <Together stats={dailyStats} song={daily.song} />}
+                    {dailyStats && dailyStats.planks > 0 && !dailyDone && (
+                      <p className="row-note">
+                        {dailyStats.planks.toLocaleString()} {dailyStats.planks === 1 ? 'person has' : 'people have'} planked it today
+                      </p>
+                    )}
+                    {twofer && <p className="row-note signal">It's also your ladder level: one plank counts for both.</p>}
+                  </SongRow>
+
+                  {ladder.finished ? (
+                    <article className="song-row finished">
+                      <div className="row-text">
+                        <p className="row-eyebrow">Your ladder · complete</p>
+                        <h3 className="row-title">You planked the whole catalog.</h3>
+                        <p className="row-album">
+                          All {ladder.total} songs, up to All Too Well (10 Minute Version).
+                        </p>
+                      </div>
+                      <div className="row-actions">
+                        <button type="button" className="btn btn-secondary" onClick={() => setRestarting(true)}>
+                          Start again
+                        </button>
+                      </div>
+                    </article>
+                  ) : (
+                    <SongRow
+                      eyebrow={`Your ladder · level ${ladder.level} of ${ladder.total}`}
+                      song={ladder.song!}
+                      done={false}
+                      startLabel={`Start level ${ladder.level}`}
+                      onStart={() => start({ song: ladder.song!, label: `Level ${ladder.level} of ${ladder.total}`, kind: 'ladder', level: ladder.level })}
+                      onShare={lastClimb && (() => shareCompletion(lastClimb))}
+                    >
+                      <LadderProgress done={ladder.level - 1} total={ladder.total} />
+                      {climbed > 0 ? (
+                        <p className="row-note">
+                          {climbed} {climbed === 1 ? 'level' : 'levels'} climbed today
+                          {climbedXp > 0 && ` · +${climbedXp.toLocaleString()} XP`}. Keep going as long as you like.
+                        </p>
+                      ) : ladder.level === 1 && data.completions.length === 0 ? (
+                        <p className="row-note">Level 1 is her shortest song. They get longer from here.</p>
+                      ) : (
+                        <p className="row-note">Climb as many levels a day as you like. Only today's song keeps your streak.</p>
+                      )}
+                    </SongRow>
+                  )}
+                  <InstallNote completions={data.completions} />
+                  <BringPlanksNote completions={data.completions} onSignIn={offerSignIn} />
+                </div>
+              </section>
+
+              {accountsEnabled && <HomeGroups today={today} completions={data.completions} />}
+              <StreakPanel
+                completions={data.completions}
+                days={days}
+                streak={streak}
+                today={today}
+                onSignIn={offerSignIn}
+                rank={rank}
+                onHistory={() => setHistoryOpen(true)}
+              />
+              <Setlist level={ladder.level} completions={data.completions} onOpen={setLevelInfo} />
+            </main>
+            {route.page === 'settings' && (
+              <main>
+                <SettingsPage section={route.section} />
+              </main>
+            )}
+            {route.page === 'ranks' && (
+              <main>
+                <RanksPage rank={rank} onSignIn={offerSignIn} completions={data.completions} />
+              </main>
+            )}
+            {route.page === 'groups' && (
+              <main>
+                <GroupsPage today={today} completions={data.completions} />
+              </main>
+            )}
+            {route.page === 'group' && (
+              <main>
+                <GroupPage key={route.id} id={route.id} today={today} completions={data.completions} />
+              </main>
+            )}
+            {route.page === 'join' && (
+              <main>
+                <JoinPage code={route.code} today={today} />
+              </main>
+            )}
+            {route.page === 'friends' && (
+              <main>
+                <FriendsPage tab={route.tab} today={today} />
+              </main>
+            )}
+            {route.page === 'friend' && (
+              <main>
+                <FriendLinkPage key={route.code} code={route.code} />
+              </main>
+            )}
+            {route.page === 'together' && (
+              <main>
+                <Suspense fallback={null}>
+                  <LivePage
+                    key={`${route.code}/${route.songId}`}
+                    code={route.code}
+                    songId={route.songId}
+                    today={today}
+                    defaultName={shownName}
+                    renderPlank={(together, link, onClose) => (
+                      <PlankTimer
+                        session={together}
+                        live={link}
+                        prefs={data.prefs}
+                        earningXp={earningXp}
+                        onFinish={finish}
+                        onShare={(plank) => sharePlank(plank)}
+                        onClose={onClose}
+                        onSignIn={offerSignIn}
+                        // Going on to the next level leaves the room's plank screen for one of your own.
+                        onNext={(next) => {
+                          onClose()
+                          start(next)
+                        }}
+                        onOpenEra={(album) => {
+                          onClose()
+                          navigate(eraRoute(album))
+                        }}
+                      />
+                    )}
+                    onShareTogether={setSharingTogether}
+                  />
+                </Suspense>
+              </main>
+            )}
+            {route.page === 'eras' && (
+              <main>
+                <ErasPage album={route.album} completions={data.completions} today={today} onStart={start} />
+              </main>
+            )}
+            {route.page === 'help' && (
+              <main>
+                <HelpPage />
+              </main>
+            )}
+            {route.page === 'install' && (
+              <main>
+                <InstallPage signedIn={user !== null} onSignIn={offerSignIn} />
+              </main>
+            )}
+            {route.page === 'year' && <YearReview completions={data.completions} today={today} earningXp={earningXp} />}
+
+            <footer className="site-footer grid">
+              <div className="section-rule light" />
+              <div className="footer-mark">
+                <StarMark size={14} />
               </div>
-              <div className="section-body year-promo-body">
+              <div className="footer-body">
                 <p>
-                  Your {promoYear} in planks is here: the time you held, your top album, your longest hold and more, with a card to
-                  share for each.
+                  {user
+                    ? `Synced to ${user.email}.`
+                    : accountsEnabled
+                      ? 'Your progress is saved in this browser. Sign in to take it with you.'
+                      : 'Your progress is saved in this browser.'}
                 </p>
-                <a className="btn btn-primary" href={hashFor(YEAR)} onClick={(e) => followLink(e, YEAR)}>
-                  Open {REVIEW_NAME}
-                </a>
-              </div>
-            </section>
-          )}
-
-          <section className="section grid" aria-labelledby="today-heading">
-            <div className="section-rule" />
-            <div className="section-label">
-              <h2 id="today-heading">Today</h2>
-              <p className="label-meta">{daily.done ? 'Streak safe' : "Today's song to go"}</p>
-            </div>
-            <div className="section-body today-list">
-              <SongRow
-                eyebrow="Today's song · the same for everyone"
-                song={daily.song}
-                done={daily.done}
-                startLabel="Start plank"
-                onStart={() => start({ song: daily.song, label: "Today's song", kind: 'daily' })}
-                onShare={dailyDone && (() => shareCompletion(dailyDone))}
-                onAgain={() => start({ song: daily.song, label: "Today's song · extra credit", kind: 'extra' })}
-                moreActions={<StartTogether today={today} />}
-              >
-                {dailyDone && <p className="row-note">{plankSummary(dailyDone.pauses ?? [], dailyDone.seconds)}</p>}
-                {dailyStats && dailyStats.planks > 0 && dailyDone && <Together stats={dailyStats} song={daily.song} />}
-                {dailyStats && dailyStats.planks > 0 && !dailyDone && (
-                  <p className="row-note">
-                    {dailyStats.planks.toLocaleString()} {dailyStats.planks === 1 ? 'person has' : 'people have'} planked it today
+                {!isStandalone() && (
+                  <p>
+                    <a href={hashFor(INSTALL)} onClick={(e) => followLink(e, INSTALL)}>
+                      Add it to your home screen
+                    </a>{' '}
+                    and it opens like an app.
                   </p>
                 )}
-                {twofer && <p className="row-note signal">It's also your ladder level: one plank counts for both.</p>}
-              </SongRow>
-
-              {ladder.finished ? (
-                <article className="song-row finished">
-                  <div className="row-text">
-                    <p className="row-eyebrow">Your ladder · complete</p>
-                    <h3 className="row-title">You planked the whole catalog.</h3>
-                    <p className="row-album">
-                      All {ladder.total} songs, up to All Too Well (10 Minute Version).
-                    </p>
-                  </div>
-                  <div className="row-actions">
-                    <button type="button" className="btn btn-secondary" onClick={() => setRestarting(true)}>
-                      Start again
-                    </button>
-                  </div>
-                </article>
-              ) : (
-                <SongRow
-                  eyebrow={`Your ladder · level ${ladder.level} of ${ladder.total}`}
-                  song={ladder.song!}
-                  done={false}
-                  startLabel={`Start level ${ladder.level}`}
-                  onStart={() => start({ song: ladder.song!, label: `Level ${ladder.level} of ${ladder.total}`, kind: 'ladder', level: ladder.level })}
-                  onShare={lastClimb && (() => shareCompletion(lastClimb))}
-                >
-                  <LadderProgress done={ladder.level - 1} total={ladder.total} />
-                  {climbed > 0 ? (
-                    <p className="row-note">
-                      {climbed} {climbed === 1 ? 'level' : 'levels'} climbed today
-                      {climbedXp > 0 && ` · +${climbedXp.toLocaleString()} XP`}. Keep going as long as you like.
-                    </p>
-                  ) : ladder.level === 1 && data.completions.length === 0 ? (
-                    <p className="row-note">Level 1 is her shortest song. They get longer from here.</p>
-                  ) : (
-                    <p className="row-note">Climb as many levels a day as you like. Only today's song keeps your streak.</p>
-                  )}
-                </SongRow>
-              )}
-              <InstallNote completions={data.completions} />
-              <BringPlanksNote completions={data.completions} onSignIn={offerSignIn} />
-            </div>
-          </section>
-
-          {accountsEnabled && <HomeGroups today={today} completions={data.completions} />}
-          <StreakPanel
-            completions={data.completions}
-            days={days}
-            streak={streak}
-            today={today}
-            onSignIn={offerSignIn}
-            rank={rank}
-            onHistory={() => setHistoryOpen(true)}
-          />
-          <Setlist level={ladder.level} completions={data.completions} onOpen={setLevelInfo} />
-        </main>
-        {route.page === 'settings' && (
-          <main>
-            <SettingsPage section={route.section} />
-          </main>
-        )}
-        {route.page === 'ranks' && (
-          <main>
-            <RanksPage rank={rank} onSignIn={offerSignIn} completions={data.completions} />
-          </main>
-        )}
-        {route.page === 'groups' && (
-          <main>
-            <GroupsPage today={today} completions={data.completions} />
-          </main>
-        )}
-        {route.page === 'group' && (
-          <main>
-            <GroupPage key={route.id} id={route.id} today={today} completions={data.completions} />
-          </main>
-        )}
-        {route.page === 'join' && (
-          <main>
-            <JoinPage code={route.code} today={today} />
-          </main>
-        )}
-        {route.page === 'friends' && (
-          <main>
-            <FriendsPage tab={route.tab} today={today} />
-          </main>
-        )}
-        {route.page === 'friend' && (
-          <main>
-            <FriendLinkPage key={route.code} code={route.code} />
-          </main>
-        )}
-        {route.page === 'together' && (
-          <main>
-            <Suspense fallback={null}>
-              <LivePage
-                key={`${route.code}/${route.songId}`}
-                code={route.code}
-                songId={route.songId}
-                today={today}
-                defaultName={shownName}
-                renderPlank={(together, link, onClose) => (
-                  <PlankTimer
-                    session={together}
-                    live={link}
-                    prefs={data.prefs}
-                    earningXp={earningXp}
-                    onFinish={finish}
-                    onShare={(plank) => sharePlank(plank)}
-                    onClose={onClose}
-                    onSignIn={offerSignIn}
-                    // Going on to the next level leaves the room's plank screen for one of your own.
-                    onNext={(next) => {
-                      onClose()
-                      start(next)
-                    }}
-                    onOpenEra={(album) => {
-                      onClose()
-                      navigate(eraRoute(album))
-                    }}
-                  />
-                )}
-                onShareTogether={setSharingTogether}
-              />
-            </Suspense>
-          </main>
-        )}
-        {route.page === 'eras' && (
-          <main>
-            <ErasPage album={route.album} completions={data.completions} today={today} onStart={start} />
-          </main>
-        )}
-        {route.page === 'help' && (
-          <main>
-            <HelpPage />
-          </main>
-        )}
-        {route.page === 'install' && (
-          <main>
-            <InstallPage signedIn={user !== null} onSignIn={offerSignIn} />
-          </main>
-        )}
-        {route.page === 'year' && <YearReview completions={data.completions} today={today} earningXp={earningXp} />}
-
-        <footer className="site-footer grid">
-          <div className="section-rule light" />
-          <div className="footer-mark">
-            <StarMark size={14} />
+                <p>
+                  <a href={hashFor(HELP)} onClick={(e) => followLink(e, HELP)}>
+                    How it works
+                  </a>
+                </p>
+                <p>A fan project. Not affiliated with Taylor Swift, her label or YouTube.</p>
+              </div>
+            </footer>
           </div>
-          <div className="footer-body">
-            <p>
-              {user
-                ? `Synced to ${user.email}.`
-                : accountsEnabled
-                  ? 'Your progress is saved in this browser. Sign in to take it with you.'
-                  : 'Your progress is saved in this browser.'}
-            </p>
-            {!isStandalone() && (
-              <p>
-                <a href={hashFor(INSTALL)} onClick={(e) => followLink(e, INSTALL)}>
-                  Add it to your home screen
-                </a>{' '}
-                and it opens like an app.
-              </p>
-            )}
-            <p>
-              <a href={hashFor(HELP)} onClick={(e) => followLink(e, HELP)}>
-                How it works
-              </a>
-            </p>
-            <p>A fan project. Not affiliated with Taylor Swift, her label or YouTube.</p>
-          </div>
-        </footer>
+          {rail && <FriendsRail today={today} />}
+        </div>
       </div>
 
       {session && (

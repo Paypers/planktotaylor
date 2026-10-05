@@ -66,7 +66,7 @@ Friends have no streak of their own and nothing that ranks them. A group is stil
 
 ### 13.3 The rail, and who's online
 
-- The friends rail on wide screens, and the header button on narrow ones.
+- The friends rail on wide screens, and the header button on narrow ones. (Built: the rail shows on every page but the friends page, a room and Your Plank Year. Under 414px the header's icon buttons narrow to 30px so the site's name still fits beside the new button on phones 390px and up.)
 - Checking in every 45 seconds while the page is in view, on every page, and planking now from the plank screen.
 
 ### 13.4 Planking together with friends
