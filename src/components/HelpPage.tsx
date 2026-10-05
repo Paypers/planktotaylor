@@ -257,9 +257,15 @@ export function HelpPage() {
             <a href={hashFor(friendsRoute('add'))} onClick={(e) => followLink(e, friendsRoute('add'))}>
               Add a friend
             </a>
-            . Give someone your friend code (8 letters and numbers, like K7QM-3XPD) or send your friend link, and they can send
+            . Give someone your friend code (8 letters and numbers, like K7QM-3XPD) or send your profile link, and they can send
             you a request. You can also add people from your groups, under People you plank with. There's no search: nobody
             can find you by your name. You'll need a name, as friends see it.
+          </dd>
+          <dt>Your profile link</dt>
+          <dd>
+            Share it from your profile, or from Add a friend. Whoever opens it sees your name and photo, and nothing else, and
+            can send you a request. Someone without an account is asked to make one (just an email, no password), and comes
+            back to the link to send it. Make a new code if your link gets around: the old one stops working.
           </dd>
           <dt>Requests</dt>
           <dd>

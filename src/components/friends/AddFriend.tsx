@@ -3,13 +3,10 @@ import { findByFriendCode, friendSuggestions, newFriendCode, requestFriend, requ
 import { nudgeFriends } from '../../lib/friendInbox'
 import { readFriendCode, showFriendCode } from '../../lib/friends'
 import { refreshFriends } from '../../lib/myFriends'
-import { siteLink } from '../../lib/share'
 import { friendProblemText, PersonRow } from './FriendRow'
+import { ShareProfileLink } from './ProfileLink'
 
-/** A friend link: whoever opens it can send a request. */
-export const friendLink = (code: string) => `${siteLink()}#friend/${showFriendCode(code)}`
-
-/** Your code and link to share, a box for someone else's code, and people you plank with in your groups. */
+/** Your code and profile link to share, a box for someone else's code, and people you plank with in your groups. */
 export function AddFriend({ code }: { code: string }) {
   return (
     <>
@@ -25,31 +22,6 @@ function YourCode({ code }: { code: string }) {
   const [said, setSaid] = useState<string | null>(null)
   const [renewing, setRenewing] = useState<'asking' | 'busy' | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const link = friendLink(code)
-
-  const share = async () => {
-    const text = 'Add me as a friend on Plank to Taylor:'
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: 'Plank to Taylor', text, url: link })
-        return
-      } catch (e) {
-        if ((e as Error).name === 'AbortError') return
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(`${text} ${link}`)
-      setSaid('Link copied.')
-    } catch {
-      // The link is on screen to copy by hand.
-    }
-  }
-
-  const copyCode = () =>
-    navigator.clipboard.writeText(showFriendCode(code)).then(
-      () => setSaid('Code copied.'),
-      () => {},
-    )
 
   const renew = () => {
     setRenewing('busy')
@@ -71,21 +43,11 @@ function YourCode({ code }: { code: string }) {
         <p className="friend-code" aria-label={`Your friend code: ${showFriendCode(code).split('').join(' ')}`}>
           {showFriendCode(code)}
         </p>
-        <p className="groups-lede">Give someone your code, or send your friend link. Either way, they can send you a request.</p>
-        <div className="invite-link">
-          <label className="field">
-            <span>Friend link</span>
-            <input className="input" readOnly value={link} onFocus={(e) => e.target.select()} />
-          </label>
-          <div className="button-row">
-            <button type="button" className="btn btn-primary" onClick={() => void share()}>
-              Share link
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={() => void copyCode()}>
-              Copy code
-            </button>
-          </div>
-        </div>
+        <p className="groups-lede">
+          Give someone your code, or send your profile link. Either way, they can send you a request, and someone without
+          an account is asked to make one first.
+        </p>
+        <ShareProfileLink code={code} />
         {said && (
           <p className="fine" role="status">
             {said}
@@ -136,7 +98,7 @@ function AddByCode() {
     setBusy(true)
     ;(async () => {
       const found = await findByFriendCode(code)
-      if (!found) return setError('Nobody has that friend code. Check it, or ask them for their friend link.')
+      if (!found) return setError('Nobody has that friend code. Check it, or ask them for their profile link.')
       if (found.status === 'me') return setError("That's your own code.")
       if (found.status === 'friends') return setSaid(`You and ${found.name} are friends already.`)
       if (found.status === 'blocked') return setError(`You've blocked ${found.name}. Unblock them first, under Blocked.`)
@@ -158,7 +120,7 @@ function AddByCode() {
       </div>
       <form className="section-body group-form" onSubmit={submit}>
         <label className="field">
-          <span>Their friend code, or friend link</span>
+          <span>Their friend code, or profile link</span>
           <input
             className="input friend-code-input"
             value={typed}
@@ -249,7 +211,7 @@ function Suggestions() {
   )
 }
 
-/** Exactly what friends see of each other, here and on a friend link. */
+/** Exactly what friends see of each other, here and on a profile link. */
 export function WhatFriendsSee() {
   return (
     <section className="section grid" aria-labelledby="friends-see">
@@ -272,7 +234,7 @@ export function WhatFriendsSee() {
         </dd>
         <dt>Finding you</dt>
         <dd>
-          Only by your friend code or link, or from a group you're both in. There's no search, and no list of players.
+          Only by your friend code or profile link, or from a group you're both in. There's no search, and no list of players. Your profile link shows your name and photo to whoever opens it.
         </dd>
       </dl>
     </section>

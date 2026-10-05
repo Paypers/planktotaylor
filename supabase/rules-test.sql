@@ -481,6 +481,10 @@ do $$
 begin
   assert public.rules_test_refused($q$ select public.friends_now(current_date, null) $q$), 'signed out, there''s no friends list';
   assert public.rules_test_refused(format($q$ select public.friend_lookup(%L) $q$, current_setting('test.eve_code'))), 'and no looking up a code';
+  assert public.friend_link_preview(current_setting('test.eve_code')) ->> 'name' = 'Eve', 'but a profile link shows whose it is';
+  assert (select array_agg(k order by k) from json_object_keys(public.friend_link_preview(current_setting('test.eve_code'))) k) = array['avatar_url', 'name'],
+    'by name and photo, and nothing else';
+  assert public.friend_link_preview('ZZZZZZZZ') is null, 'and a code that is nobody''s shows nothing';
 end;
 $$;
 
@@ -596,6 +600,7 @@ do $$
 begin
   assert public.request_friend(current_setting('test.eve_code')) = 'sent', 'Gus asks again, and it seems to go';
   assert public.friend_lookup(current_setting('test.eve_code')) is null, 'her code finds nobody for him';
+  assert public.friend_link_preview(current_setting('test.eve_code')) is null, 'and her profile link shows him nothing';
   assert not public.friend_inbox_sender('friend-inbox:00000000-0000-4000-8000-0000000000e1'), 'and he can''t nudge her';
 end;
 $$;

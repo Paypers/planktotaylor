@@ -36,6 +36,7 @@ import {
   displayName,
   fetchDailyStats,
   onSignInAsked,
+  type SignInReason,
   refreshReminderZone,
   saveLadderCursor,
   useAccount,
@@ -127,12 +128,21 @@ export function App() {
   const climbedXp = totalXp(data.completions.filter((c) => c.day === today && ladder.climbedToday.some((l) => l.at === c.at)))
 
   // Settings asks for the sign-in box (reminders are for signed-in players).
-  useEffect(() => onSignInAsked(() => setDialog('account')), [])
+  // Why it was asked for, when that changes what it says ("Make an account", from a profile link).
+  const [signInReason, setSignInReason] = useState<SignInReason | null>(null)
+  useEffect(
+    () =>
+      onSignInAsked((reason) => {
+        setSignInReason(reason)
+        setDialog('account')
+      }),
+    [],
+  )
 
   // A player who's travelled gets reminders at their time where they are now.
   const userId = user?.id
 
-  // Signed in from an invite link or a friend link: back to it, to join or add them. (The magic link lands on the
+  // Signed in from an invite link or a profile link: back to it, to join or add them. (The magic link lands on the
   // front page.)
   useEffect(() => {
     const code = userId ? keptInvite() : null
@@ -600,7 +610,17 @@ export function App() {
         />
       )}
       <MusicDialog open={dialog === 'music'} prefs={data.prefs} onClose={() => setDialog(null)} />
-      {accountsEnabled && <AccountDialog open={dialog === 'account'} onClose={() => setDialog(null)} rank={rank} />}
+      {accountsEnabled && (
+        <AccountDialog
+          open={dialog === 'account'}
+          onClose={() => {
+            setDialog(null)
+            setSignInReason(null)
+          }}
+          rank={rank}
+          reason={signInReason}
+        />
+      )}
       {/* The one way the ladder moves other than climbing: back to the bottom, once it's all done. */}
       <ConfirmDialog
         open={restarting && ladder.finished}

@@ -67,7 +67,7 @@ export function FriendsRail({ today }: { today: DayKey }) {
               ))}
             </ul>
           ) : (
-            <p className="rail-note">No friends yet. Send someone your friend link, or add people from your groups.</p>
+            <p className="rail-note">No friends yet. Send someone your profile link, or add people from your groups.</p>
           )}
           <div className="rail-links">
             {friends.length > 0 && (

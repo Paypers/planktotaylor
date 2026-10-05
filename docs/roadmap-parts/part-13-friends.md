@@ -38,7 +38,7 @@ Friends have no streak of their own and nothing that ranks them. A group is stil
   - **All friends (23)**, which opens the friends page, and **Add a friend**.
 - **Narrower screens, or signed out:** no rail. Signed in, the header gets a Friends button showing how many are online. It opens the friends page.
 - **The friends page** (`#friends`), with tabs as on Discord, each at its own address: All · Online · Pending (in and out) · Blocked · Add a friend. All comes first: on a small site most friends are offline, and an empty Online tab would look broken. Add a friend shows your code and link, with Copy and Share, a box to type someone's code, and "People you plank with": members of your groups who aren't friends yet.
-- **A friend link** (`#friend/<code>`) shows the person's name and photo and a Send request button. Signed out, it's kept through sign-in, as group invite links are.
+- **A profile link** (`#friend/<code>`, called a friend link until after 13.5) shows the person's name and photo and a Send request button. Signed out, it shows the name and photo too (and nothing else), and asks them to make an account, or sign in; it's kept through that, as group invite links are. Share it from your profile, or Add a friend. Decided after 13.5: opening it sends a request (never friends straight away), and signed out it shows only the name and photo.
 
 ## How it works
 

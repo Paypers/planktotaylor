@@ -8,7 +8,7 @@ import { HeldMark, Icon } from '../Icon'
 const PROBLEMS: Record<FriendProblem, string> = {
   'sign-in': 'Sign in first.',
   name: "Add your name first: it's how friends see you.",
-  'not-found': 'Nobody has that friend code. Check it, or ask them for their friend link.',
+  'not-found': 'Nobody has that friend code. Check it, or ask them for their profile link.',
   yourself: "That's your own code.",
   blocked: "You've blocked them. Unblock them first, under Blocked.",
   'too-many-friends': `One of you has ${FRIENDS_EACH} friends already, the most each.`,

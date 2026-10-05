@@ -484,14 +484,25 @@ export async function signOut() {
   await (await client()).auth.signOut()
 }
 
-const signInAsks = new Set<() => void>()
+/** Why the sign-in box was asked for, when it's to join for something: its title and first line. */
+export interface SignInReason {
+  title: string
+  lede: string
+}
+
+const signInAsks = new Set<(reason: SignInReason | null) => void>()
 
 /** Somewhere without the header's Sign in button (Settings, say) asks for the sign-in box. */
 export function askToSignIn() {
-  signInAsks.forEach((fn) => fn())
+  signInAsks.forEach((fn) => fn(null))
 }
 
-export function onSignInAsked(fn: () => void): () => void {
+/** The sign-in box, to make an account (or sign in) for something: a profile link to answer, say. */
+export function askToJoin(reason: SignInReason) {
+  signInAsks.forEach((fn) => fn(reason))
+}
+
+export function onSignInAsked(fn: (reason: SignInReason | null) => void): () => void {
   signInAsks.add(fn)
   return () => signInAsks.delete(fn)
 }
@@ -827,6 +838,14 @@ export async function friendsNow(today: DayKey, plankingUntil: number | null): P
     blocked: now.blocked.map(withPhoto),
     invites: now.invites.map(withPhoto),
   }
+}
+
+/** Whose a profile link is, by name and photo: for anyone, signed in or not. Null for a code that isn't anyone's. */
+export async function previewFriendLink(code: string): Promise<{ name: string; avatar_url: string | null } | null> {
+  const { data, error } = await (await client()).rpc('friend_link_preview', { p_code: code })
+  if (error?.code === MISSING_FUNCTION) return null
+  if (error) throw friendFailure(error)
+  return data ? withPhoto(data as { name: string; avatar_url: string | null }) : null
 }
 
 /** Who a friend code belongs to. Null for a code that isn't anyone's (or an old one). */

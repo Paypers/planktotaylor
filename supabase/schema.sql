@@ -1215,6 +1215,36 @@ begin
 end;
 $$;
 
+-- What a profile link (a friend code's link) shows anyone, signed in or not: whose it is, by name and photo, so
+-- someone without an account knows who's asking them to join. Nothing else, and nothing at all for a code that
+-- isn't anyone's or, signed in, for someone who's blocked you.
+create or replace function public.friend_link_preview(p_code text)
+returns json
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  them uuid;
+begin
+  select user_id into them from public.friend_profiles where code = public.friend_code_read(p_code);
+  if them is null then
+    return null;
+  end if;
+  if auth.uid() is not null and exists (select 1 from public.friend_blocks where blocker = them and blocked = auth.uid()) then
+    return null;
+  end if;
+  return (
+    select json_build_object('name', btrim(p.display_name), 'avatar_url', p.avatar_url)
+    from public.plank_profiles p
+    where p.user_id = them and btrim(coalesce(p.display_name, '')) <> ''
+  );
+end;
+$$;
+revoke all on function public.friend_link_preview(text) from public;
+grant execute on function public.friend_link_preview(text) to anon, authenticated;
+
 create or replace function public.my_friend_code()
 returns text
 language plpgsql

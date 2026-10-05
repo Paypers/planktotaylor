@@ -9,13 +9,17 @@ import {
   uploadAvatar,
   useAccount,
   verifySignInCode,
+  type SignInReason,
 } from '../lib/account'
 import { squarePhoto } from '../lib/avatar'
+import { useToday } from '../lib/hooks'
+import { refreshFriends, useMyFriends } from '../lib/myFriends'
 import { isIos, isStandalone } from '../lib/install'
 import type { PlayerRank } from '../lib/ranks'
 import { followLink, FRIENDS, GROUPS, hashFor } from '../lib/route'
 import { Avatar } from './Avatar'
 import { Dialog } from './Dialog'
+import { ShareProfileLink } from './friends/ProfileLink'
 import { ProfileStats } from './ProfileStats'
 import { RankCard } from './Rank'
 
@@ -26,11 +30,19 @@ const SYNC_TEXT = {
   error: "Couldn't sync just now. Your progress is safe in this browser.",
 }
 
-export function AccountDialog({ open, onClose, rank }: { open: boolean; onClose: () => void; rank: PlayerRank | null }) {
+interface Props {
+  open: boolean
+  onClose: () => void
+  rank: PlayerRank | null
+  /** Asked for to join for something (a profile link): a title and first line of its own. */
+  reason?: SignInReason | null
+}
+
+export function AccountDialog({ open, onClose, rank, reason = null }: Props) {
   const { user } = useAccount()
   return (
-    <Dialog open={open} title={user ? 'Your profile' : 'Sign in'} onClose={onClose}>
-      {user ? <ProfileForm rank={rank} onClose={onClose} /> : <SignInForm />}
+    <Dialog open={open} title={user ? 'Your profile' : (reason?.title ?? 'Sign in')} onClose={onClose}>
+      {user ? <ProfileForm rank={rank} onClose={onClose} /> : <SignInForm reason={reason} />}
     </Dialog>
   )
 }
@@ -91,7 +103,8 @@ function ProfileForm({ rank, onClose }: { rank: PlayerRank | null; onClose: () =
         className="dialog-section"
         onSubmit={(e: FormEvent) => {
           e.preventDefault()
-          void run('name', () => saveDisplayName(name))
+          // A first name brings the profile link with it: friends see the name.
+          void run('name', () => saveDisplayName(name).then(() => refreshFriends()))
         }}
       >
         <label className="field">
@@ -115,6 +128,8 @@ function ProfileForm({ rank, onClose }: { rank: PlayerRank | null; onClose: () =
           {saved && <span className="fine profile-saved">Saved.</span>}
         </div>
       </form>
+
+      <YourProfileLink />
 
       <section className="dialog-section">
         <h3>Friends and groups</h3>
@@ -176,7 +191,30 @@ function ProfileForm({ rank, onClose }: { rank: PlayerRank | null; onClose: () =
   )
 }
 
-function SignInForm() {
+/** Your profile link, to send anyone: they see your name and photo, and can add you, making an account if they need to. */
+function YourProfileLink() {
+  const { now } = useMyFriends(useToday())
+  // Not until the site has friends; and it needs a name, which friends see.
+  if (!now) return null
+  return (
+    <section className="dialog-section">
+      <h3>Your profile link</h3>
+      {now.code ? (
+        <>
+          <p className="muted">
+            Send it to anyone. They see your name and photo, and can add you as a friend. Someone without an account is asked
+            to make one.
+          </p>
+          <ShareProfileLink code={now.code} />
+        </>
+      ) : (
+        <p className="muted">Save a name above to get your profile link: it's how friends see you.</p>
+      )}
+    </section>
+  )
+}
+
+function SignInForm({ reason }: { reason: SignInReason | null }) {
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [sent, setSent] = useState(false)
@@ -208,10 +246,14 @@ function SignInForm() {
           })
         }
       >
-        <p>
-          Optional. Sign in to keep your streak on your phone and laptop, and to earn XP. Without an account, your
-          progress stays in this browser.
-        </p>
+        {reason ? (
+          <p>{reason.lede}</p>
+        ) : (
+          <p>
+            Optional. Sign in to keep your streak on your phone and laptop, and to earn XP. Without an account, your
+            progress stays in this browser.
+          </p>
+        )}
         <label className="field">
           <span>Email</span>
           <input
@@ -228,7 +270,10 @@ function SignInForm() {
         <button className="btn btn-primary btn-block" disabled={busy}>
           {busy ? 'Sending…' : codeOnly ? 'Email me a sign-in code' : 'Email me a sign-in link'}
         </button>
-        <p className="fine">No password. Your streak so far comes with you.</p>
+        <p className="fine">
+          {reason ? 'New or not, it works the same: no password, and an account is made for a new email.' : 'No password.'} Your
+          streak so far comes with you.
+        </p>
       </form>
     )
   }
