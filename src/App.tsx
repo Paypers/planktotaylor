@@ -4,19 +4,18 @@ import { Avatar } from './components/Avatar'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { ErasPage } from './components/ErasPage'
 import { FriendLinkPage } from './components/friends/FriendLinkPage'
-import { FriendsLink } from './components/friends/FriendsLink'
 import { FriendsPage } from './components/friends/FriendsPage'
 import { FriendsRail } from './components/friends/FriendsRail'
 import { InviteToast } from './components/friends/InviteToast'
 import { GroupPage } from './components/GroupPage'
 import { GroupsPage, HomeGroups, JoinPage } from './components/Groups'
-import { GroupsLink } from './components/GroupsLink'
 import { HistoryDialog } from './components/HistoryDialog'
 import { HelpPage } from './components/HelpPage'
 import { BringPlanksNote, InstallNote } from './components/install/InstallNote'
 import { InstallPage } from './components/install/InstallPage'
 import { Flame, Icon, StarMark } from './components/Icon'
 import { LevelDialog } from './components/LevelDialog'
+import { SiteTabs } from './components/SiteTabs'
 import { StartTogether } from './components/live/StartTogether'
 import { MusicDialog } from './components/MusicDialog'
 import { PlankTimer, type FinishSummary, type PlankSession, type PlankShare } from './components/PlankTimer'
@@ -39,6 +38,7 @@ import {
   type SignInReason,
   refreshReminderZone,
   saveLadderCursor,
+  sessionStored,
   useAccount,
 } from './lib/account'
 import { remindersAvailable } from './lib/push'
@@ -72,7 +72,7 @@ const TogetherShareDialog = lazy(() => import('./components/live/TogetherShareDi
 export function App() {
   const data = useAppData()
   const today = useToday()
-  const { user, profile } = useAccount()
+  const { user, profile, known } = useAccount()
   const [session, setSession] = useState<PlankSession | null>(null)
   const [dialog, setDialog] = useState<'music' | 'account' | null>(null)
   // Today's count, and how everyone did: shown once you've planked today's song.
@@ -265,16 +265,20 @@ export function App() {
   }
   // Without an account, progress lives in this browser: say so quietly where there's something to keep.
   const offerSignIn = accountsEnabled && !user ? () => setDialog('account') : undefined
-  // The friends rail, down the right on a computer (styles.css), on every page but those with their own list of
-  // people (friends, a room) or that take the whole screen (Your Plank Year).
-  const rail = accountsEnabled && user !== null && friendsNow !== null && !['friends', 'friend', 'together', 'year'].includes(route.page)
+  // Signed in on a computer, every page keeps the friends rail's frame (styles.css), so the header and the page
+  // stay put from one page to the next. Before the account has loaded, a session kept in this browser says it will be.
+  const signedIn = user !== null || (!known && sessionStored)
+  const frame = accountsEnabled && signedIn && friendsNow !== null
+  // The rail itself, down the right, on every page but those with their own list of people (friends, a room) or that
+  // take the whole screen (Your Plank Year): they have its room to themselves.
+  const rail = frame && user !== null && !['friends', 'friend', 'together', 'year'].includes(route.page)
   // Nudges from friends (a request, an invite) check in straight away.
   useFriendInbox(accountsEnabled && friendsNow ? (user?.id ?? null) : null)
   const dateline = fromDayKey(today).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
 
   return (
     <>
-      <div className={rail ? 'page with-rail' : 'page'}>
+      <div className={['page', frame && 'wide-frame', rail && 'with-rail'].filter(Boolean).join(' ')}>
         <header className="site-header">
           <a
             className="brand"
@@ -284,18 +288,16 @@ export function App() {
             <StarMark size={18} />
             <span>Plank to Taylor</span>
           </a>
-          <nav className="header-actions" aria-label="Groups, account and settings">
+          {accountsEnabled && <SiteTabs today={today} page={route.page} />}
+          <nav className="header-actions" aria-label="Account and settings">
             <span className="streak-pill" title={streakTitle}>
               <Flame size={20} lit={streak.doneToday} />
               <span className="streak-pill-num">{streak.current}</span>
               <span className="sr-only">-day streak</span>
             </span>
-            {accountsEnabled && <FriendsLink today={today} current={route.page === 'friends' || route.page === 'friend'} />}
-            {accountsEnabled && <GroupsLink today={today} current={route.page === 'groups' || route.page === 'group'} />}
             <a
               href={hashFor(HELP)}
-              // On phones it makes way for Groups. The footer links to it too.
-              className={accountsEnabled ? 'icon-btn header-help' : 'icon-btn'}
+              className="icon-btn"
               onClick={(e) => followLink(e, HELP)}
               aria-label="How it works"
               aria-current={route.page === 'help' ? 'page' : undefined}

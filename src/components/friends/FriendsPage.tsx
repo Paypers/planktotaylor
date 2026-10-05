@@ -1,5 +1,14 @@
 import { useState, type FormEvent } from 'react'
-import { answerFriendRequest, askToSignIn, blockPlayer, cancelFriendRequest, saveDisplayName, unblockPlayer, useAccount } from '../../lib/account'
+import {
+  answerFriendRequest,
+  askToSignIn,
+  blockPlayer,
+  cancelFriendRequest,
+  saveDisplayName,
+  sessionStored,
+  unblockPlayer,
+  useAccount,
+} from '../../lib/account'
 import type { DayKey } from '../../lib/dates'
 import { FRIENDS_EACH, friendsInOrder, friendStatus, timeAgo, type Friend, type FriendsNow } from '../../lib/friends'
 import { nudgeFriends } from '../../lib/friendInbox'
@@ -13,15 +22,19 @@ import { InviteList } from './Invites'
 
 /** Your friends, on tabs as on Discord: everyone, who's online, requests, who you've blocked, and adding someone. */
 export function FriendsPage({ tab, today }: { tab: FriendsTab; today: DayKey }) {
-  const { user, profile } = useAccount()
+  const { user, known } = useAccount()
   const { now, failed } = useMyFriends(today)
   const [open, setOpen] = useState<Friend | null>(null)
 
   let body
-  if (!user) body = <SignedOut />
-  else if (now === undefined) body = <Note text="Loading your friends…" />
+  // Signed in from before, the account is still loading: not "sign in" for a moment first.
+  if (!user && !known && sessionStored) body = <Note text="Loading your friends…" />
+  else if (!user) body = <SignedOut />
+  else if (now === undefined) body = <Note text={failed ? "Couldn't reach the site just now. Trying again…" : 'Loading your friends…'} />
   else if (now === null) body = <Note text="Friends aren't set up on this site yet." />
-  else if (!profile.name || !now.code) body = <NameFirst />
+  // The account gives a friend code once there's a name, so the code says, not this page's copy of the name (which
+  // can still be loading).
+  else if (!now.code) body = <NameFirst />
   else {
     body = (
       <>

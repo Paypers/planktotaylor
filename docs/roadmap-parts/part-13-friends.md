@@ -36,7 +36,7 @@ Friends have no streak of their own and nothing that ranks them. A group is stil
   - **Requests waiting**, as a line that opens the friends page.
   - **Up to 10 friends:** planking now first, then online, then most recently seen. A friend who hides their online status comes after, by when you became friends. Each row has their photo with a status dot, their name, the activity line, and ✓ or 🟩 for today's song. A row opens the friend's card: streak, today, groups you share, Plank together, Invite to a group, Remove, Block.
   - **All friends (23)**, which opens the friends page, and **Add a friend**.
-- **Narrower screens, or signed out:** no rail. Signed in, the header gets a Friends button showing how many are online. It opens the friends page.
+- **Narrower screens, or signed out:** no rail. The Friends tab at the top shows how many are online. It opens the friends page.
 - **The friends page** (`#friends`), with tabs as on Discord, each at its own address: All · Online · Pending (in and out) · Blocked · Add a friend. All comes first: on a small site most friends are offline, and an empty Online tab would look broken. Add a friend shows your code and link, with Copy and Share, a box to type someone's code, and "People you plank with": members of your groups who aren't friends yet.
 - **A profile link** (`#friend/<code>`, called a friend link until after 13.5) shows the person's name and photo and a Send request button. Signed out, it shows the name and photo too (and nothing else), and asks them to make an account, or sign in; it's kept through that, as group invite links are. Share it from your profile, or Add a friend. Decided after 13.5: opening it sends a request (never friends straight away), and signed out it shows only the name and photo.
 
@@ -68,7 +68,7 @@ Friends have no streak of their own and nothing that ranks them. A group is stil
 
 ### 13.3 The rail, and who's online
 
-- The friends rail on wide screens, and the header button on narrow ones. (Built: the rail shows on every page but the friends page, a room and Your Plank Year. Under 430px the header's icon buttons narrow to 30px so the site's name still fits beside the new button on phones 390px and up.)
+- The friends rail on wide screens, and the header button on narrow ones. (Built: the rail shows on every page but the friends page, a room and Your Plank Year. Changed after the profile links: Friends and Groups became tabs across the top, as on Discord, in the same place on every page and every width: beside the site's name from 1100px, on their own row under it on phones. Signed in on a computer, every page keeps the rail's frame, so the header and the page don't shift between pages; a page without the rail takes its room.)
 - Checking in every 45 seconds while the page is in view, on every page, and planking now from the plank screen.
 
 ### 13.4 Planking together with friends

@@ -203,7 +203,7 @@ export function HelpPage() {
             <a href={hashFor(GROUPS)} onClick={(e) => followLink(e, GROUPS)}>
               Groups
             </a>{' '}
-            (the people icon at the top) and share its invite link. Anyone with the link can join: up to 50 members, and 10 groups
+            (the tab at the top) and share its invite link. Anyone with the link can join: up to 50 members, and 10 groups
             each. You'll need a name to show the group. Your groups show on the home page, under Today.
           </dd>
           <dt>The group page</dt>
@@ -222,7 +222,7 @@ export function HelpPage() {
           <dt>Planking now</dt>
           <dd>
             While anyone in your group has the plank screen on, the group shows how many are planking right now: on its
-            page, on its card, and on the people icon at the top. It shows how many, not who, and a break still counts as
+            page, on its card, and on the Groups tab at the top. It shows how many, not who, and a break still counts as
             planking, so nobody's pauses show. Only the group's members can see it.
           </dd>
           <dt>This month</dt>
@@ -254,7 +254,7 @@ export function HelpPage() {
             <a href={hashFor(FRIENDS)} onClick={(e) => followLink(e, FRIENDS)}>
               your friends
             </a>{' '}
-            (the smiley at the top, or the list down the right on a computer) and{' '}
+            (the tab at the top, or the list down the right on a computer) and{' '}
             <a href={hashFor(friendsRoute('add'))} onClick={(e) => followLink(e, friendsRoute('add'))}>
               Add a friend
             </a>
@@ -277,9 +277,9 @@ export function HelpPage() {
           <dt>Who's around</dt>
           <dd>
             On a computer, your friends are down the right of the page: whoever's planking now first, then who's online, then
-            who was on most recently, up to {RAIL_FRIENDS}, with any requests waiting at the top. On a phone, the smiley at the
-            top shows how many are online, with a red dot when a request is waiting. A green dot means a friend has the site
-            open; "Planking now" means their plank screen is on, breaks included.
+            who was on most recently, up to {RAIL_FRIENDS}, with any requests waiting at the top. On every page, the Friends tab
+            at the top shows how many are online by a green dot, and a red count when a request or an invite is waiting. A
+            green dot means a friend has the site open; "Planking now" means their plank screen is on, breaks included.
           </dd>
           <dt>A friend's card</dt>
           <dd>

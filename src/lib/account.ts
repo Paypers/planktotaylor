@@ -75,11 +75,25 @@ const NO_PROFILE: Profile = { name: null, avatarUrl: null }
 
 interface AccountState {
   user: User | null
+  /** Whether anyone's signed in is known: false while the account loads, when `user` null means not yet, not nobody. */
+  known: boolean
   sync: SyncStatus
   profile: Profile
 }
 
-let state: AccountState = { user: null, sync: 'idle', profile: NO_PROFILE }
+let state: AccountState = { user: null, known: !accountsEnabled, sync: 'idle', profile: NO_PROFILE }
+
+/**
+ * A sign-in kept in this browser, from before this page opened (supabase-js keeps it as sb-<project>-auth-token):
+ * while the account loads, pages that look different signed in can look that way from the start.
+ */
+export const sessionStored: boolean = (() => {
+  try {
+    return accountsEnabled && Object.keys(localStorage).some((key) => /^sb-.+-auth-token$/.test(key))
+  } catch {
+    return false
+  }
+})()
 const listeners = new Set<() => void>()
 
 function setState(patch: Partial<AccountState>) {
@@ -384,7 +398,7 @@ function listen(supabase: SupabaseClient) {
     const changedUser = user?.id !== state.user?.id
     if (user && changedUser) claimBrowser(user.id)
     if (changedUser) lookedAt = null
-    setState({ user, sync: user ? state.sync : 'idle', profile: changedUser ? NO_PROFILE : state.profile })
+    setState({ user, known: true, sync: user ? state.sync : 'idle', profile: changedUser ? NO_PROFILE : state.profile })
     // Supabase warns against awaiting other Supabase calls inside this callback. A new player here: compare
     // everything, so whatever this browser has that the account doesn't goes up.
     if (user && (changedUser || event === 'SIGNED_IN')) setTimeout(() => sync(user, changedUser), 0)

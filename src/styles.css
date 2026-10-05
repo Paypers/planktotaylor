@@ -281,22 +281,118 @@ a {
   }
 }
 
-/* Header. Phones pack it close: the brand, the streak and four buttons share 360px. */
+/* Header. Phones pack it close: the brand, the streak and four buttons share 360px, with Friends and Groups on
+   their own row of tabs underneath. From 1100px the tabs sit beside the brand, as Discord's do. */
 
 .site-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: 64px;
+  grid-template-areas:
+    'brand actions'
+    'tabs tabs';
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  height: 64px;
+  column-gap: 8px;
   padding-inline: var(--margin);
+}
+
+.site-header .brand {
+  grid-area: brand;
+  justify-self: start;
+  max-width: 100%;
 }
 
 @media (min-width: 760px) {
   .site-header {
-    gap: 12px;
-    height: 88px;
+    column-gap: 12px;
+    grid-template-rows: 88px;
   }
+}
+
+@media (min-width: 1100px) {
+  .site-header {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: 'brand tabs actions';
+  }
+}
+
+/* Friends and Groups: the same two tabs on every page, the one you're on outlined like the header's other buttons. */
+.site-tabs {
+  grid-area: tabs;
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+  padding-bottom: 8px;
+}
+
+@media (min-width: 1100px) {
+  .site-tabs {
+    margin-left: 12px;
+    padding: 0 0 0 20px;
+    border-left: 1px solid var(--rule);
+  }
+}
+
+.site-tab {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px 0 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--ink-2);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.site-tab:hover {
+  background: var(--well);
+  color: var(--ink);
+}
+
+.site-tab[aria-current='page'] {
+  border-color: var(--ink);
+  background: var(--well);
+  color: var(--ink);
+}
+
+/* How many friends are online: a green dot, as on their rows. */
+.site-tab-online {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.site-tab-online::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--held);
+}
+
+/* How many in your groups are planking now. */
+.site-tab-planking {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--button);
+  color: var(--button-ink);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .brand {
@@ -336,6 +432,7 @@ a {
 }
 
 .header-actions {
+  grid-area: actions;
   display: flex;
   flex-shrink: 0;
   align-items: center;
@@ -351,8 +448,8 @@ a {
   background: var(--well);
 }
 
-/* Most phones (390px and up) fit the site's name beside Friends and Groups with the buttons a little narrower:
-   still full height to tap, the icons the same size. Up to 429px, so a window with a scrollbar fits it too. */
+/* Phones fit the site's name beside the buttons with them a little narrower: still full height to tap, the icons
+   the same size. Up to 429px, so a window with a scrollbar fits it too. */
 @media (max-width: 429px) {
   .header-actions .icon-btn {
     width: 30px;
@@ -361,41 +458,6 @@ a {
     gap: 4px;
     padding: 0 2px;
   }
-}
-
-/* On phones the help icon makes way for Groups, so the site's name still fits. It's in the footer too. */
-.header-actions .header-help {
-  display: none;
-}
-
-@media (min-width: 480px) {
-  .header-actions .header-help {
-    display: inline-grid;
-  }
-}
-
-/* Groups: a count on the icon when anyone in your groups is planking now. */
-.groups-link {
-  position: relative;
-}
-
-.planking-badge {
-  position: absolute;
-  top: 2px;
-  right: -2px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border: 2px solid var(--paper);
-  border-radius: 9px;
-  background: var(--button);
-  color: var(--button-ink);
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 14px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
 }
 
 @media (min-width: 760px) {
@@ -5932,59 +5994,27 @@ a {
 }
 
 /* The friends rail: down the right on a computer, like Discord's member list, with the page's content moved
-   left to make room. The header stays across the top. Narrower, the header's Friends button does its job. */
+   left to make room. Signed in, every page keeps that frame (wide-frame), so the header and the page don't shift
+   from one page to the next; one without the rail (friends, a room) takes its room. Narrower, the Friends tab does
+   the rail's job. */
 
 .friends-rail {
   display: none;
 }
 
-.friends-link {
-  position: relative;
-}
-
-.online-badge {
-  position: absolute;
-  top: 2px;
-  right: -2px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border: 2px solid var(--paper);
-  border-radius: 9px;
-  background: var(--held);
-  color: var(--paper);
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 14px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-
-.request-dot {
-  position: absolute;
-  bottom: 3px;
-  right: 1px;
-  width: 10px;
-  height: 10px;
-  border: 2px solid var(--paper);
-  border-radius: 50%;
-  background: var(--signal);
-}
-
 @media (min-width: 1200px) {
-  .page.with-rail {
+  .page.wide-frame {
     max-width: 1620px;
   }
 
-  .with-rail .page-columns {
+  .wide-frame .page-columns {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 340px;
     align-items: start;
   }
 
-  .with-rail .friends-link {
-    display: none;
+  .wide-frame .page-main:only-child {
+    grid-column: 1 / -1;
   }
 
   .friends-rail {

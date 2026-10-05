@@ -11,7 +11,7 @@ import { InviteList } from './Invites'
 /**
  * The friends rail, down the right of the page on a computer, like Discord's member list: requests waiting,
  * then up to 10 friends (planking now, online, then most recently seen), each opening their card. Narrower
- * screens don't show it (styles.css): the header's Friends button opens the friends page instead.
+ * screens don't show it (styles.css): the Friends tab at the top opens the friends page instead.
  */
 export function FriendsRail({ today }: { today: DayKey }) {
   const { now } = useMyFriends(today)

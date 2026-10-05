@@ -6,6 +6,7 @@ import {
   groupInvite,
   joinGroup,
   saveDisplayName,
+  sessionStored,
   useAccount,
   type Group,
 } from '../lib/account'
@@ -64,13 +65,18 @@ const KINDS: { kind: GroupKind; label: string; about: string }[] = [
 
 /** Your groups, each linking to its page, and a form to make one. */
 export function GroupsPage({ today, completions }: { today: DayKey; completions: readonly Completion[] }) {
-  const { user } = useAccount()
+  const { user, known } = useAccount()
   const { groups, boards, failed } = useMyGroups(today)
 
   return (
     <div className="info-page groups-page">
       <PageTop title="Groups" />
-      {!user ? (
+      {!user && !known && sessionStored ? (
+        // Signed in from before, the account is still loading: not "sign in" for a moment first.
+        <div className="grid">
+          <p className="page-note fine">Loading your groups…</p>
+        </div>
+      ) : !user ? (
         <section className="section grid" aria-labelledby="groups-signed-out">
           <div className="section-rule" />
           <div className="section-label">

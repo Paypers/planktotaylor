@@ -59,7 +59,9 @@ function checkIn(): Promise<void> {
       const now = await friendsNow(today, planking)
       if (key === loadedFor) setState({ now, failed: false })
     } catch {
-      if (key === loadedFor) setState({ now: state.now ?? null, failed: true })
+      // What's shown stays, marked out of date. With nothing yet, it's still loading (and tried again shortly): null is
+      // only for a site without friends, and would hide them everywhere until the next check-in.
+      if (key === loadedFor) setState({ now: state.now, failed: true })
     }
   })()
   checking = current
