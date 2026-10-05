@@ -30,9 +30,6 @@ const STAR = 'M12 1.5 14.2 9.8 22.5 12 14.2 14.2 12 22.5 9.8 14.2 1.5 12 9.8 9.8
 const FLAME =
   'M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z'
 const CHECK = 'M20 6 9 17l-5-5'
-// Someone holding a forearm plank, side on, with the floor along the bottom (as PLANKER in src/lib/shareCard.ts).
-const PLANKER =
-  '<path d="M1.4 10.6 32.4 4M32.4 4V10.6H40.4" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="38.3" cy="3.2" r="3.2"/>'
 
 // ——— Drawing ———
 
@@ -62,13 +59,6 @@ function icon(path: string, size: number, color: string, stroke = false): Node {
     : `fill="${color}" stroke="${color}" stroke-width="1.2" stroke-linejoin="round"`
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="${path}" ${paint}/></svg>`
   return { type: 'img', props: { src: `data:image/svg+xml;base64,${btoa(svg)}`, width: size, height: size, style: { flexShrink: 0 } } }
-}
-
-/** The planker, `height` tall: resting on a song's bar, so the card says planking at a glance. */
-function planker(height: number, color: string): Node {
-  const width = (height * 42) / 12
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="42" height="12" viewBox="0 0 42 12" stroke="${color}" fill="${color}">${PLANKER}</svg>`
-  return { type: 'img', props: { src: `data:image/svg+xml;base64,${btoa(svg)}`, width, height, style: { flexShrink: 0, marginLeft: 2 } } }
 }
 
 /** Held with no breaks: the setlist's green tick. */
@@ -209,9 +199,10 @@ async function layout(card: Card, host: string, photoOf: (link: string | null) =
             el('div', { fontSize: 14, color: COLOR.ink2 }, song.album),
             el(
               'div',
-              { alignItems: 'flex-end', gap: 10, marginTop: 2, fontFamily: 'Mono', fontSize: 14, fontWeight: 600, lineHeight: 1 },
-              el('div', { flexDirection: 'column', flexGrow: 1 }, planker(15, COLOR.ink), el('div', { height: 6, borderRadius: 3, background: COLOR.held })),
-              song.length,
+              { alignItems: 'center', gap: 10, marginTop: 6, fontFamily: 'Mono', fontSize: 14, fontWeight: 600 },
+              el('div', { flexGrow: 1, height: 6, borderRadius: 3, background: COLOR.held }),
+              // Said in words, as under the share card's bar, so it reads as a plank and not a song played.
+              `${song.length} plank`,
             ),
           ),
         ),

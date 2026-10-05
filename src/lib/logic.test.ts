@@ -439,8 +439,8 @@ describe('pauses', () => {
 
   it('heads the card with what the plank counted for', () => {
     expect(plankHeadline(true, 12)).toBe('Two for one.')
-    expect(plankHeadline(false, 12)).toBe('Level 12 done.')
-    expect(plankHeadline(true)).toBe("Today's song, done.")
+    expect(plankHeadline(false, 12)).toBe('Level 12, planked.')
+    expect(plankHeadline(true)).toBe("Today's song, planked.")
     expect(plankHeadline(false)).toBe('Extra credit.')
     expect(plankHeadline(false, undefined, 'The Encore')).toBe('Collected.')
   })

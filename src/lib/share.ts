@@ -107,8 +107,8 @@ export const togetherLine = (together: number) => `Planked together · ${togethe
 /** The finished screen's headline, also printed on the share card. */
 export function plankHeadline(daily: boolean, level?: number, release?: string): string {
   if (daily && level) return 'Two for one.'
-  if (level) return `Level ${level} done.`
-  if (daily) return "Today's song, done."
+  if (level) return `Level ${level}, planked.`
+  if (daily) return "Today's song, planked."
   if (release) return 'Collected.'
   return 'Extra credit.'
 }
