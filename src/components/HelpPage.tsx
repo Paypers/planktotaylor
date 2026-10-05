@@ -85,7 +85,15 @@ export function HelpPage() {
 
       <Topic id="daily" title="Today's song">
         <dt>The same for everyone</dt>
-        <dd>Everyone gets the same song each day, by their own calendar. New releases take the spot on their release day.</dd>
+        <dd>
+          Everyone gets the same song each day, by their own calendar. Every song comes round, in no set order, and none
+          comes back within three months. New releases take the spot on their release day.
+        </dd>
+        <dt>All Too Well day</dt>
+        <dd>
+          All Too Well (10 Minute Version) isn't one of the everyday songs. Once in a long while it gets a day of its own,
+          never twice in a year, and nobody knows when the next one is. You'll know it when you see it.
+        </dd>
         <dt>Your streak</dt>
         <dd>
           Plank today's song to keep your streak going. The flame in the header lights up once today's is done. Ladder

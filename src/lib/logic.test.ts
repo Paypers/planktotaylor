@@ -1,6 +1,23 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ALBUMS, LADDER, LAUNCH_SONGS, SONG_BY_ID, SONGS, UPCOMING, formatDuration, slugify } from '../data/songs'
-import { DAILY_EPOCH, PREMIERES, dailyNumber, dailySchedule, dailySong, songOfTheDay } from './daily'
+import {
+  ALBUM_SPACING,
+  DAILY_EPOCH,
+  PICKER_FROM,
+  PREMIERES,
+  RARE_CHANCE,
+  RARE_GAP,
+  RARE_LATEST,
+  RARE_SONG_ID,
+  REST_DAYS,
+  dailyNumber,
+  dailySchedule,
+  dailySong,
+  deckSong,
+  isRareDay,
+  lastRareDay,
+  songOfTheDay,
+} from './daily'
 import { addDays, daysBetween } from './dates'
 import { applyPlank, emptyData, ladderRecords, ladderView, mergeCompletions, newerCursor, newerSettings, streakDays, type Completion } from './progress'
 import { isVideoId, normalizeTitle, parseIsoDuration, pickVideo, videoSongName, type VideoCandidate } from './match'
@@ -43,15 +60,15 @@ describe('daily song', () => {
     expect(dailyNumber(DAILY_EPOCH)).toBe(1)
   })
 
-  it('deals every song once before any repeats', () => {
-    const ids = Array.from({ length: LAUNCH_SONGS.length }, (_, i) => songOfTheDay(addDays(DAILY_EPOCH, i), new Map()).id)
+  it('deals every song once before any repeats, before the picker', () => {
+    const ids = Array.from({ length: LAUNCH_SONGS.length }, (_, i) => deckSong(addDays(DAILY_EPOCH, i), new Map()).id)
     expect(new Set(ids).size).toBe(LAUNCH_SONGS.length)
   })
 
   it('slots a premiere in without moving the days before it or skipping a song', () => {
     const premieres = new Map([[addDays(DAILY_EPOCH, 3), { ...LAUNCH_SONGS[0], id: 'new-single', title: 'New Single' }]])
-    const usual = (i: number) => songOfTheDay(addDays(DAILY_EPOCH, i), new Map()).id
-    const withPremiere = (i: number) => songOfTheDay(addDays(DAILY_EPOCH, i), premieres).id
+    const usual = (i: number) => deckSong(addDays(DAILY_EPOCH, i), new Map()).id
+    const withPremiere = (i: number) => deckSong(addDays(DAILY_EPOCH, i), premieres).id
     for (let i = 0; i < 3; i++) expect(withPremiere(i)).toBe(usual(i))
     expect(withPremiere(3)).toBe('new-single')
     for (let i = 4; i < 600; i++) expect(withPremiere(i)).toBe(usual(i - 1))
@@ -61,8 +78,8 @@ describe('daily song', () => {
     const day = (i: number) => addDays(DAILY_EPOCH, i)
     const out = new Map([[day(3), { ...LAUNCH_SONGS[0], id: 'new-single', title: 'New Single' }]])
     const late = new Map([[day(3), null]])
-    for (let i = 0; i < 600; i++) if (i !== 3) expect(songOfTheDay(day(i), late).id).toBe(songOfTheDay(day(i), out).id)
-    expect(LAUNCH_SONGS.some((s) => s.id === songOfTheDay(day(3), late).id)).toBe(true)
+    for (let i = 0; i < 600; i++) if (i !== 3) expect(deckSong(day(i), late).id).toBe(deckSong(day(i), out).id)
+    expect(LAUNCH_SONGS.some((s) => s.id === deckSong(day(3), late).id)).toBe(true)
   })
 
   it("plays the Encore's four new songs back to back from release day, then picks the rotation back up", () => {
@@ -75,7 +92,7 @@ describe('daily song', () => {
     const released = new Map(Object.entries(PREMIERES).map(([day, id]) => [day, { ...LAUNCH_SONGS[0], id }]))
     expect([0, 1, 2, 3].map((i) => songOfTheDay(addDays('2026-09-25', i), released).id)).toEqual(Object.values(PREMIERES))
     // The 29th gets the song the 25th would have had.
-    expect(songOfTheDay('2026-09-29', released).id).toBe(songOfTheDay('2026-09-25', new Map()).id)
+    expect(songOfTheDay('2026-09-29', released).id).toBe(deckSong('2026-09-25', new Map()).id)
   })
 
   it('premieres songs from the catalog, released after launch', () => {
@@ -93,6 +110,101 @@ describe('daily song', () => {
       expect(LADDER).not.toContain(song)
     }
     expect(LADDER.length).toBe(LAUNCH_SONGS.length)
+  })
+})
+
+describe('the picker', () => {
+  const day = (i: number) => addDays(PICKER_FROM, i)
+  const YEARS = 20
+  const schedule = Array.from({ length: YEARS * 365 }, (_, i) => dailySong(day(i)))
+
+  it('leaves every day before it as it was', () => {
+    const released = new Map(Object.entries(PREMIERES).map(([d, id]) => [d, SONG_BY_ID.get(id) ?? null]))
+    for (let d = DAILY_EPOCH; d < PICKER_FROM; d = addDays(d, 1)) expect(songOfTheDay(d, released).id, d).toBe(deckSong(d, released).id)
+    // As the site showed them: Daily No. 11 to 20.
+    expect(Array.from({ length: 10 }, (_, i) => dailySong(addDays('2026-10-02', i)).id)).toEqual([
+      'im-only-me-when-im-with-you',
+      'cassandra',
+      'peter',
+      'foolish-one',
+      'illicit-affairs',
+      'so-high-school',
+      'you-need-to-calm-down',
+      'cowboy-like-me',
+      'tolerate-it',
+      'better-than-revenge',
+    ])
+  })
+
+  it('is the same whichever day is asked for first', async () => {
+    vi.resetModules()
+    const fresh = await import('./daily')
+    const far = day(4000)
+    expect(fresh.dailySong(far).id).toBe(dailySong(far).id)
+    expect(fresh.dailySong(day(10)).id).toBe(schedule[10].id)
+  })
+
+  it('never brings a song back within its rest, nor an album two days running', () => {
+    const last = new Map<string, number>()
+    schedule.forEach((song, i) => {
+      if (song.id === RARE_SONG_ID) return
+      const before = last.get(song.id)
+      if (before !== undefined) expect(i - before, song.id).toBeGreaterThan(REST_DAYS)
+      last.set(song.id, i)
+    })
+    for (let i = 1; i < schedule.length; i++) {
+      const recent = schedule.slice(Math.max(0, i - ALBUM_SPACING), i).map((s) => s.album)
+      expect(recent, day(i)).not.toContain(schedule[i].album)
+    }
+  })
+
+  it('brings every song round, at no fixed interval', () => {
+    const rotation = LAUNCH_SONGS.filter((s) => s.id !== RARE_SONG_ID)
+    const firstTwoYears = new Set(schedule.slice(0, 730).map((s) => s.id))
+    expect(rotation.every((s) => firstTwoYears.has(s.id))).toBe(true)
+    const last = new Map<string, number>()
+    const gaps: number[] = []
+    schedule.forEach((song, i) => {
+      if (last.has(song.id)) gaps.push(i - last.get(song.id)!)
+      last.set(song.id, i)
+    })
+    gaps.sort((a, b) => a - b)
+    // Spread out, not a cycle: a fifth of the way along to four fifths are months apart, and none waits two years.
+    expect(gaps[Math.floor(gaps.length * 0.8)] - gaps[Math.floor(gaps.length * 0.2)]).toBeGreaterThan(90)
+    expect(gaps.at(-1)).toBeLessThan(730)
+  })
+
+  it('gives All Too Well (10 Minute Version) a day of its own, exceedingly rarely', () => {
+    const rare = schedule.flatMap((song, i) => (song.id === RARE_SONG_ID ? [i] : []))
+    expect(rare.length).toBeGreaterThanOrEqual(YEARS / (RARE_LATEST / 365))
+    expect(rare.length).toBeLessThanOrEqual(YEARS)
+    expect(rare[0]).toBeLessThanOrEqual(RARE_LATEST)
+    rare.slice(1).forEach((at, i) => {
+      expect(at - rare[i]).toBeGreaterThanOrEqual(RARE_GAP)
+      expect(at - rare[i]).toBeLessThanOrEqual(RARE_LATEST)
+    })
+    // Around a year and a half apart, on average.
+    const mean = (rare.at(-1)! - rare[0]) / (rare.length - 1)
+    expect(mean).toBeGreaterThan(RARE_GAP)
+    expect(mean).toBeLessThan(RARE_GAP + 2 / RARE_CHANCE)
+    expect(isRareDay(day(rare[0]))).toBe(true)
+    expect(isRareDay(day(rare[0] + 1))).toBe(false)
+    expect(lastRareDay(day(rare[1]))).toBe(day(rare[0]))
+    expect(lastRareDay(day(rare[0]))).toBeNull()
+  })
+
+  it('never on a premiere day, and a late premiere moves nothing else', () => {
+    const rare = schedule.findIndex((song) => song.id === RARE_SONG_ID)
+    const single = { ...LAUNCH_SONGS[0], id: 'new-single', title: 'New Single' }
+    const onIt = new Map([[day(rare), single]])
+    expect(songOfTheDay(day(rare), onIt).id).toBe('new-single')
+    // All Too Well day waits for its next chance instead, past its rest from nothing: at least a day later.
+    const moved = Array.from({ length: RARE_LATEST + 1 }, (_, i) => songOfTheDay(day(i), onIt).id).indexOf(RARE_SONG_ID)
+    expect(moved).toBeGreaterThan(rare)
+    const out = new Map([[day(5), single]])
+    const late = new Map([[day(5), null]])
+    for (let i = 0; i < 1500; i++) if (i !== 5) expect(songOfTheDay(day(i), late).id).toBe(songOfTheDay(day(i), out).id)
+    expect(songOfTheDay(day(5), late).id).toBe(schedule[5].id)
   })
 })
 

@@ -16,14 +16,25 @@ interface Props {
   moreActions?: ReactNode
   /** Extra lines under the album: progress, notes. */
   children?: ReactNode
+  /** All Too Well day's song: in its red, stamped Rare. */
+  rare?: boolean
 }
 
 /** One of today's planks, laid out like a tracklist row: sleeve, title, length, action. */
-export function SongRow({ eyebrow, song, done, startLabel, onStart, onShare, onAgain, moreActions, children }: Props) {
+export function SongRow({ eyebrow, song, done, startLabel, onStart, onShare, onAgain, moreActions, children, rare = false }: Props) {
   const album = ALBUMS[song.album]
   return (
-    <article className="song-row">
-      <Sleeve album={album} size="lg" />
+    <article className={rare ? 'song-row rare' : 'song-row'}>
+      {rare ? (
+        <div className="row-sleeve">
+          <Sleeve album={album} size="lg" />
+          <span className="row-stamp" aria-hidden="true">
+            Rare
+          </span>
+        </div>
+      ) : (
+        <Sleeve album={album} size="lg" />
+      )}
       <div className="row-text">
         <p className="row-eyebrow">
           {done && <Icon name="check" size={14} />}

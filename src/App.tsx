@@ -16,6 +16,7 @@ import { InstallPage } from './components/install/InstallPage'
 import { Flame, Icon, StarMark } from './components/Icon'
 import { LevelDialog } from './components/LevelDialog'
 import { SiteTabs } from './components/SiteTabs'
+import { AllTooWellMasthead } from './components/AllTooWellDay'
 import { StartTogether } from './components/live/StartTogether'
 import { MusicDialog } from './components/MusicDialog'
 import { PlankTimer, type FinishSummary, type PlankSession, type PlankShare } from './components/PlankTimer'
@@ -28,7 +29,7 @@ import { LadderProgress, SongLine, SongRow } from './components/SongRow'
 import { StreakPanel } from './components/StreakPanel'
 import { Together } from './components/Together'
 import { YearReview } from './components/YearReview'
-import { ALBUMS, LADDER, type Song } from './data/songs'
+import { ALBUMS, LADDER, formatDuration, type Song } from './data/songs'
 import {
   accountsEnabled,
   bumpDailyStats,
@@ -45,7 +46,7 @@ import { remindersAvailable } from './lib/push'
 import { fromDayKey } from './lib/dates'
 import { useToday } from './lib/hooks'
 import { dailyView, ladderView, songFor, streakDays, type Completion, type Pause } from './lib/progress'
-import { dailyNumber } from './lib/daily'
+import { dailyNumber, isRareDay } from './lib/daily'
 import { collectionOf, eraStamps, stampNews } from './lib/eras'
 import { forgetFriendCode, keptFriendCode, showFriendCode } from './lib/friends'
 import { forgetInvite, keptInvite } from './lib/groups'
@@ -106,6 +107,8 @@ export function App() {
   }, [route.page])
 
   const daily = dailyView(data, today)
+  // All Too Well day: the home page dresses for it (AllTooWellDay.tsx).
+  const rareDay = isRareDay(today)
   const ladder = ladderView(data, today)
   const days = useMemo(() => streakDays(data.completions), [data.completions])
   const streak = streakInfo(days, today)
@@ -357,19 +360,23 @@ export function App() {
           <div className="page-main">
             {/* Home stays mounted behind settings, so the setlist comes back as it was left. */}
             <main hidden={!onHome}>
-              <section className="masthead grid">
-                <div className="masthead-meta">
-                  <p>{dateline}</p>
-                  <p>Daily No. {daily.number}</p>
-                </div>
-                <div className="masthead-body">
-                  <h1 className="headline">Hold a plank for the length of a Taylor Swift song.</h1>
-                  <p className="lede">
-                    Everyone gets the same song each day: plank it to keep your streak. Your ladder climbs her whole catalog,
-                    shortest song to longest, as fast as you like.
-                  </p>
-                </div>
-              </section>
+              {rareDay ? (
+                <AllTooWellMasthead today={today} dateline={dateline} number={daily.number} done={daily.done} />
+              ) : (
+                <section className="masthead grid">
+                  <div className="masthead-meta">
+                    <p>{dateline}</p>
+                    <p>Daily No. {daily.number}</p>
+                  </div>
+                  <div className="masthead-body">
+                    <h1 className="headline">Hold a plank for the length of a Taylor Swift song.</h1>
+                    <p className="lede">
+                      Everyone gets the same song each day: plank it to keep your streak. Your ladder climbs her whole catalog,
+                      shortest song to longest, as fast as you like.
+                    </p>
+                  </div>
+                </section>
+              )}
 
               {promo && (
                 <section className="section grid year-promo" aria-labelledby="year-heading">
@@ -398,10 +405,11 @@ export function App() {
                 </div>
                 <div className="section-body today-list">
                   <SongRow
-                    eyebrow="Today's song · the same for everyone"
+                    eyebrow={rareDay ? "Today's song · All Too Well day" : "Today's song · the same for everyone"}
                     song={daily.song}
                     done={daily.done}
-                    startLabel="Start plank"
+                    rare={rareDay}
+                    startLabel={rareDay ? `Start all ${formatDuration(daily.song.seconds)}` : 'Start plank'}
                     onStart={() => start({ song: daily.song, label: "Today's song", kind: 'daily' })}
                     onShare={dailyDone && (() => shareCompletion(dailyDone))}
                     onAgain={() => start({ song: daily.song, label: "Today's song · extra credit", kind: 'extra' })}
