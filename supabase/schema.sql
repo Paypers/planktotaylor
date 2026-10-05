@@ -920,3 +920,782 @@ create policy "group members see who's planking" on realtime.messages for select
 drop policy if exists "group members say they're planking" on realtime.messages;
 create policy "group members say they're planking" on realtime.messages for insert to authenticated
   with check (realtime.messages.extension = 'presence' and public.planking_channel_member(realtime.topic()));
+
+-- Friends: players who add each other, one to one (docs/roadmap-parts/part-13-friends.md). Nobody reads these
+-- tables directly: everything goes through the functions below, which check who's asking. A friend sees the
+-- same as a group does (name, photo, whether today's song is planked and if with no breaks) plus whether
+-- they're online or planking now, unless they've hidden it. Never XP, breaks, attempts, rank or the ladder.
+-- There's no search: people find each other by a friend code, or through a group they share.
+
+-- Each player's friend code, whether friends see them online, when the site last checked in, and until when
+-- they're planking. Made the first time it's needed.
+create table if not exists public.friend_profiles (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  -- 8 of 23456789ABCDEFGHJKLMNPQRSTUVWXYZ (no 0, O, 1 or I), shown as XXXX-XXXX. FRIEND_CODE in src/lib/friends.ts.
+  code text not null unique check (code ~ '^[2-9A-HJ-NP-Z]{8}$'),
+  show_online boolean not null default true,
+  seen_at timestamptz,
+  planking_until timestamptz
+);
+
+-- One row per pair of friends, the smaller id first.
+create table if not exists public.friendships (
+  user_a uuid not null references auth.users (id) on delete cascade,
+  user_b uuid not null references auth.users (id) on delete cascade,
+  since timestamptz not null default now(),
+  primary key (user_a, user_b),
+  check (user_a < user_b)
+);
+create index if not exists friendships_b on public.friendships (user_b);
+
+create table if not exists public.friend_requests (
+  from_user uuid not null references auth.users (id) on delete cascade,
+  to_user uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (from_user, to_user),
+  check (from_user <> to_user)
+);
+create index if not exists friend_requests_to on public.friend_requests (to_user);
+
+-- Who each player has blocked. Requests and invites between the two then go nowhere, either way.
+create table if not exists public.friend_blocks (
+  blocker uuid not null references auth.users (id) on delete cascade,
+  blocked uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (blocker, blocked),
+  check (blocker <> blocked)
+);
+create index if not exists friend_blocks_blocked on public.friend_blocks (blocked);
+
+-- An invite from a friend: into a plank-together room (its code and song, for 30 minutes), or into a group
+-- (for 7 days). One at a time from each friend for rooms, and one for each group.
+create table if not exists public.friend_invites (
+  id uuid primary key default gen_random_uuid(),
+  from_user uuid not null references auth.users (id) on delete cascade,
+  to_user uuid not null references auth.users (id) on delete cascade,
+  kind text not null check (kind in ('room', 'group')),
+  room_code text check (room_code ~ '^[a-z0-9]{10}$'),
+  song_id text check (song_id ~ '^[a-z0-9-]{1,100}$'),
+  group_id uuid references public.groups (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null,
+  check (
+    (kind = 'room' and room_code is not null and song_id is not null and group_id is null)
+    or (kind = 'group' and group_id is not null and room_code is null and song_id is null)
+  )
+);
+create unique index if not exists friend_invites_one on public.friend_invites (from_user, to_user, kind, coalesce(group_id, '00000000-0000-0000-0000-000000000000'::uuid));
+create index if not exists friend_invites_to on public.friend_invites (to_user);
+
+-- Requests and invites sent, kept a day, for the limits: they count even once answered.
+create table if not exists public.friend_sends (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  kind text not null check (kind in ('request', 'invite')),
+  at timestamptz not null default now()
+);
+create index if not exists friend_sends_user on public.friend_sends (user_id, kind, at);
+
+alter table public.friend_profiles enable row level security;
+alter table public.friendships enable row level security;
+alter table public.friend_requests enable row level security;
+alter table public.friend_blocks enable row level security;
+alter table public.friend_invites enable row level security;
+alter table public.friend_sends enable row level security;
+revoke all on public.friend_profiles, public.friendships, public.friend_requests, public.friend_blocks, public.friend_invites, public.friend_sends
+  from anon, authenticated;
+
+-- Are these two friends?
+create or replace function public.are_friends(p_one uuid, p_two uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from public.friendships where user_a = least(p_one, p_two) and user_b = greatest(p_one, p_two))
+$$;
+revoke all on function public.are_friends(uuid, uuid) from public, anon, authenticated;
+
+-- Has either of these two blocked the other?
+create or replace function public.friend_blocked(p_one uuid, p_two uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.friend_blocks
+    where (blocker = p_one and blocked = p_two) or (blocker = p_two and blocked = p_one)
+  )
+$$;
+revoke all on function public.friend_blocked(uuid, uuid) from public, anon, authenticated;
+
+-- A new friend code, unused by anyone. 32 letters, so each byte of the hash picks one evenly.
+create or replace function public.friend_code_new()
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  letters constant text := '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  bytes bytea;
+  made text;
+begin
+  loop
+    bytes := decode(md5(gen_random_uuid()::text || clock_timestamp()::text), 'hex');
+    select string_agg(substr(letters, 1 + get_byte(bytes, i) % 32, 1), '' order by i) into made from generate_series(0, 7) i;
+    exit when not exists (select 1 from public.friend_profiles where code = made);
+  end loop;
+  return made;
+end;
+$$;
+revoke all on function public.friend_code_new() from public, anon, authenticated;
+
+-- The player's own row, made with a code the first time.
+create or replace function public.friend_profile_for(p_user uuid)
+returns public.friend_profiles
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  mine public.friend_profiles;
+begin
+  select * into mine from public.friend_profiles where user_id = p_user;
+  if not found then
+    insert into public.friend_profiles (user_id, code) values (p_user, public.friend_code_new())
+    on conflict (user_id) do nothing;
+    select * into mine from public.friend_profiles where user_id = p_user;
+  end if;
+  return mine;
+end;
+$$;
+revoke all on function public.friend_profile_for(uuid) from public, anon, authenticated;
+
+-- A code as typed or pasted: capitals, without the dash or spaces.
+create or replace function public.friend_code_read(p_code text)
+returns text
+language sql
+immutable
+as $$
+  select upper(regexp_replace(coalesce(p_code, ''), '[^0-9A-Za-z]', '', 'g'))
+$$;
+
+-- Each limit counts what was sent in the last day (requests) or hour (invites).
+create or replace function public.friend_sent(p_user uuid, p_kind text, p_within interval)
+returns int
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select count(*)::int from public.friend_sends where user_id = p_user and kind = p_kind and at > now() - p_within
+$$;
+revoke all on function public.friend_sent(uuid, text, interval) from public, anon, authenticated;
+
+create or replace function public.friend_count(p_user uuid)
+returns int
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select count(*)::int from public.friendships where user_a = p_user or user_b = p_user
+$$;
+revoke all on function public.friend_count(uuid) from public, anon, authenticated;
+
+-- Makes two players friends, and clears the requests between them. At most 200 friends each.
+create or replace function public.friends_make(p_one uuid, p_two uuid)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+begin
+  if public.friend_count(p_one) >= 200 or public.friend_count(p_two) >= 200 then
+    raise exception 'too many friends';
+  end if;
+  insert into public.friendships (user_a, user_b) values (least(p_one, p_two), greatest(p_one, p_two)) on conflict do nothing;
+  delete from public.friend_requests where (from_user = p_one and to_user = p_two) or (from_user = p_two and to_user = p_one);
+end;
+$$;
+revoke all on function public.friends_make(uuid, uuid) from public, anon, authenticated;
+
+-- A request from one player to another, however they found each other. Returns 'sent', or 'friends' when the
+-- other had already asked. To someone who's blocked the sender, it quietly goes nowhere, and still says 'sent'.
+create or replace function public.friend_request_to(p_me uuid, p_to uuid)
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+begin
+  if p_to = p_me then
+    raise exception 'that''s your own code';
+  end if;
+  -- One of the player's own friend changes at a time, so two at once can't pass the limits together.
+  perform pg_advisory_xact_lock(hashtext('friend player ' || p_me::text));
+  if exists (select 1 from public.friend_blocks where blocker = p_me and blocked = p_to) then
+    raise exception 'unblock them first';
+  end if;
+  if public.are_friends(p_me, p_to) then
+    return 'friends';
+  end if;
+  if exists (select 1 from public.friend_blocks where blocker = p_to and blocked = p_me) then
+    return 'sent';
+  end if;
+  if exists (select 1 from public.friend_requests where from_user = p_to and to_user = p_me) then
+    perform public.friends_make(p_me, p_to);
+    return 'friends';
+  end if;
+  if exists (select 1 from public.friend_requests where from_user = p_me and to_user = p_to) then
+    return 'sent';
+  end if;
+  if public.friend_count(p_me) >= 200 then
+    raise exception 'too many friends';
+  end if;
+  if (select count(*) from public.friend_requests where from_user = p_me) >= 50 then
+    raise exception 'too many requests waiting';
+  end if;
+  if public.friend_sent(p_me, 'request', interval '1 day') >= 30 then
+    raise exception 'too many requests today';
+  end if;
+  delete from public.friend_sends where at < now() - interval '1 day';
+  insert into public.friend_sends (user_id, kind) values (p_me, 'request');
+  insert into public.friend_requests (from_user, to_user) values (p_me, p_to);
+  return 'sent';
+end;
+$$;
+revoke all on function public.friend_request_to(uuid, uuid) from public, anon, authenticated;
+
+-- Who a friend code belongs to, for its link's page: their name and photo, and where the two of you stand
+-- ('me', 'friends', 'sent', 'received', 'blocked' or 'none'). Null for a code that isn't anyone's, and for
+-- someone who's blocked you.
+create or replace function public.friend_lookup(p_code text)
+returns json
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+  them uuid;
+begin
+  if me is null then
+    raise exception 'sign in first';
+  end if;
+  select user_id into them from public.friend_profiles where code = public.friend_code_read(p_code);
+  if them is null or exists (select 1 from public.friend_blocks where blocker = them and blocked = me) then
+    return null;
+  end if;
+  return (
+    select json_build_object(
+      'user_id', them,
+      'name', coalesce(nullif(btrim(p.display_name), ''), 'A planker'),
+      'avatar_url', p.avatar_url,
+      'status', case
+        when them = me then 'me'
+        when public.are_friends(me, them) then 'friends'
+        when exists (select 1 from public.friend_blocks where blocker = me and blocked = them) then 'blocked'
+        when exists (select 1 from public.friend_requests where from_user = me and to_user = them) then 'sent'
+        when exists (select 1 from public.friend_requests where from_user = them and to_user = me) then 'received'
+        else 'none'
+      end
+    )
+    from (select 1) one
+    left join public.plank_profiles p on p.user_id = them
+  );
+end;
+$$;
+
+create or replace function public.my_friend_code()
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+begin
+  return (public.friend_profile_for(public.group_player())).code;
+end;
+$$;
+
+-- A new code: the old one, and its link, stop working.
+create or replace function public.new_friend_code()
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := public.group_player();
+  made text := public.friend_code_new();
+begin
+  perform public.friend_profile_for(me);
+  update public.friend_profiles set code = made where user_id = me;
+  return made;
+end;
+$$;
+
+create or replace function public.request_friend(p_code text)
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := public.group_player();
+  them uuid;
+begin
+  select user_id into them from public.friend_profiles where code = public.friend_code_read(p_code);
+  if them is null then
+    raise exception 'no such friend code';
+  end if;
+  return public.friend_request_to(me, them);
+end;
+$$;
+
+-- Someone you share a group with, from the group's members: no code needed.
+create or replace function public.request_friend_from_group(p_user uuid)
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := public.group_player();
+begin
+  if not exists (
+    select 1 from public.group_members mine join public.group_members theirs on theirs.group_id = mine.group_id
+    where mine.user_id = me and theirs.user_id = p_user
+  ) then
+    raise exception 'not in a group with them';
+  end if;
+  return public.friend_request_to(me, p_user);
+end;
+$$;
+
+-- Accepts or declines a request. Declining is quiet: it's just gone from the sender's list.
+create or replace function public.answer_friend_request(p_from uuid, p_accept boolean)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := public.group_player();
+begin
+  perform pg_advisory_xact_lock(hashtext('friend player ' || me::text));
+  if not exists (select 1 from public.friend_requests where from_user = p_from and to_user = me) then
+    raise exception 'no such request';
+  end if;
+  if p_accept then
+    perform public.friends_make(me, p_from);
+  else
+    delete from public.friend_requests where from_user = p_from and to_user = me;
+  end if;
+end;
+$$;
+
+create or replace function public.cancel_friend_request(p_to uuid)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+begin
+  delete from public.friend_requests where from_user = auth.uid() and to_user = p_to;
+end;
+$$;
+
+-- Either friend can end it. Invites between them go too.
+create or replace function public.remove_friend(p_user uuid)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+begin
+  delete from public.friendships where user_a = least(me, p_user) and user_b = greatest(me, p_user);
+  delete from public.friend_invites where (from_user = me and to_user = p_user) or (from_user = p_user and to_user = me);
+end;
+$$;
+
+-- Blocking ends the friendship and clears everything between the two. They're never told.
+create or replace function public.block_player(p_user uuid)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+begin
+  if me is null then
+    raise exception 'sign in first';
+  end if;
+  if p_user = me then
+    raise exception 'that''s you';
+  end if;
+  insert into public.friend_blocks (blocker, blocked) values (me, p_user) on conflict do nothing;
+  perform public.remove_friend(p_user);
+  delete from public.friend_requests where (from_user = me and to_user = p_user) or (from_user = p_user and to_user = me);
+end;
+$$;
+
+create or replace function public.unblock_player(p_user uuid)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+begin
+  delete from public.friend_blocks where blocker = auth.uid() and blocked = p_user;
+end;
+$$;
+
+create or replace function public.set_show_online(p_show boolean)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+begin
+  if me is null then
+    raise exception 'sign in first';
+  end if;
+  perform public.friend_profile_for(me);
+  update public.friend_profiles set show_online = coalesce(p_show, true) where user_id = me;
+end;
+$$;
+
+-- Invites friends into a plank-together room (p_room and p_song) or a group (p_group). Anyone in the list who
+-- isn't a friend, has blocked you, or is in the group already is skipped. Returns how many went. A new room
+-- invite to a friend replaces the last one. At most 50 invites an hour.
+create or replace function public.invite_friends(p_kind text, p_users uuid[], p_room text, p_song text, p_group uuid)
+returns int
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := public.group_player();
+  friend uuid;
+  sent int := 0;
+begin
+  if p_kind is null or p_kind not in ('room', 'group') then
+    raise exception 'a room or a group';
+  end if;
+  if p_kind = 'group' and not public.in_group(p_group) then
+    raise exception 'not in this group';
+  end if;
+  if coalesce(array_length(p_users, 1), 0) > 50 then
+    raise exception 'too many invites';
+  end if;
+  perform pg_advisory_xact_lock(hashtext('friend player ' || me::text));
+  for friend in select distinct u from unnest(coalesce(p_users, '{}'::uuid[])) u loop
+    continue when not public.are_friends(me, friend) or public.friend_blocked(me, friend);
+    continue when p_kind = 'group' and exists (select 1 from public.group_members where group_id = p_group and user_id = friend);
+    if public.friend_sent(me, 'invite', interval '1 hour') >= 50 then
+      raise exception 'too many invites';
+    end if;
+    delete from public.friend_invites
+    where from_user = me and to_user = friend and kind = p_kind and (p_kind = 'room' or group_id = p_group);
+    insert into public.friend_invites (from_user, to_user, kind, room_code, song_id, group_id, expires_at)
+    values (
+      me, friend, p_kind,
+      case when p_kind = 'room' then p_room end,
+      case when p_kind = 'room' then p_song end,
+      case when p_kind = 'group' then p_group end,
+      now() + case when p_kind = 'room' then interval '30 minutes' else interval '7 days' end
+    );
+    insert into public.friend_sends (user_id, kind) values (me, 'invite');
+    sent := sent + 1;
+  end loop;
+  delete from public.friend_sends where at < now() - interval '1 day';
+  return sent;
+end;
+$$;
+
+create or replace function public.dismiss_invite(p_id uuid)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+begin
+  delete from public.friend_invites where id = p_id and to_user = auth.uid();
+end;
+$$;
+
+-- Joins the group a friend invited you to, on the group's own limits, while the friend is still in it.
+create or replace function public.accept_group_invite(p_id uuid, p_today date)
+returns public.groups
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := public.group_player();
+  invite public.friend_invites;
+  joined public.groups;
+begin
+  select * into invite from public.friend_invites where id = p_id and to_user = me and kind = 'group' and expires_at > now();
+  if not found or not exists (select 1 from public.group_members where group_id = invite.group_id and user_id = invite.from_user) then
+    raise exception 'no such invite';
+  end if;
+  joined := public.join_group((select invite_code from public.groups where id = invite.group_id), p_today);
+  delete from public.friend_invites where id = p_id;
+  return joined;
+end;
+$$;
+
+-- People you plank with in your groups who aren't your friends yet: name, photo and a group you share.
+create or replace function public.friend_suggestions()
+returns table (user_id uuid, name text, avatar_url text, group_name text)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+#variable_conflict use_column
+declare
+  me uuid := auth.uid();
+begin
+  return query
+  select distinct on (them.user_id)
+    them.user_id,
+    coalesce(nullif(btrim(p.display_name), ''), 'A planker'),
+    p.avatar_url,
+    g.name
+  from public.group_members mine
+  join public.group_members them on them.group_id = mine.group_id and them.user_id <> me
+  join public.groups g on g.id = mine.group_id
+  left join public.plank_profiles p on p.user_id = them.user_id
+  where mine.user_id = me
+    and not public.are_friends(me, them.user_id)
+    and not public.friend_blocked(me, them.user_id)
+    and not exists (
+      select 1 from public.friend_requests r
+      where (r.from_user = me and r.to_user = them.user_id) or (r.from_user = them.user_id and r.to_user = me)
+    )
+  order by them.user_id, g.name
+  limit 50;
+end;
+$$;
+
+-- One friend in full, for their card: the days they planked today's song (for their streak), since when you've
+-- been friends, and the groups you share.
+create or replace function public.friend_card(p_user uuid)
+returns json
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+begin
+  if me is null or not public.are_friends(me, p_user) then
+    raise exception 'not your friend';
+  end if;
+  return json_build_object(
+    'since', (select since from public.friendships where user_a = least(me, p_user) and user_b = greatest(me, p_user)),
+    'days', coalesce((select json_agg(c.day order by c.day) from public.plank_completions c where c.user_id = p_user and c.mode = 'daily'), '[]'::json),
+    'groups', coalesce((
+      select json_agg(json_build_object('id', g.id, 'name', g.name) order by g.name)
+      from public.groups g
+      where exists (select 1 from public.group_members where group_id = g.id and user_id = me)
+        and exists (select 1 from public.group_members where group_id = g.id and user_id = p_user)
+    ), '[]'::json)
+  );
+end;
+$$;
+
+-- The friends list's one call, every 45 seconds while the site is in view: checks the player in (and says
+-- until when they're planking, or null), then returns their code (once they have a name, as friends need)
+-- and everything the list shows. For each
+-- friend: name, photo, since when, online and planking (false for anyone hiding it), when last seen and when
+-- they planked `p_today`'s song (null for anyone hiding it), and whether that was with no breaks.
+create or replace function public.friends_now(p_today date, p_planking_until timestamptz)
+returns json
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+  mine public.friend_profiles;
+begin
+  if me is null then
+    raise exception 'sign in first';
+  end if;
+  perform public.group_day(p_today);
+  mine := public.friend_profile_for(me);
+  update public.friend_profiles
+  -- At most 2 hours ahead, so a plank screen left open stops counting. Null: not planking.
+  set seen_at = now(), planking_until = case when p_planking_until is not null then least(p_planking_until, now() + interval '2 hours') end
+  where user_id = me;
+  delete from public.friend_invites where to_user = me and expires_at <= now();
+  return json_build_object(
+    'code', case when exists (
+      select 1 from public.plank_profiles where user_id = me and btrim(coalesce(display_name, '')) <> ''
+    ) then mine.code end,
+    'show_online', mine.show_online,
+    'friends', coalesce((
+      select json_agg(f order by f.since desc)
+      from (
+        select
+          them.id as user_id,
+          coalesce(nullif(btrim(p.display_name), ''), 'A planker') as name,
+          p.avatar_url,
+          fr.since,
+          coalesce(fp.show_online and fp.seen_at > now() - interval '2 minutes', false) as online,
+          coalesce(fp.show_online and fp.planking_until > now(), false) as planking,
+          case when fp.show_online then fp.seen_at end as seen_at,
+          case when fp.show_online then c.completed_at end as planked_at,
+          c.user_id is not null as planked_today,
+          case when c.user_id is not null then c.pauses is null or jsonb_array_length(c.pauses) = 0 end as clean_today,
+          c.song_id as planked_song
+        from public.friendships fr
+        cross join lateral (select case when fr.user_a = me then fr.user_b else fr.user_a end as id) them
+        left join public.plank_profiles p on p.user_id = them.id
+        left join public.friend_profiles fp on fp.user_id = them.id
+        left join public.plank_completions c on c.user_id = them.id and c.mode = 'daily' and c.day = p_today
+        where fr.user_a = me or fr.user_b = me
+      ) f
+    ), '[]'::json),
+    'requests_in', coalesce((
+      select json_agg(json_build_object('user_id', r.from_user, 'name', coalesce(nullif(btrim(p.display_name), ''), 'A planker'), 'avatar_url', p.avatar_url, 'at', r.created_at) order by r.created_at desc)
+      from public.friend_requests r left join public.plank_profiles p on p.user_id = r.from_user
+      where r.to_user = me
+    ), '[]'::json),
+    'requests_out', coalesce((
+      select json_agg(json_build_object('user_id', r.to_user, 'name', coalesce(nullif(btrim(p.display_name), ''), 'A planker'), 'avatar_url', p.avatar_url, 'at', r.created_at) order by r.created_at desc)
+      from public.friend_requests r left join public.plank_profiles p on p.user_id = r.to_user
+      where r.from_user = me
+    ), '[]'::json),
+    'blocked', coalesce((
+      select json_agg(json_build_object('user_id', b.blocked, 'name', coalesce(nullif(btrim(p.display_name), ''), 'A planker'), 'avatar_url', p.avatar_url) order by b.created_at desc)
+      from public.friend_blocks b left join public.plank_profiles p on p.user_id = b.blocked
+      where b.blocker = me
+    ), '[]'::json),
+    'invites', coalesce((
+      select json_agg(json_build_object(
+        'id', i.id, 'from_user', i.from_user, 'name', coalesce(nullif(btrim(p.display_name), ''), 'A planker'), 'avatar_url', p.avatar_url,
+        'kind', i.kind, 'room_code', i.room_code, 'song_id', i.song_id, 'group_id', i.group_id, 'group_name', g.name,
+        'at', i.created_at, 'expires_at', i.expires_at
+      ) order by i.created_at desc)
+      from public.friend_invites i
+      left join public.plank_profiles p on p.user_id = i.from_user
+      left join public.groups g on g.id = i.group_id
+      where i.to_user = me and i.expires_at > now() and public.are_friends(me, i.from_user)
+    ), '[]'::json)
+  );
+end;
+$$;
+
+-- The site's calls: signed-in players only.
+revoke all on function public.friend_lookup(text) from public, anon;
+revoke all on function public.my_friend_code() from public, anon;
+revoke all on function public.new_friend_code() from public, anon;
+revoke all on function public.request_friend(text) from public, anon;
+revoke all on function public.request_friend_from_group(uuid) from public, anon;
+revoke all on function public.answer_friend_request(uuid, boolean) from public, anon;
+revoke all on function public.cancel_friend_request(uuid) from public, anon;
+revoke all on function public.remove_friend(uuid) from public, anon;
+revoke all on function public.block_player(uuid) from public, anon;
+revoke all on function public.unblock_player(uuid) from public, anon;
+revoke all on function public.set_show_online(boolean) from public, anon;
+revoke all on function public.invite_friends(text, uuid[], text, text, uuid) from public, anon;
+revoke all on function public.dismiss_invite(uuid) from public, anon;
+revoke all on function public.accept_group_invite(uuid, date) from public, anon;
+revoke all on function public.friend_suggestions() from public, anon;
+revoke all on function public.friend_card(uuid) from public, anon;
+revoke all on function public.friends_now(date, timestamptz) from public, anon;
+grant execute on function public.friend_lookup(text) to authenticated;
+grant execute on function public.my_friend_code() to authenticated;
+grant execute on function public.new_friend_code() to authenticated;
+grant execute on function public.request_friend(text) to authenticated;
+grant execute on function public.request_friend_from_group(uuid) to authenticated;
+grant execute on function public.answer_friend_request(uuid, boolean) to authenticated;
+grant execute on function public.cancel_friend_request(uuid) to authenticated;
+grant execute on function public.remove_friend(uuid) to authenticated;
+grant execute on function public.block_player(uuid) to authenticated;
+grant execute on function public.unblock_player(uuid) to authenticated;
+grant execute on function public.set_show_online(boolean) to authenticated;
+grant execute on function public.invite_friends(text, uuid[], text, text, uuid) to authenticated;
+grant execute on function public.dismiss_invite(uuid) to authenticated;
+grant execute on function public.accept_group_invite(uuid, date) to authenticated;
+grant execute on function public.friend_suggestions() to authenticated;
+grant execute on function public.friend_card(uuid) to authenticated;
+grant execute on function public.friends_now(date, timestamptz) to authenticated;
+
+-- Each player's friend inbox: a private Realtime channel, friend-inbox:<their id>, where a request, an answer or
+-- an invite sends a nudge with nothing in it, so their site checks in straight away. Only they can listen. Only
+-- their friends, or someone with a request waiting for them, can nudge, and never someone they've blocked.
+create or replace function public.friend_inbox_listener(p_topic text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p_topic = 'friend-inbox:' || auth.uid()::text
+$$;
+revoke all on function public.friend_inbox_listener(text) from public, anon;
+grant execute on function public.friend_inbox_listener(text) to authenticated;
+
+create or replace function public.friend_inbox_sender(p_topic text)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  them uuid;
+begin
+  if p_topic !~ '^friend-inbox:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' or auth.uid() is null then
+    return false;
+  end if;
+  them := substr(p_topic, 14)::uuid;
+  return not public.friend_blocked(auth.uid(), them) and (
+    public.are_friends(auth.uid(), them)
+    or exists (select 1 from public.friend_requests where from_user = auth.uid() and to_user = them)
+  );
+end;
+$$;
+revoke all on function public.friend_inbox_sender(text) from public, anon;
+grant execute on function public.friend_inbox_sender(text) to authenticated;
+
+drop policy if exists "players hear their friend inbox" on realtime.messages;
+create policy "players hear their friend inbox" on realtime.messages for select to authenticated
+  using (realtime.messages.extension = 'broadcast' and public.friend_inbox_listener(realtime.topic()));
+drop policy if exists "friends nudge each other's inbox" on realtime.messages;
+create policy "friends nudge each other's inbox" on realtime.messages for insert to authenticated
+  with check (realtime.messages.extension = 'broadcast' and public.friend_inbox_sender(realtime.topic()));

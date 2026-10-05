@@ -22,6 +22,7 @@ import { readStats, type DailyStats } from './together'
 import type { AddProblem } from './discord'
 import { groupProblem, type BoardMember, type GroupKind, type GroupProblem, type Invite } from './groups'
 import { photoInOwnBucket } from './avatar'
+import { friendProblem, readFriendsNow, type FriendProblem, type FriendsNow, type Person } from './friends'
 
 // The project address, without the /rest/v1/ the dashboard shows on the end (it breaks sign-in).
 const url = (import.meta.env.VITE_SUPABASE_URL as string | undefined)
@@ -761,6 +762,143 @@ export async function groupInvite(code: string, today: DayKey): Promise<Invite |
   const invite = (data as Invite | null) ?? null
   if (!invite || !('contributors' in invite) || !invite.contributors) return invite
   return { ...invite, contributors: invite.contributors.map((c) => ({ ...c, avatar_url: photoToShow(c.avatar_url) })) }
+}
+
+// ——— Friends ———
+
+/** Why a friends call didn't work. */
+export class FriendError extends Error {
+  constructor(readonly problem: FriendProblem) {
+    super(`Friends: ${problem}`)
+  }
+}
+
+const friendFailure = (error: { message?: string }) => new FriendError(friendProblem(error.message))
+
+/** Where you stand with the owner of a friend code. */
+export type FriendStanding = 'me' | 'friends' | 'sent' | 'received' | 'blocked' | 'none'
+
+/** A friend code's owner, for its link's page. */
+export interface FoundPlayer extends Person {
+  status: FriendStanding
+}
+
+/** Someone in a group you share who isn't a friend yet, and one of the groups. */
+export interface Suggestion extends Person {
+  group_name: string
+}
+
+/** One friend in full, for their card. */
+export interface FriendCard {
+  since: string
+  /** Every day they planked today's song, for their streak. */
+  days: DayKey[]
+  /** The groups you're both in. */
+  groups: { id: string; name: string }[]
+}
+
+const withPhoto = <T extends { avatar_url: string | null }>(person: T): T => ({ ...person, avatar_url: photoToShow(person.avatar_url) })
+
+/**
+ * The check-in: says the player's here (and until when they're planking, or null), and brings back
+ * everything the friends list shows. Null signed out, or before schema.sql has friends.
+ */
+export async function friendsNow(today: DayKey, plankingUntil: number | null): Promise<FriendsNow | null> {
+  if (!accountsEnabled || !state.user) return null
+  const { data, error } = await (await client()).rpc('friends_now', {
+    p_today: today,
+    p_planking_until: plankingUntil === null ? null : new Date(plankingUntil).toISOString(),
+  })
+  if (error?.code === MISSING_FUNCTION) return null
+  if (error) throw friendFailure(error)
+  const now = readFriendsNow(data)
+  if (!now) return null
+  return {
+    ...now,
+    friends: now.friends.map(withPhoto),
+    requests_in: now.requests_in.map(withPhoto),
+    requests_out: now.requests_out.map(withPhoto),
+    blocked: now.blocked.map(withPhoto),
+    invites: now.invites.map(withPhoto),
+  }
+}
+
+/** Who a friend code belongs to. Null for a code that isn't anyone's (or an old one). */
+export async function findByFriendCode(code: string): Promise<FoundPlayer | null> {
+  const { data, error } = await (await client()).rpc('friend_lookup', { p_code: code })
+  if (error) throw friendFailure(error)
+  return data ? withPhoto(data as FoundPlayer) : null
+}
+
+/** Asks someone by their code. 'friends' when they'd already asked you. */
+export async function requestFriend(code: string): Promise<'sent' | 'friends'> {
+  const { data, error } = await (await client()).rpc('request_friend', { p_code: code })
+  if (error) throw friendFailure(error)
+  return data === 'friends' ? 'friends' : 'sent'
+}
+
+/** Asks someone you share a group with. */
+export async function requestFriendFromGroup(userId: string): Promise<'sent' | 'friends'> {
+  const { data, error } = await (await client()).rpc('request_friend_from_group', { p_user: userId })
+  if (error) throw friendFailure(error)
+  return data === 'friends' ? 'friends' : 'sent'
+}
+
+async function friendCall(fn: string, args: Record<string, unknown>) {
+  const { error } = await (await client()).rpc(fn, args)
+  if (error) throw friendFailure(error)
+}
+
+export const answerFriendRequest = (from: string, accept: boolean) => friendCall('answer_friend_request', { p_from: from, p_accept: accept })
+export const cancelFriendRequest = (to: string) => friendCall('cancel_friend_request', { p_to: to })
+export const removeFriend = (userId: string) => friendCall('remove_friend', { p_user: userId })
+export const blockPlayer = (userId: string) => friendCall('block_player', { p_user: userId })
+export const unblockPlayer = (userId: string) => friendCall('unblock_player', { p_user: userId })
+export const setShowOnline = (show: boolean) => friendCall('set_show_online', { p_show: show })
+export const dismissInvite = (id: string) => friendCall('dismiss_invite', { p_id: id })
+
+/** A new friend code: the old one, and its link, stop working. */
+export async function newFriendCode(): Promise<string> {
+  const { data, error } = await (await client()).rpc('new_friend_code')
+  if (error) throw friendFailure(error)
+  return data as string
+}
+
+/** Invites friends into a plank-together room, or into a group. Returns how many it went to. */
+export async function inviteFriends(to: readonly string[], where: { room: string; song: string } | { group: string }): Promise<number> {
+  const room = 'room' in where
+  const { data, error } = await (await client()).rpc('invite_friends', {
+    p_kind: room ? 'room' : 'group',
+    p_users: to,
+    p_room: room ? where.room : null,
+    p_song: room ? where.song : null,
+    p_group: room ? null : where.group,
+  })
+  if (error) throw friendFailure(error)
+  return data as number
+}
+
+/** Joins the group a friend invited you to. Its limits are the group's own. */
+export async function acceptGroupInvite(id: string, today: DayKey): Promise<{ id: string; name: string }> {
+  const { data, error } = await (await client()).rpc('accept_group_invite', { p_id: id, p_today: today })
+  if (error) {
+    const problem = groupProblem(error.message)
+    throw problem === 'unavailable' ? friendFailure(error) : new GroupError(problem)
+  }
+  return data as { id: string; name: string }
+}
+
+/** People in your groups who aren't friends yet. */
+export async function friendSuggestions(): Promise<Suggestion[]> {
+  const { data, error } = await (await client()).rpc('friend_suggestions')
+  if (error) throw friendFailure(error)
+  return (data as Suggestion[]).map(withPhoto)
+}
+
+export async function friendCard(userId: string): Promise<FriendCard> {
+  const { data, error } = await (await client()).rpc('friend_card', { p_user: userId })
+  if (error) throw friendFailure(error)
+  return data as FriendCard
 }
 
 /** The name to show: the one they chose, or the start of their email. */

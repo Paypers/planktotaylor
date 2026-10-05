@@ -418,4 +418,327 @@ begin
 end;
 $$;
 
+-- Friends, with four more made-up players of their own: Eve, Fay and Gus, and Hal with no name. Eve and Fay
+-- become friends; Gus is a stranger to Eve, then shares a group with Fay.
+reset role;
+insert into auth.users (id, email) values
+  ('00000000-0000-4000-8000-0000000000e1', 'rules-test-eve@example.invalid'),
+  ('00000000-0000-4000-8000-0000000000e2', 'rules-test-fay@example.invalid'),
+  ('00000000-0000-4000-8000-0000000000e3', 'rules-test-gus@example.invalid'),
+  ('00000000-0000-4000-8000-0000000000e4', 'rules-test-hal@example.invalid');
+insert into public.plank_profiles (user_id, display_name) values
+  ('00000000-0000-4000-8000-0000000000e1', 'Eve'),
+  ('00000000-0000-4000-8000-0000000000e2', 'Fay'),
+  ('00000000-0000-4000-8000-0000000000e3', 'Gus'),
+  ('00000000-0000-4000-8000-0000000000e4', null);
+insert into public.plank_completions (user_id, day, mode, song_id, seconds, pauses) values
+  ('00000000-0000-4000-8000-0000000000e2', current_date, 'daily', 'style', 231, '[{"at": 30, "ms": 4000}]'),
+  ('00000000-0000-4000-8000-0000000000e2', current_date - 1, 'daily', 'wood', 150, null),
+  ('00000000-0000-4000-8000-0000000000e2', current_date, 'ladder', 'cruel-summer', 178, null);
+
+-- Acts as one of them, by id, the way rules_test_as does.
+create function public.rules_test_be(p_id uuid)
+returns void
+language plpgsql
+as $$
+begin
+  perform set_config('request.jwt.claim.sub', coalesce(p_id::text, ''), true);
+  perform set_config('request.jwt.claims', json_build_object('sub', p_id, 'role', case when p_id is null then 'anon' else 'authenticated' end)::text, true);
+  perform set_config('role', case when p_id is null then 'anon' else 'authenticated' end, true);
+end;
+$$;
+
+-- Eve's code. Nobody reads the tables, or the helpers that would make friends of anyone.
+select public.rules_test_be('00000000-0000-4000-8000-0000000000e1');
+do $$
+declare
+  code text := public.my_friend_code();
+begin
+  perform set_config('test.eve_code', code, true);
+  assert code ~ '^[2-9A-HJ-NP-Z]{8}$', 'a friend code is 8 letters and digits with no look-alikes: ' || code;
+  assert public.my_friend_code() = code, 'and stays the same';
+  assert public.rules_test_refused($q$ select * from public.friend_profiles $q$), 'no reading friend codes directly';
+  assert public.rules_test_refused($q$ select * from public.friendships $q$), 'or friendships';
+  assert public.rules_test_refused($q$ select * from public.friend_requests $q$), 'or requests';
+  assert public.rules_test_refused($q$ select * from public.friend_invites $q$), 'or invites';
+  assert public.rules_test_refused($q$ insert into public.friendships (user_a, user_b) values ('00000000-0000-4000-8000-0000000000e1', '00000000-0000-4000-8000-0000000000e3') $q$), 'no making friends directly';
+  assert public.rules_test_refused($q$ select public.friends_make('00000000-0000-4000-8000-0000000000e1', '00000000-0000-4000-8000-0000000000e3') $q$), 'or through the helper';
+  assert public.rules_test_refused($q$ select public.friend_request_to('00000000-0000-4000-8000-0000000000e3', '00000000-0000-4000-8000-0000000000e1') $q$), 'or sending someone else''s request';
+  assert public.rules_test_refused($q$ select public.are_friends('00000000-0000-4000-8000-0000000000e2', '00000000-0000-4000-8000-0000000000e3') $q$), 'or asking about two other players';
+end;
+$$;
+select public.rules_test_be('00000000-0000-4000-8000-0000000000e4');
+do $$
+begin
+  assert public.rules_test_refused($q$ select public.my_friend_code() $q$), 'Hal needs a name for a friend code';
+  assert public.friends_now(current_date, null) ->> 'code' is null, 'and his friends list has none to share';
+end;
+$$;
+select public.rules_test_be(null);
+do $$
+begin
+  assert public.rules_test_refused($q$ select public.friends_now(current_date, null) $q$), 'signed out, there''s no friends list';
+  assert public.rules_test_refused(format($q$ select public.friend_lookup(%L) $q$, current_setting('test.eve_code'))), 'and no looking up a code';
+end;
+$$;
+
+-- Fay finds Eve by her code, typed loosely, and asks.
+select public.rules_test_be('00000000-0000-4000-8000-0000000000e2');
+do $$
+declare
+  code text := current_setting('test.eve_code');
+  found json := public.friend_lookup(' ' || lower(substr(code, 1, 4)) || '-' || lower(substr(code, 5)) || ' ');
+begin
+  assert found ->> 'name' = 'Eve' and found ->> 'status' = 'none', 'a code shows its player''s name, and that they aren''t friends yet';
+  assert (select array_agg(k order by k) from json_object_keys(found) k) = array['avatar_url', 'name', 'status', 'user_id'], 'and nothing else';
+  assert public.friend_lookup('ZZZZZZZZ') is null, 'a code that isn''t anyone''s finds nobody';
+  assert public.rules_test_refused($q$ select public.request_friend('ZZZZZZZZ') $q$), 'or can be asked';
+  assert public.request_friend(code) = 'sent', 'Fay asks';
+  assert public.request_friend(code) = 'sent', 'asking again changes nothing';
+  assert public.friend_lookup(code) ->> 'status' = 'sent', 'and her request is waiting';
+  assert json_array_length(public.friends_now(current_date, null) -> 'requests_out') = 1, 'in her list of requests sent';
+  assert public.rules_test_refused(format($q$ select public.request_friend(%L) $q$, public.my_friend_code())), 'nobody asks themselves';
+end;
+$$;
+
+-- Eve accepts. Friends see each other's name, photo, online, planking now, and today's song: nothing else.
+select public.rules_test_be('00000000-0000-4000-8000-0000000000e1');
+do $$
+declare
+  now_list json := public.friends_now(current_date, null);
+  fay json;
+begin
+  assert json_array_length(now_list -> 'requests_in') = 1 and now_list -> 'requests_in' -> 0 ->> 'name' = 'Fay', 'Eve has Fay''s request';
+  assert json_array_length(now_list -> 'friends') = 0, 'before she answers, no friends';
+  assert public.rules_test_refused($q$ select public.answer_friend_request('00000000-0000-4000-8000-0000000000e3', true) $q$), 'there''s no request from Gus to accept';
+  perform public.answer_friend_request('00000000-0000-4000-8000-0000000000e2', true);
+  now_list := public.friends_now(current_date, null);
+  fay := now_list -> 'friends' -> 0;
+  assert json_array_length(now_list -> 'requests_in') = 0, 'the request has gone';
+  assert fay ->> 'name' = 'Fay', 'and Fay is her friend';
+  assert (select array_agg(k order by k) from json_object_keys(fay) k)
+    = array['avatar_url', 'clean_today', 'name', 'online', 'planked_at', 'planked_song', 'planked_today', 'planking', 'seen_at', 'since', 'user_id'],
+    'a friend shows only name, photo, since when, online, planking now and today''s song: ' || (select string_agg(k, ', ') from json_object_keys(fay) k);
+  assert (fay ->> 'online')::boolean, 'Fay checked in a moment ago: online';
+  assert (fay ->> 'planked_today')::boolean and not (fay ->> 'clean_today')::boolean, 'she planked today''s song, with breaks: no 🟩, and no count of them';
+  assert fay ->> 'planked_song' = 'style', 'today''s song, never her ladder';
+  assert json_array_length((public.friend_card('00000000-0000-4000-8000-0000000000e2') -> 'days')) = 2, 'her card has the days she planked today''s song, for her streak';
+  assert public.rules_test_refused($q$ select public.friend_card('00000000-0000-4000-8000-0000000000e3') $q$), 'Gus isn''t a friend: no card';
+end;
+$$;
+
+-- Fay planks, then hides that she's online.
+select public.rules_test_be('00000000-0000-4000-8000-0000000000e2');
+select public.friends_now(current_date, now() + interval '4 minutes');
+select public.rules_test_be('00000000-0000-4000-8000-0000000000e1');
+do $$
+begin
+  assert (public.friends_now(current_date, null) -> 'friends' -> 0 ->> 'planking')::boolean, 'Eve sees Fay planking now';
+end;
+$$;
+select public.rules_test_be('00000000-0000-4000-8000-0000000000e2');
+select public.friends_now(current_date, now() + interval '1 day');
+select public.set_show_online(false);
+select public.rules_test_be('00000000-0000-4000-8000-0000000000e1');
+do $$
+declare
+  fay json := public.friends_now(current_date, null) -> 'friends' -> 0;
+begin
+  assert not (fay ->> 'online')::boolean and not (fay ->> 'planking')::boolean, 'hidden: never online or planking';
+  assert fay ->> 'seen_at' is null and fay ->> 'planked_at' is null, 'and no times';
+  assert (fay ->> 'planked_today')::boolean, 'but still whether she planked today''s song, as a group shows';
+end;
+$$;
+reset role;
+do $$
+begin
+  assert (select planking_until from public.friend_profiles where user_id = '00000000-0000-4000-8000-0000000000e2') <= now() + interval '2 hours',
+    'a plank counts as planking now for 2 hours at most';
+end;
+$$;
+select public.rules_test_be('00000000-0000-4000-8000-0000000000e2');
+select public.set_show_online(true);
+select public.friends_now(current_date, null);
+select public.rules_test_be('00000000-0000-4000-8000-0000000000e1');
+do $$
+begin
+  assert not (public.friends_now(current_date, null) -> 'friends' -> 0 ->> 'planking')::boolean, 'a plank over is over';
+end;
+$$;
+
+-- Gus is a stranger to Eve: he can find her by code, and nothing more.
+select public.rules_test_be('00000000-0000-4000-8000-0000000000e3');
+do $$
+begin
+  assert json_array_length(public.friends_now(current_date, null) -> 'friends') = 0, 'Gus has no friends yet';
+  assert public.invite_friends('room', array['00000000-0000-4000-8000-0000000000e1'::uuid], 'abcdefghij', 'style', null) = 0, 'and can''t invite Eve anywhere';
+  assert not public.friend_inbox_sender('friend-inbox:00000000-0000-4000-8000-0000000000e1'), 'or nudge her inbox';
+  assert not public.friend_inbox_listener('friend-inbox:00000000-0000-4000-8000-0000000000e1'), 'or listen to it';
+  assert public.request_friend(current_setting('test.eve_code')) = 'sent', 'he asks';
+  assert public.friend_inbox_sender('friend-inbox:00000000-0000-4000-8000-0000000000e1'), 'and can nudge her about it';
+end;
+$$;
+
+-- Eve blocks him. Everything between them goes, and nothing he sends reaches her. He's never told.
+select public.rules_test_be('00000000-0000-4000-8000-0000000000e1');
+do $$
+begin
+  assert public.friend_inbox_listener('friend-inbox:00000000-0000-4000-8000-0000000000e1'), 'Eve listens to her own inbox';
+  perform public.block_player('00000000-0000-4000-8000-0000000000e3');
+  assert json_array_length(public.friends_now(current_date, null) -> 'requests_in') = 0, 'his request has gone';
+  assert json_array_length(public.friends_now(current_date, null) -> 'blocked') = 1, 'and he''s on her blocked list';
+end;
+$$;
+select public.rules_test_be('00000000-0000-4000-8000-0000000000e3');
+do $$
+begin
+  assert public.request_friend(current_setting('test.eve_code')) = 'sent', 'Gus asks again, and it seems to go';
+  assert public.friend_lookup(current_setting('test.eve_code')) is null, 'her code finds nobody for him';
+  assert not public.friend_inbox_sender('friend-inbox:00000000-0000-4000-8000-0000000000e1'), 'and he can''t nudge her';
+end;
+$$;
+select public.rules_test_be('00000000-0000-4000-8000-0000000000e1');
+do $$
+begin
+  assert json_array_length(public.friends_now(current_date, null) -> 'requests_in') = 0, 'but it never reaches Eve';
+  perform public.unblock_player('00000000-0000-4000-8000-0000000000e3');
+  assert json_array_length(public.friends_now(current_date, null) -> 'blocked') = 0, 'she unblocks him';
+end;
+$$;
+
+-- Invites: Eve invites Fay into a room, then a group. Gus, not a friend, is skipped.
+select public.rules_test_be('00000000-0000-4000-8000-0000000000e1');
+do $$
+declare
+  made public.groups := public.create_group('Tuesday crew', 'private', current_date);
+begin
+  perform set_config('test.crew', made.id::text, true);
+  assert public.invite_friends('room', array['00000000-0000-4000-8000-0000000000e2', '00000000-0000-4000-8000-0000000000e3']::uuid[], 'abcdefghij', 'style', null) = 1, 'a room invite goes to Fay, not Gus';
+  assert public.invite_friends('room', array['00000000-0000-4000-8000-0000000000e2']::uuid[], 'klmnopqrst', 'wood', null) = 1, 'a second room invite';
+  assert public.invite_friends('group', array['00000000-0000-4000-8000-0000000000e2']::uuid[], null, null, made.id) = 1, 'and a group invite';
+  assert public.rules_test_refused($q$ select public.invite_friends('room', array['00000000-0000-4000-8000-0000000000e2']::uuid[], 'NOT A ROOM', 'style', null) $q$), 'only a real room code';
+  assert public.rules_test_refused(format($q$ select public.invite_friends('group', array['00000000-0000-4000-8000-0000000000e2']::uuid[], null, null, %L) $q$, gen_random_uuid())), 'only into her own groups';
+end;
+$$;
+select public.rules_test_be('00000000-0000-4000-8000-0000000000e2');
+do $$
+declare
+  invites json := public.friends_now(current_date, null) -> 'invites';
+  room json;
+  team json;
+begin
+  assert json_array_length(invites) = 2, 'Fay has one room invite (the newer replaced the older) and one group invite: ' || invites::text;
+  select value into room from json_array_elements(invites) where value ->> 'kind' = 'room';
+  select value into team from json_array_elements(invites) where value ->> 'kind' = 'group';
+  assert room ->> 'room_code' = 'klmnopqrst' and room ->> 'song_id' = 'wood', 'the room''s code and song';
+  assert team ->> 'group_name' = 'Tuesday crew', 'and the group''s name';
+  perform public.accept_group_invite((team ->> 'id')::uuid, current_date);
+  assert exists (select 1 from public.group_members where group_id = current_setting('test.crew')::uuid and user_id = auth.uid()), 'accepting joins the group';
+  perform public.dismiss_invite((room ->> 'id')::uuid);
+  assert json_array_length(public.friends_now(current_date, null) -> 'invites') = 0, 'Not now clears the room invite';
+end;
+$$;
+select public.rules_test_be('00000000-0000-4000-8000-0000000000e1');
+do $$
+begin
+  assert public.invite_friends('group', array['00000000-0000-4000-8000-0000000000e2']::uuid[], null, null, current_setting('test.crew')::uuid) = 0, 'nobody is invited to a group they''re in';
+end;
+$$;
+
+-- Gus and Fay share a group: they can ask each other from it, with no code. Gus and Eve can't.
+select public.rules_test_be('00000000-0000-4000-8000-0000000000e3');
+do $$
+declare
+  made public.groups := public.create_group('Gus club', 'public', current_date);
+begin
+  perform set_config('test.gus_club_code', made.invite_code, true);
+end;
+$$;
+select public.rules_test_be('00000000-0000-4000-8000-0000000000e2');
+do $$
+begin
+  perform public.join_group(current_setting('test.gus_club_code'), current_date);
+  assert (select count(*) from public.friend_suggestions() where name = 'Gus') = 1, 'Fay is offered Gus, from the group they share';
+  assert (select count(*) from public.friend_suggestions() where name = 'Eve') = 0, 'never a friend already';
+  assert public.request_friend_from_group('00000000-0000-4000-8000-0000000000e3') = 'sent', 'Fay asks Gus from the group';
+  assert (select count(*) from public.friend_suggestions() where name = 'Gus') = 0, 'and he''s not offered again';
+end;
+$$;
+select public.rules_test_be('00000000-0000-4000-8000-0000000000e3');
+do $$
+begin
+  assert public.rules_test_refused($q$ select public.request_friend_from_group('00000000-0000-4000-8000-0000000000e1') $q$), 'Gus shares no group with Eve: he needs her code';
+  assert public.request_friend_from_group('00000000-0000-4000-8000-0000000000e2') = 'friends', 'asking someone who''s asked you makes you friends';
+  perform public.remove_friend('00000000-0000-4000-8000-0000000000e2');
+  assert json_array_length(public.friends_now(current_date, null) -> 'friends') = 0, 'either friend can end it';
+end;
+$$;
+
+-- A new code: the old one stops working.
+select public.rules_test_be('00000000-0000-4000-8000-0000000000e1');
+do $$
+declare
+  old text := current_setting('test.eve_code');
+  made text := public.new_friend_code();
+begin
+  assert made <> old and public.my_friend_code() = made, 'Eve has a new code';
+  assert public.friend_lookup(old) is null, 'and the old one finds nobody';
+end;
+$$;
+
+-- Limits: 30 requests sent a day, 50 waiting at once, and 200 friends each. 250 made-up players to ask.
+reset role;
+insert into auth.users (id, email)
+select ('00000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid, 'rules-test-' || n || '@example.invalid' from generate_series(1000, 1249) n;
+insert into public.plank_profiles (user_id, display_name)
+select ('00000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid, 'Player ' || n from generate_series(1000, 1249) n;
+insert into public.friend_profiles (user_id, code)
+select ('00000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid, public.friend_code_new() from generate_series(1000, 1249) n;
+select set_config('test.codes', (
+  select string_agg(code, ',' order by user_id) from public.friend_profiles
+  where user_id between '00000000-0000-4000-8000-000000001000' and '00000000-0000-4000-8000-000000001249'
+), true);
+select public.rules_test_be('00000000-0000-4000-8000-0000000000e3');
+do $$
+declare
+  codes text[] := string_to_array(current_setting('test.codes'), ',');
+  sent int := 0;
+begin
+  assert public.rules_test_refused($q$ delete from public.friend_sends $q$), 'no clearing the count of requests sent';
+  -- Gus asked Eve earlier today: that counts towards the 30.
+  for i in 1..40 loop
+    exit when public.rules_test_refused(format($q$ select public.request_friend(%L) $q$, codes[i]));
+    sent := sent + 1;
+  end loop;
+  assert sent = 29, 'Gus can send 30 requests a day, the one from earlier included: ' || sent;
+end;
+$$;
+-- A new day, with 50 of his requests waiting.
+reset role;
+delete from public.friend_sends where user_id = '00000000-0000-4000-8000-0000000000e3';
+insert into public.friend_requests (from_user, to_user)
+select '00000000-0000-4000-8000-0000000000e3', ('00000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid from generate_series(1100, 1120) n;
+select public.rules_test_be('00000000-0000-4000-8000-0000000000e3');
+do $$
+begin
+  assert json_array_length(public.friends_now(current_date, null) -> 'requests_out') = 50, 'Gus has 50 requests waiting';
+  assert public.rules_test_refused(format($q$ select public.request_friend(%L) $q$, (string_to_array(current_setting('test.codes'), ','))[200])), 'a 51st is refused';
+end;
+$$;
+-- Eve with 200 friends.
+reset role;
+insert into public.friendships (user_a, user_b)
+select '00000000-0000-4000-8000-0000000000e1', ('00000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid from generate_series(1050, 1248) n;
+reset role;
+insert into public.friend_requests (from_user, to_user) values ('00000000-0000-4000-8000-000000001249', '00000000-0000-4000-8000-0000000000e1');
+select public.rules_test_be('00000000-0000-4000-8000-0000000000e1');
+do $$
+begin
+  assert json_array_length(public.friends_now(current_date, null) -> 'friends') = 200, 'Eve has 200 friends';
+  assert public.rules_test_refused($q$ select public.answer_friend_request('00000000-0000-4000-8000-000000001249', true) $q$), 'a 201st friend is refused';
+  perform public.answer_friend_request('00000000-0000-4000-8000-000000001249', false);
+  assert json_array_length(public.friends_now(current_date, null) -> 'requests_in') = 0, 'declining clears it quietly';
+end;
+$$;
+
 rollback;
