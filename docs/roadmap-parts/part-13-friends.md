@@ -1,5 +1,7 @@
 # Part 13: Friends
 
+**Status:** built October 2026, in five parts (13.1–13.5).
+
 Add people as friends, see who's online and who's planking right now, and pull them into a plank or a group with one tap. On a computer, the home page moves left to make room for a friends list down the right, like Discord's member list. A friends page holds the rest.
 
 **Builds:** friends, from requests to planking together · **Needs:** accounts, Parts 8 and 9 (groups), Part 12 (plank together), Part 5 (push, for 13.5) · **Schema change:** yes · **Size:** large, in five smaller parts (13.1–13.5)
@@ -78,7 +80,7 @@ Friends have no streak of their own and nothing that ranks them. A group is stil
 
 ### 13.5 Invites on your phone, and the check
 
-- Invites as pushes, through the reminders' push: a database trigger calls an Edge Function, which sends to the friend's devices that have reminders on. At most one from the same friend every 10 minutes.
+- Invites as pushes, through the reminders' push: a database trigger calls an Edge Function, which sends to the friend's devices that have reminders on. At most one from the same friend every 10 minutes. (Built: the trigger calls `send-invite` through `pg_net` at the reminders' address with the reminders' secret, so there's nothing new to set up beyond deploying it; Invites from friends is one switch per device.)
 - Settings → Reminders → Invites from friends.
 - README, and the check: two or three accounts on a phone and a computer, trying requests, blocking, online, planking now, room and group invites, and the pushes.
 
@@ -86,11 +88,11 @@ Friends have no streak of their own and nothing that ranks them. A group is stil
 
 ## Done when
 
-- [ ] The rules test covers strangers, friends, blocking, hiding online and the limits, and passes.
-- [ ] `npm test` and `npm run build` pass after each part.
-- [ ] Tried with two or three accounts in two browsers, and on a phone.
-- [ ] Nothing shows breaks, XP or rank, and nothing ranks friends.
-- [ ] Help page and README updated. ✓ in the index.
+- [x] The rules test covers strangers, friends, blocking, hiding online and the limits, and passes.
+- [x] `npm test` and `npm run build` pass after each part.
+- [ ] Tried with two or three accounts in two browsers, and on a phone. (Each part was tried in a browser against a stand-in for Supabase; the real thing needs you, with real accounts.)
+- [x] Nothing shows breaks, XP or rank, and nothing ranks friends.
+- [x] Help page and README updated. ✓ in the index.
 
 ## For you, after each part with a schema change
 

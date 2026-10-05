@@ -461,6 +461,8 @@ begin
   assert public.rules_test_refused($q$ select * from public.friendships $q$), 'or friendships';
   assert public.rules_test_refused($q$ select * from public.friend_requests $q$), 'or requests';
   assert public.rules_test_refused($q$ select * from public.friend_invites $q$), 'or invites';
+  assert public.rules_test_refused($q$ select * from public.friend_pushes $q$), 'or when invites were pushed';
+  assert public.rules_test_refused($q$ select public.friend_invite_push() $q$), 'or call the push trigger';
   assert public.rules_test_refused($q$ insert into public.friendships (user_a, user_b) values ('00000000-0000-4000-8000-0000000000e1', '00000000-0000-4000-8000-0000000000e3') $q$), 'no making friends directly';
   assert public.rules_test_refused($q$ select public.friends_make('00000000-0000-4000-8000-0000000000e1', '00000000-0000-4000-8000-0000000000e3') $q$), 'or through the helper';
   assert public.rules_test_refused($q$ select public.friend_request_to('00000000-0000-4000-8000-0000000000e3', '00000000-0000-4000-8000-0000000000e1') $q$), 'or sending someone else''s request';

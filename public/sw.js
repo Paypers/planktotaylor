@@ -81,7 +81,11 @@ async function trim(cache) {
   await Promise.all(keys.slice(0, Math.max(0, keys.length - MAX_ASSETS)).map((key) => cache.delete(key)))
 }
 
-// Daily reminders: the push carries the words (see supabase/functions/send-reminders), this shows them.
+// Daily reminders and invites from friends: the push carries the words (see supabase/functions/send-reminders
+// and send-invite), this shows them. An invite also says where tapping it goes (a page's #address) and its tag.
+const PAGE_HASH = /^#[A-Za-z0-9/_-]{1,80}$/
+const TAG = /^[a-z0-9-]{1,80}$/
+
 self.addEventListener('push', (event) => {
   let message = { title: 'Plank to Taylor', body: "Today's song is waiting." }
   try {
@@ -89,23 +93,31 @@ self.addEventListener('push', (event) => {
   } catch {
     // An empty or unreadable push still reminds.
   }
+  const hash = typeof message.hash === 'string' && PAGE_HASH.test(message.hash) ? message.hash : ''
   event.waitUntil(
-    self.registration.showNotification(message.title, {
-      body: message.body,
+    self.registration.showNotification(String(message.title), {
+      body: String(message.body),
       icon: `${BASE}icon-192.png`,
-      // One at a time: a later reminder replaces an earlier one still showing.
-      tag: 'today',
+      // One at a time of each kind: a later reminder replaces an earlier one still showing, and so does a later
+      // invite to a room. An invite never replaces the day's reminder.
+      tag: typeof message.tag === 'string' && TAG.test(message.tag) ? message.tag : 'today',
+      data: { hash },
     }),
   )
 })
 
-// Tapping it opens the site: the tab that's already open if there is one, a new one if not.
+// Tapping it opens the site, at the page it's for: the tab that's already open if there is one, a new one if not.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
+  const hash = event.notification.data?.hash ?? ''
+  const url = `${self.location.origin}${BASE}${hash}`
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (windows) => {
       const open = windows.find((client) => new URL(client.url).origin === self.location.origin)
-      return open ? open.focus() : self.clients.openWindow(BASE)
+      if (!open) return self.clients.openWindow(url)
+      await open.focus()
+      // To the invite's page in the tab that's open (a change of #address: the site follows it).
+      if (hash && 'navigate' in open) await open.navigate(url).catch(() => {})
     }),
   )
 })

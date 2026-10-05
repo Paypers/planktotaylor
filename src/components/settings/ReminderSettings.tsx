@@ -62,7 +62,7 @@ export function ReminderSettings() {
   }
 
   const turnOn = () => {
-    const first = { remind_at: DEFAULT_REMINDER, evening: false }
+    const first = { remind_at: DEFAULT_REMINDER, evening: false, invites: true }
     setSwitching('on')
     setError(null)
     // Straight from the tap: browsers only ask for permission from one.
@@ -149,11 +149,15 @@ export function ReminderSettings() {
                   more
                 </span>
               </label>
+              <label className="switch-row">
+                <input type="checkbox" checked={reminder.invites} onChange={(e) => change({ invites: e.target.checked })} />
+                <span>Invites from friends: when a friend invites you to plank, or to a group</span>
+              </label>
             </>
           )}
           <p className="fine">
             Reminders come to this device, at its time. Turn them on on each device you'd like them on. Each comes at most
-            once a day.
+            once a day. Invites come at most once every 10 minutes from the same friend.
           </p>
         </>
       )}

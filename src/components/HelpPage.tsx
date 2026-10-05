@@ -284,7 +284,8 @@ export function HelpPage() {
             Plank together on a friend's card makes a room with today's song, invites them, and takes you to its lobby to wait.
             In any room's lobby, Invite friends asks more; on a group's page, Invite friends asks them to join it. An invite
             shows at the top of their friends list (and at the foot of the screen on a phone), with Join and Not now, and
-            arrives within seconds. A room's invite lasts 30 minutes, a group's a week.
+            arrives within seconds. A room's invite lasts 30 minutes, a group's a week. With daily reminders on, it comes to
+            their phone too: at most one from the same friend every 10 minutes.
           </dd>
           <dt>From a room</dt>
           <dd>
@@ -374,6 +375,12 @@ export function HelpPage() {
           <dd>
             Reminders come to the device you turned them on, at its time. On iPhone and iPad, add the site to your home
             screen first. Signing out turns them off there.
+          </dd>
+          <dt>Invites from friends</dt>
+          <dd>
+            With reminders on, an invite from a friend comes to the same device: tap it to join their room, or to answer a
+            group's invite. At most one from the same friend every 10 minutes. Turn it off for any device in Settings →
+            Reminders.
           </dd>
         </Topic>
       )}

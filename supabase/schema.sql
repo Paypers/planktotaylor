@@ -1699,3 +1699,65 @@ create policy "players hear their friend inbox" on realtime.messages for select 
 drop policy if exists "friends nudge each other's inbox" on realtime.messages;
 create policy "friends nudge each other's inbox" on realtime.messages for insert to authenticated
   with check (realtime.messages.extension = 'broadcast' and public.friend_inbox_sender(realtime.topic()));
+
+-- Invites from friends as pushes, to devices with daily reminders on (Settings → Reminders → Invites from
+-- friends, on by default, one switch per device). A new invite calls the send-invite Edge Function, at the same
+-- address as send-reminders and with the same secret (the reminders_url and reminders_secret in Vault, as the
+-- schedule above uses), only when the friend has a device to send to, and at most once from the same friend every
+-- 10 minutes. Until pg_net and the secrets are set up this does nothing, and a push never stops an invite.
+alter table public.push_subscriptions add column if not exists invites boolean not null default true;
+
+-- When each friend last pushed each other an invite.
+create table if not exists public.friend_pushes (
+  from_user uuid not null references auth.users (id) on delete cascade,
+  to_user uuid not null references auth.users (id) on delete cascade,
+  at timestamptz not null default now(),
+  primary key (from_user, to_user)
+);
+alter table public.friend_pushes enable row level security;
+revoke all on public.friend_pushes from anon, authenticated;
+
+create or replace function public.friend_invite_push()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  reminders_url text;
+  secret text;
+begin
+  if not exists (select 1 from public.push_subscriptions where user_id = new.to_user and invites) then
+    return null;
+  end if;
+  if exists (
+    select 1 from public.friend_pushes
+    where from_user = new.from_user and to_user = new.to_user and at > now() - interval '10 minutes'
+  ) then
+    return null;
+  end if;
+  insert into public.friend_pushes (from_user, to_user) values (new.from_user, new.to_user)
+  on conflict (from_user, to_user) do update set at = now();
+  begin
+    select decrypted_secret into reminders_url from vault.decrypted_secrets where name = 'reminders_url';
+    select decrypted_secret into secret from vault.decrypted_secrets where name = 'reminders_secret';
+    if reminders_url is null or secret is null then
+      return null;
+    end if;
+    perform net.http_post(
+      url := regexp_replace(reminders_url, 'send-reminders/?$', 'send-invite'),
+      headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer ' || secret),
+      body := jsonb_build_object('invite', new.id),
+      timeout_milliseconds := 10000
+    );
+  exception when others then
+    -- No pg_net, no Vault, no secrets: the invite still goes, just not to the phone.
+    null;
+  end;
+  return null;
+end;
+$$;
+revoke all on function public.friend_invite_push() from public, anon, authenticated;
+drop trigger if exists friend_invite_push on public.friend_invites;
+create trigger friend_invite_push after insert on public.friend_invites
+  for each row execute function public.friend_invite_push();

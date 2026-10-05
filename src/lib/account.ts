@@ -501,37 +501,43 @@ export interface DeviceReminder {
   /** "HH:MM", in STEP_MINUTES steps (src/lib/reminders.ts). */
   remind_at: string
   evening: boolean
+  /** Invites from friends come to this device too. On unless turned off. */
+  invites: boolean
 }
 
 /** This device's reminder in the account, if it has one. */
 export async function loadReminder(endpoint: string): Promise<DeviceReminder | null> {
   if (!accountsEnabled || !state.user) return null
-  const { data, error } = await (await client())
-    .from('push_subscriptions')
-    .select('remind_at, evening')
-    .eq('endpoint', endpoint)
-    .maybeSingle()
+  const supabase = await client()
+  const found = await supabase.from('push_subscriptions').select('remind_at, evening, invites').eq('endpoint', endpoint).maybeSingle()
+  if (!found.error) return found.data as DeviceReminder | null
+  // Before schema.sql has invites: the reminder as it was, with invites on (as the column starts).
+  if (found.error.code !== MISSING_COLUMN) throw found.error
+  const { data, error } = await supabase.from('push_subscriptions').select('remind_at, evening').eq('endpoint', endpoint).maybeSingle()
   if (error) throw error
-  return data as DeviceReminder | null
+  return data ? { ...(data as Omit<DeviceReminder, 'invites'>), invites: true } : null
 }
 
 /** Saves this device's reminder: where to send it (the browser's push subscription), when, and the time zone it's in. */
 export async function saveReminder(subscription: PushSubscriptionJSON, reminder: DeviceReminder) {
   const user = state.user
   if (!accountsEnabled || !user || !subscription.endpoint || !subscription.keys) throw new Error('Not signed in')
-  const { error } = await (await client()).from('push_subscriptions').upsert(
-    {
-      endpoint: subscription.endpoint,
-      user_id: user.id,
-      p256dh: subscription.keys.p256dh,
-      auth: subscription.keys.auth,
-      remind_at: reminder.remind_at,
-      evening: reminder.evening,
-      time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    },
-    { onConflict: 'endpoint' },
-  )
-  if (error) throw error
+  const supabase = await client()
+  const row = {
+    endpoint: subscription.endpoint,
+    user_id: user.id,
+    p256dh: subscription.keys.p256dh,
+    auth: subscription.keys.auth,
+    remind_at: reminder.remind_at,
+    evening: reminder.evening,
+    time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  }
+  const { error } = await supabase.from('push_subscriptions').upsert({ ...row, invites: reminder.invites }, { onConflict: 'endpoint' })
+  // Before schema.sql has invites: saved without it (it starts on there), unless it's being turned off.
+  if (error?.code === MISSING_COLUMN && reminder.invites) {
+    const again = await supabase.from('push_subscriptions').upsert(row, { onConflict: 'endpoint' })
+    if (again.error) throw again.error
+  } else if (error) throw error
 }
 
 export async function removeReminder(endpoint: string) {
