@@ -13,7 +13,7 @@ import {
 import { squarePhoto } from '../lib/avatar'
 import { isIos, isStandalone } from '../lib/install'
 import type { PlayerRank } from '../lib/ranks'
-import { followLink, GROUPS, hashFor } from '../lib/route'
+import { followLink, FRIENDS, GROUPS, hashFor } from '../lib/route'
 import { Avatar } from './Avatar'
 import { Dialog } from './Dialog'
 import { ProfileStats } from './ProfileStats'
@@ -117,7 +117,19 @@ function ProfileForm({ rank, onClose }: { rank: PlayerRank | null; onClose: () =
       </form>
 
       <section className="dialog-section">
-        <h3>Groups</h3>
+        <h3>Friends and groups</h3>
+        <p className="muted">
+          <a
+            href={hashFor(FRIENDS)}
+            onClick={(e) => {
+              followLink(e, FRIENDS)
+              onClose()
+            }}
+          >
+            Your friends
+          </a>
+          : add someone with your friend code, and answer requests.
+        </p>
         <p className="muted">
           <a
             href={hashFor(GROUPS)}

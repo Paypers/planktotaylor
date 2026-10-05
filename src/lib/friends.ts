@@ -235,3 +235,36 @@ export function friendProblem(message: string | undefined): FriendProblem {
   if (message.includes('not in a group with them') || message.includes('not in this group')) return 'not-in-group'
   return 'unavailable'
 }
+
+// A friend link followed while signed out is kept here through sign-in: the magic link comes back to the
+// site's front page, without the #friend/<code> it left from. As group invite links are (groups.ts).
+const KEPT_KEY = 'plank-to-taylor:friend'
+/** A kept link older than this is forgotten: signing in days later is for something else. */
+const KEPT_MS = 24 * 60 * 60 * 1000
+
+export function keepFriendCode(code: string, now = Date.now()) {
+  try {
+    localStorage.setItem(KEPT_KEY, JSON.stringify({ code, at: now }))
+  } catch {
+    // Private mode: the friend link still works when it's opened again after signing in.
+  }
+}
+
+/** The friend code kept through sign-in, if there's a recent one. */
+export function keptFriendCode(now = Date.now()): string | null {
+  try {
+    const kept = JSON.parse(localStorage.getItem(KEPT_KEY) ?? 'null') as { code?: unknown; at?: unknown } | null
+    if (!kept || typeof kept.code !== 'string' || typeof kept.at !== 'number' || now - kept.at > KEPT_MS) return null
+    return readFriendCode(kept.code)
+  } catch {
+    return null
+  }
+}
+
+export function forgetFriendCode() {
+  try {
+    localStorage.removeItem(KEPT_KEY)
+  } catch {
+    // Nothing kept, then.
+  }
+}

@@ -36,6 +36,14 @@ const PATHS: Record<IconName, ReactNode> = {
       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </>
   ),
+  'user-plus': (
+    <>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M19 8v6" />
+      <path d="M22 11h-6" />
+    </>
+  ),
   x: (
     <>
       <path d="M18 6 6 18" />
@@ -184,6 +192,7 @@ export type IconName =
   | 'view-more'
   | 'add-square'
   | 'install'
+  | 'user-plus'
 
 interface Props {
   name: IconName

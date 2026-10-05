@@ -1,5 +1,17 @@
-import { describe, expect, it } from 'vitest'
-import { activityLine, friendProblem, friendsInOrder, readFriendCode, readFriendsNow, showFriendCode, timeAgo, type Friend } from './friends'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import {
+  activityLine,
+  forgetFriendCode,
+  friendProblem,
+  friendsInOrder,
+  keepFriendCode,
+  keptFriendCode,
+  readFriendCode,
+  readFriendsNow,
+  showFriendCode,
+  timeAgo,
+  type Friend,
+} from './friends'
 
 const NOW = Date.parse('2026-10-04T12:00:00Z')
 const minutesAgo = (n: number) => new Date(NOW - n * 60_000).toISOString()
@@ -116,5 +128,36 @@ describe("why a friends call didn't work", () => {
     expect(friendProblem('a name first')).toBe('name')
     expect(friendProblem('something else')).toBe('unavailable')
     expect(friendProblem(undefined)).toBe('unavailable')
+  })
+})
+
+describe('a friend link kept through sign-in', () => {
+  const store = new Map<string, string>()
+  beforeEach(() => {
+    store.clear()
+    globalThis.localStorage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+      removeItem: (k: string) => void store.delete(k),
+    } as Storage
+  })
+  afterEach(() => {
+    // @ts-expect-error: put back as it was, with no storage
+    delete globalThis.localStorage
+  })
+
+  it('is there after sign-in, for a day, and gone once forgotten', () => {
+    keepFriendCode('K7QM3XPD', 1000)
+    expect(keptFriendCode(1000 + 60_000)).toBe('K7QM3XPD')
+    expect(keptFriendCode(1000 + 25 * 60 * 60 * 1000)).toBeNull()
+    forgetFriendCode()
+    expect(keptFriendCode(1000)).toBeNull()
+  })
+
+  it('ignores anything else kept under its name', () => {
+    store.set('plank-to-taylor:friend', 'not json')
+    expect(keptFriendCode()).toBeNull()
+    store.set('plank-to-taylor:friend', JSON.stringify({ code: 'not a code', at: Date.now() }))
+    expect(keptFriendCode()).toBeNull()
   })
 })

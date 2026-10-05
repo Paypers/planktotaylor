@@ -4,6 +4,7 @@ import { accountsEnabled } from '../../lib/account'
 import { remindersAvailable } from '../../lib/push'
 import { AppearanceSettings } from './AppearanceSettings'
 import { DiscordSettings } from './DiscordSettings'
+import { FriendSettings } from './FriendSettings'
 import { PlankSettings } from './PlankSettings'
 import { ReminderSettings } from './ReminderSettings'
 
@@ -25,6 +26,10 @@ export const SECTIONS: SettingsSection[] = [
   // Only on a site with reminders set up (see "Daily reminders" in the README).
   ...(remindersAvailable
     ? [{ id: 'reminders', label: 'Reminders', summary: 'A nudge to plank each day', icon: 'bell' as const, Content: ReminderSettings }]
+    : []),
+  // Only on a site with accounts: whether friends see when you're online.
+  ...(accountsEnabled
+    ? [{ id: 'friends', label: 'Friends', summary: "Who sees when you're online", icon: 'user-plus' as const, Content: FriendSettings }]
     : []),
   // Only on a site with accounts (see "The Discord daily post" in the README). #discord opens it too.
   ...(accountsEnabled

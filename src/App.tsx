@@ -3,6 +3,8 @@ import { AccountDialog } from './components/AccountDialog'
 import { Avatar } from './components/Avatar'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { ErasPage } from './components/ErasPage'
+import { FriendLinkPage } from './components/friends/FriendLinkPage'
+import { FriendsPage } from './components/friends/FriendsPage'
 import { GroupPage } from './components/GroupPage'
 import { GroupsPage, HomeGroups, JoinPage } from './components/Groups'
 import { GroupsLink } from './components/GroupsLink'
@@ -41,6 +43,7 @@ import { useToday } from './lib/hooks'
 import { dailyView, ladderView, songFor, streakDays, type Completion, type Pause } from './lib/progress'
 import { dailyNumber } from './lib/daily'
 import { collectionOf, eraStamps, stampNews } from './lib/eras'
+import { forgetFriendCode, keptFriendCode, showFriendCode } from './lib/friends'
 import { forgetInvite, keptInvite } from './lib/groups'
 import { isStandalone } from './lib/install'
 import type { TogetherShare } from './lib/live/link'
@@ -122,12 +125,17 @@ export function App() {
   // A player who's travelled gets reminders at their time where they are now.
   const userId = user?.id
 
-  // Signed in from an invite link: back to it, to join. (The magic link lands on the front page.)
+  // Signed in from an invite link or a friend link: back to it, to join or add them. (The magic link lands on the
+  // front page.)
   useEffect(() => {
     const code = userId ? keptInvite() : null
+    const friend = userId ? keptFriendCode() : null
     if (code) {
       forgetInvite()
       navigate({ page: 'join', code })
+    } else if (friend) {
+      forgetFriendCode()
+      navigate({ page: 'friend', code: showFriendCode(friend) })
     }
   }, [userId])
 
@@ -460,6 +468,16 @@ export function App() {
         {route.page === 'join' && (
           <main>
             <JoinPage code={route.code} today={today} />
+          </main>
+        )}
+        {route.page === 'friends' && (
+          <main>
+            <FriendsPage tab={route.tab} today={today} />
+          </main>
+        )}
+        {route.page === 'friend' && (
+          <main>
+            <FriendLinkPage key={route.code} code={route.code} />
           </main>
         )}
         {route.page === 'together' && (

@@ -20,7 +20,7 @@ Friends have no streak of their own and nothing that ranks them. A group is stil
 - **Requests.** Send one, and they accept or decline. Declining is quiet: the request just goes from the sender's list. The sender can cancel. Two people who send each other a request at once become friends straight away. Either friend can remove the other.
 - **Blocking.** Blocking someone removes the friendship and any requests both ways. Their requests and invites to you then quietly go nowhere, and they're never told. Unblock from the friends page.
 - **What friends see of you:** the same as a group does. Your name, photo, online or planking now, your streak, and whether you've planked today's song (✓, or 🟩 with no breaks), with when ("Planked Peter · 20 min ago"). Never breaks, XP, rank, attempts or the ladder.
-- **Online.** The dot is green while the site is open in front of you: the site checks in every 45 seconds, and you count as online for 2 minutes after the last check-in. You're "Planking now" while the plank screen is on, the same as in groups. **Settings → Account → Show when I'm online** is on by default. Turned off, friends see you as offline, never planking, with no time on what you planked. You still see theirs.
+- **Online.** The dot is green while the site is open in front of you: the site checks in every 45 seconds, and you count as online for 2 minutes after the last check-in. You're "Planking now" while the plank screen is on, the same as in groups. **Settings → Friends → Show when I'm online** is on by default. Turned off, friends see you as offline, never planking, with no time on what you planked. You still see theirs.
 - **Invites.** "Plank with friends" sends a room invite. It's in a room's lobby, and on each friend's row as "Plank together", which makes a room with today's song. "Invite friends" on a group's page sends a group invite. Invites show at the top of the friends list, with Join or Not now. A room invite lasts 30 minutes, and a group invite 7 days. Joining a group from an invite follows the group's own limits.
 - **Push.** An invite also reaches the friend's phone if they've turned daily reminders on, with at most one push from the same friend every 10 minutes. Settings → Reminders gets an "Invites from friends" switch, on by default.
 - **Activity.** A line under each friend: "Planking now", "Planked Peter · 20 min ago" (today's song only), "Online", or "Seen 3 hours ago". It never says anything about breaks.
@@ -35,7 +35,7 @@ Friends have no streak of their own and nothing that ranks them. A group is stil
   - **Up to 10 friends:** planking now first, then online, then most recently seen. A friend who hides their online status comes after, by when you became friends. Each row has their photo with a status dot, their name, the activity line, and ✓ or 🟩 for today's song. A row opens the friend's card: streak, today, groups you share, Plank together, Invite to a group, Remove, Block.
   - **All friends (23)**, which opens the friends page, and **Add a friend**.
 - **Narrower screens, or signed out:** no rail. Signed in, the header gets a Friends button showing how many are online. It opens the friends page.
-- **The friends page** (`#friends`), with tabs as on Discord: Online · All · Pending (in and out) · Blocked · Add a friend. Add a friend shows your code and link, with Copy and Share, a box to type someone's code, and "People you plank with": members of your groups who aren't friends yet.
+- **The friends page** (`#friends`), with tabs as on Discord, each at its own address: All · Online · Pending (in and out) · Blocked · Add a friend. All comes first: on a small site most friends are offline, and an empty Online tab would look broken. Add a friend shows your code and link, with Copy and Share, a box to type someone's code, and "People you plank with": members of your groups who aren't friends yet.
 - **A friend link** (`#friend/<code>`) shows the person's name and photo and a Send request button. Signed out, it's kept through sign-in, as group invite links are.
 
 ## How it works
@@ -60,14 +60,14 @@ Friends have no streak of their own and nothing that ranks them. A group is stil
 
 - `#friends` with its tabs, and `#friend/<code>`.
 - Requests, answers, removing and blocking, and making a new code.
-- Settings → Account → Show when I'm online.
+- The friend card (moved here from 13.3: the list needs somewhere for Remove and Block).
+- Settings → Friends → Show when I'm online. (There's no Account section in Settings, so friends got their own.)
 - Help page: friends, and exactly what friends see.
 
 ### 13.3 The rail, and who's online
 
 - The friends rail on wide screens, and the header button on narrow ones.
-- Checking in every 45 seconds while the page is in view, and planking now from the plank screen.
-- The friend card.
+- Checking in every 45 seconds while the page is in view, on every page, and planking now from the plank screen.
 
 ### 13.4 Planking together with friends
 

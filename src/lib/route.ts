@@ -16,6 +16,12 @@ export type Route =
   | { page: 'group'; id: string }
   | { page: 'join'; code: string }
   | { page: 'together'; code: string; songId: string | null }
+  | { page: 'friends'; tab: FriendsTab }
+  | { page: 'friend'; code: string }
+
+/** The friends page's tabs, each at its own address: #friends is All. */
+export type FriendsTab = 'all' | 'online' | 'pending' | 'blocked' | 'add'
+export const FRIENDS_TABS: readonly FriendsTab[] = ['all', 'online', 'pending', 'blocked', 'add']
 
 export const HOME: Route = { page: 'home' }
 export const RANKS: Route = { page: 'ranks' }
@@ -37,6 +43,10 @@ export const groupRoute = (id: string): Route => ({ page: 'group', id })
 /** A group's id, as the database makes them. */
 const GROUP_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
+/** Your friends, on a tab. */
+export const friendsRoute = (tab: FriendsTab = 'all'): Route => ({ page: 'friends', tab })
+export const FRIENDS = friendsRoute()
+
 /** Planking together: a room's lobby. No song means today's. */
 export const togetherRoute = (code: string, songId: string | null): Route => ({ page: 'together', code, songId })
 
@@ -56,6 +66,12 @@ export function parseRoute(hash: string): Route {
     return album && Object.hasOwn(ALBUMS, album) ? eraRoute(album as AlbumId) : ERAS
   }
   if (/^#groups\/?$/i.test(hash)) return GROUPS
+  // Your friends: #friends, or one of its tabs. A tab that isn't one is All.
+  const friends = /^#friends(?:\/([a-z]*))?\/?$/i.exec(hash)
+  if (friends) return friendsRoute(FRIENDS_TABS.find((tab) => tab === friends[1]?.toLowerCase()) ?? 'all')
+  // A friend link: #friend/<code>. Anything that can't be a code still opens the page, which says so.
+  const friend = /^#friend\/([A-Za-z0-9-]{1,32})\/?$/.exec(hash)
+  if (friend) return { page: 'friend', code: friend[1] }
   // A group's page: #group/<id>. One that can't be a group's goes to your groups.
   const group = /^#group(?:\/([^/]*))?\/?$/i.exec(hash)
   if (group) {
@@ -80,6 +96,8 @@ export function hashFor(route: Route): string {
   if (route.page === 'ranks' || route.page === 'help' || route.page === 'install' || route.page === 'year') return `#${route.page}`
   if (route.page === 'eras') return `#eras${route.album ? `/${route.album}` : ''}`
   if (route.page === 'groups') return '#groups'
+  if (route.page === 'friends') return route.tab === 'all' ? '#friends' : `#friends/${route.tab}`
+  if (route.page === 'friend') return `#friend/${route.code}`
   if (route.page === 'group') return `#group/${route.id}`
   if (route.page === 'join') return `#join/${route.code}`
   if (route.page === 'together') return `#together/${route.code}${route.songId ? `/${route.songId}` : ''}`

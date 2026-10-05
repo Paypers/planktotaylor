@@ -5682,3 +5682,239 @@ a {
   font-variant-numeric: tabular-nums;
   line-height: 20px;
 }
+
+/* Friends: the friends page and its tabs, a friend's row and card, and a friend link. */
+
+.btn-small {
+  height: 36px;
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+.btn-link.btn-small {
+  min-height: 36px;
+  padding: 0 4px;
+}
+
+.friends-tabs {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 24px;
+}
+
+.friends-tab {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.friends-tab:hover {
+  background: var(--well);
+  color: var(--ink);
+}
+
+.friends-tab[aria-current='page'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.friends-tab.add {
+  margin-left: auto;
+  border: 1px solid var(--held);
+  color: var(--held);
+}
+
+.friends-tab.add[aria-current='page'] {
+  border-color: var(--held);
+  background: var(--held);
+  color: var(--paper);
+}
+
+.friends-tab-count {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+.friends-tab-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--signal);
+  color: var(--paper);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* A friend's row is a button that opens their card, laid out like a group member's row. */
+.friend-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 60px;
+  padding: 10px 4px 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.friend-row:hover .member-name {
+  text-decoration: underline;
+}
+
+.friend-list .member-today {
+  min-width: 28px;
+}
+
+.status-avatar {
+  position: relative;
+  display: inline-grid;
+  flex-shrink: 0;
+}
+
+.status-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 30%;
+  min-width: 10px;
+  max-width: 16px;
+  aspect-ratio: 1;
+  border: 2px solid var(--paper);
+  border-radius: 50%;
+  background: var(--held);
+}
+
+.status-dot.is-planking {
+  background: var(--signal);
+  animation: planking-pulse 2s ease-in-out infinite;
+}
+
+@keyframes planking-pulse {
+  50% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 30%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-dot.is-planking {
+    animation: none;
+  }
+}
+
+.person-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.friend-code-body {
+  display: grid;
+  gap: 4px;
+}
+
+.friend-code-body > .btn-link {
+  justify-self: start;
+}
+
+.friend-code {
+  font-family: var(--mono);
+  font-size: clamp(32px, 9vw, 44px);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+}
+
+.friend-code-input {
+  max-width: 280px;
+  font-family: var(--mono);
+  letter-spacing: 0.06em;
+}
+
+.friend-card {
+  display: grid;
+  gap: 16px;
+}
+
+.friend-card-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.friend-card-activity {
+  color: var(--ink-2);
+}
+
+.friend-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 8px 16px;
+  margin: 0;
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.friend-facts dt {
+  color: var(--ink-2);
+}
+
+.friend-facts dd {
+  margin: 0;
+}
+
+.friend-streak,
+.friend-today {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.friend-groups {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.friend-card-actions {
+  justify-content: space-between;
+}
+
+.friend-card-confirm {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 4px;
+  background: var(--well);
+}
+
+.friend-found {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}

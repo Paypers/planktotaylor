@@ -2,7 +2,10 @@ import { LADDER } from '../data/songs'
 import { accountsEnabled } from '../lib/account'
 import { clockTime } from '../lib/dates'
 import { MENTIONS_EACH, MORNING_POST, WEBHOOKS_EACH } from '../lib/discord'
-import { DISCORD, ERAS, followLink, GROUPS, hashFor, INSTALL, RANKS } from '../lib/route'
+import { DISCORD, ERAS, followLink, FRIENDS, friendsRoute, GROUPS, hashFor, INSTALL, RANKS } from '../lib/route'
+import { FRIENDS_EACH, REQUESTS_A_DAY, REQUESTS_WAITING } from '../lib/friends'
+
+const FRIEND_SETTINGS = { page: 'settings', section: 'friends' } as const
 import { remindersAvailable } from '../lib/push'
 import { LIGHT_XP } from '../lib/xp'
 import { PageTop } from './PageTop'
@@ -238,6 +241,52 @@ export function HelpPage() {
           <dd>
             Leave any time, and join again from the link. If whoever made the group leaves, the member who joined first
             looks after it. The last one out takes the group with them.
+          </dd>
+        </Topic>
+      )}
+
+      {accountsEnabled && (
+        <Topic id="friends" title="Friends">
+          <dt>Adding a friend</dt>
+          <dd>
+            Signed in, open{' '}
+            <a href={hashFor(FRIENDS)} onClick={(e) => followLink(e, FRIENDS)}>
+              your friends
+            </a>{' '}
+            (from your profile) and{' '}
+            <a href={hashFor(friendsRoute('add'))} onClick={(e) => followLink(e, friendsRoute('add'))}>
+              Add a friend
+            </a>
+            . Give someone your friend code (8 letters and numbers, like K7QM-3XPD) or send your friend link, and they can send
+            you a request. You can also add people from your groups, under People you plank with. There's no search: nobody
+            can find you by your name. You'll need a name, as friends see it.
+          </dd>
+          <dt>Requests</dt>
+          <dd>
+            Accept or decline under Pending. Declining is quiet: they aren't told, and their request just goes. Two people who
+            ask each other at once are friends straight away. Up to {FRIENDS_EACH} friends each, with up to{' '}
+            {REQUESTS_WAITING} of your requests waiting at once and {REQUESTS_A_DAY} sent a day.
+          </dd>
+          <dt>A friend's card</dt>
+          <dd>
+            Tap a friend for their card: their streak, whether they've planked today's song, how long you've been friends and
+            the groups you share. Remove or block them from there.
+          </dd>
+          <dt>Blocking</dt>
+          <dd>
+            Blocking someone removes them as a friend, and their requests and invites then go nowhere. They're never told.
+            Unblock them under Blocked. If your code has got around, make a new one under Add a friend: the old one, and its
+            link, stop working, and your friends stay your friends.
+          </dd>
+          <dt>What friends see</dt>
+          <dd>
+            Your name and photo, a green dot while you have the site open, "Planking now" while you plank, your streak, and
+            whether you've planked today's song (a green tick with no breaks), with when. Never your breaks, your XP, your
+            rank, your ladder or your plank history. To hide when you're online, turn off Show when I'm online in{' '}
+            <a href={hashFor(FRIEND_SETTINGS)} onClick={(e) => followLink(e, FRIEND_SETTINGS)}>
+              Settings → Friends
+            </a>: friends then see you as offline, and only whether you've
+            planked today's song.
           </dd>
         </Topic>
       )}

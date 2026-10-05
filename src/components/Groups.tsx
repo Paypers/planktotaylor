@@ -247,8 +247,8 @@ export function InviteLink({ group }: { group: Group }) {
   )
 }
 
-/** A name to show the group, asked for when the player hasn't chosen one. */
-function useGroupName() {
+/** A name to show the group (or friends), asked for when the player hasn't chosen one. */
+export function useGroupName(label = 'Your name, as the group sees it') {
   const { profile } = useAccount()
   const [name, setName] = useState('')
   const needed = !profile.name
@@ -258,7 +258,7 @@ function useGroupName() {
   }
   const field = needed ? (
     <label className="field">
-      <span>Your name, as the group sees it</span>
+      <span>{label}</span>
       <input className="input" value={name} maxLength={40} autoComplete="nickname" required onChange={(e) => setName(e.target.value)} />
     </label>
   ) : null

@@ -255,6 +255,17 @@ describe('routes', () => {
     expect(parseRoute('#group')).toEqual({ page: 'groups' })
   })
 
+  it('reads friends, their tabs and friend links from the address', () => {
+    expect(parseRoute('#friends')).toEqual({ page: 'friends', tab: 'all' })
+    expect(parseRoute('#Friends/Pending/')).toEqual({ page: 'friends', tab: 'pending' })
+    expect(parseRoute('#friends/nope')).toEqual({ page: 'friends', tab: 'all' })
+    expect(hashFor({ page: 'friends', tab: 'all' })).toBe('#friends')
+    expect(hashFor({ page: 'friends', tab: 'add' })).toBe('#friends/add')
+    expect(parseRoute('#friend/K7QM-3XPD')).toEqual({ page: 'friend', code: 'K7QM-3XPD' })
+    expect(hashFor({ page: 'friend', code: 'K7QM-3XPD' })).toBe('#friend/K7QM-3XPD')
+    expect(parseRoute('#friend/')).toEqual({ page: 'home' })
+  })
+
   it('reads a room for planking together from the address', () => {
     expect(parseRoute('#together/ab12cd34ef/cruel-summer')).toEqual({ page: 'together', code: 'ab12cd34ef', songId: 'cruel-summer' })
     expect(parseRoute('#Together/AB12CD34EF/Cruel-Summer/')).toEqual({ page: 'together', code: 'ab12cd34ef', songId: 'cruel-summer' })
