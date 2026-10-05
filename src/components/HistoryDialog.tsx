@@ -18,6 +18,8 @@ const OUTCOME: Record<AttemptOutcome, string> = {
 }
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
+/** Attempts shown at a time: the whole history can be thousands. */
+const SHOWN = 100
 
 function kindLabel(a: Attempt): string {
   if (a.kind === 'daily') return "Today's song"
@@ -44,6 +46,7 @@ function History({ signedIn }: { signedIn: boolean }) {
   // Attempts saved before breaks were timed borrow them from the plank's record.
   const { completions } = useAppData()
   const [loading, setLoading] = useState(signedIn)
+  const [shown, setShown] = useState(SHOWN)
 
   useEffect(() => {
     if (!signedIn) return
@@ -52,7 +55,7 @@ function History({ signedIn }: { signedIn: boolean }) {
       .finally(() => setLoading(false))
   }, [signedIn])
 
-  const newest = [...attempts].reverse()
+  const newest = [...attempts].reverse().slice(0, shown)
   const finished = attempts.filter((a) => a.outcome === 'finished').length
   const today = todayKey()
   const heading = (day: string) =>
@@ -84,6 +87,13 @@ function History({ signedIn }: { signedIn: boolean }) {
           </ol>
         </section>
       ))}
+      {attempts.length > shown && (
+        <div className="button-row">
+          <button type="button" className="btn btn-secondary" onClick={() => setShown((n) => n + SHOWN)}>
+            Show older
+          </button>
+        </div>
+      )}
     </>
   )
 }

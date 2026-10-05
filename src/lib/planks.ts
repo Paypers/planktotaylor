@@ -49,12 +49,19 @@ export function allPlanks(completions: readonly Completion[], attempts: readonly
       lights: records.reduce((sum, c) => sum + (c.lights ?? 0), 0),
     })
   }
+  // When each song's records finished, to match goes again against: thousands of attempts, each checked quickly.
+  const finishedAt = new Map<string, number[]>()
+  for (const c of completions) {
+    const times = finishedAt.get(c.songId)
+    if (times) times.push(Date.parse(c.at))
+    else finishedAt.set(c.songId, [Date.parse(c.at)])
+  }
   for (const a of attempts) {
     if (a.outcome !== 'finished' || (a.kind !== 'extra' && a.kind !== 'practice' && a.kind !== 'era')) continue
     const song = SONG_BY_ID.get(a.songId)
     if (!song) continue
     const ended = Date.parse(a.endedAt)
-    const recorded = completions.some((c) => c.songId === a.songId && Math.abs(Date.parse(c.at) - ended) < SAME_PLANK_MS)
+    const recorded = (finishedAt.get(a.songId) ?? []).some((at) => Math.abs(at - ended) < SAME_PLANK_MS)
     if (recorded) continue
     planks.push({
       song,

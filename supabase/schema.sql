@@ -895,6 +895,110 @@ create trigger plank_attempts_limit after insert on public.plank_attempts
   referencing new table as added
   for each statement execute function public.rows_each_limit('20000');
 
+-- One record for every device. The account holds every plank and attempt from all of a player's devices, and
+-- each device keeps a whole copy of it: a device asks for what the account got since it last looked
+-- (plank_changes, below, by saved_at: set here, never by the site), so it can look every couple of minutes. Two
+-- devices can't undo each other either: a plank sent again keeps whichever copy is better, as the site merges
+-- them (more XP, then fewer breaks, then the earlier: betterPlank in src/lib/progress.ts, so keep the two in
+-- step), and the ladder keeps whichever level was set last, so a device that hasn't caught up can't send an
+-- older one over it.
+alter table public.plank_completions add column if not exists saved_at timestamptz not null default now();
+alter table public.plank_attempts add column if not exists saved_at timestamptz not null default now();
+create index if not exists plank_completions_saved on public.plank_completions (user_id, saved_at);
+create index if not exists plank_attempts_saved on public.plank_attempts (user_id, saved_at);
+
+create or replace function public.plank_completions_saved()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+declare
+  old_breaks int;
+  new_breaks int;
+begin
+  if tg_op = 'UPDATE' then
+    old_breaks := case when jsonb_typeof(old.pauses) = 'array' then jsonb_array_length(old.pauses) else 0 end;
+    new_breaks := case when jsonb_typeof(new.pauses) = 'array' then jsonb_array_length(new.pauses) else 0 end;
+    if coalesce(old.xp, 0) > coalesce(new.xp, 0)
+      or (coalesce(old.xp, 0) = coalesce(new.xp, 0) and (old_breaks < new_breaks or (old_breaks = new_breaks and old.completed_at < new.completed_at)))
+    then
+      -- The account's copy is the better one: it stays as it is.
+      return null;
+    end if;
+  end if;
+  new.saved_at := now();
+  return new;
+end;
+$$;
+revoke all on function public.plank_completions_saved() from public, anon, authenticated;
+drop trigger if exists plank_completions_saved on public.plank_completions;
+create trigger plank_completions_saved before insert or update on public.plank_completions
+  for each row execute function public.plank_completions_saved();
+
+create or replace function public.plank_attempts_saved()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  new.saved_at := now();
+  return new;
+end;
+$$;
+revoke all on function public.plank_attempts_saved() from public, anon, authenticated;
+drop trigger if exists plank_attempts_saved on public.plank_attempts;
+create trigger plank_attempts_saved before insert on public.plank_attempts
+  for each row execute function public.plank_attempts_saved();
+
+create or replace function public.plank_profiles_ladder()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if new.updated_at < old.updated_at then
+    new.ladder_level := old.ladder_level;
+    new.updated_at := old.updated_at;
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.plank_profiles_ladder() from public, anon, authenticated;
+drop trigger if exists plank_profiles_ladder on public.plank_profiles;
+create trigger plank_profiles_ladder before update on public.plank_profiles
+  for each row execute function public.plank_profiles_ladder();
+-- A profile made by saving a name or a setting first has no ladder yet: any device's level is newer than it.
+alter table public.plank_profiles alter column updated_at set default 'epoch';
+
+-- A device's one question to the account: the player's planks saved after p_planks and attempts saved after
+-- p_attempts (all of them for null), and when it looked, by the account's own clock. The device asks next time
+-- from a minute before then, so nothing saved while it was looking is missed, and only that minute's come twice.
+create or replace function public.plank_changes(p_planks timestamptz, p_attempts timestamptz)
+returns json
+language sql
+stable
+set search_path = public
+as $$
+  select json_build_object(
+    'at', now(),
+    'completions', coalesce((
+      select json_agg(c order by c.day, c.mode, c.song_id)
+      from public.plank_completions c
+      where c.user_id = auth.uid() and (p_planks is null or c.saved_at > p_planks)
+    ), '[]'::json),
+    'attempts', coalesce((
+      select json_agg(json_build_object(
+        'id', a.id, 'song_id', a.song_id, 'kind', a.kind, 'level', a.level, 'started_at', a.started_at, 'ended_at', a.ended_at,
+        'outcome', a.outcome, 'reached', a.reached, 'pauses', a.pauses, 'breaks', a.breaks, 'saved_at', a.saved_at
+      ) order by a.saved_at, a.id)
+      from public.plank_attempts a
+      where a.user_id = auth.uid() and (p_attempts is null or a.saved_at > p_attempts)
+    ), '[]'::json)
+  )
+$$;
+revoke all on function public.plank_changes(timestamptz, timestamptz) from public, anon;
+grant execute on function public.plank_changes(timestamptz, timestamptz) to authenticated;
+
 -- Planking now: each group has a private Realtime channel, group-planking:<group id>, where members' devices
 -- say they're planking (Realtime presence: their user id, and until when). Only the group's members can join
 -- it, see who's planking in it, or say they are. Nothing is stored: presence lasts while the device is there.

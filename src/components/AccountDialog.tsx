@@ -26,7 +26,7 @@ import { RankCard } from './Rank'
 const SYNC_TEXT = {
   idle: '',
   syncing: 'Syncing…',
-  synced: 'Your streak, ladder, XP, photo and settings are synced to this account, on every device you sign in on.',
+  synced: 'Your streak, ladder, XP, plank history, photo and settings are synced to this account: every device you sign in on shows the same.',
   error: "Couldn't sync just now. Your progress is safe in this browser.",
 }
 

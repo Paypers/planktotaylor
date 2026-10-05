@@ -8,13 +8,23 @@ import {
   mergeCompletions,
   newerCursor,
   newerSettings,
+  type AppData,
   type Completion,
   type LadderCursor,
   type Mode,
   type Pause,
   type Prefs,
 } from './progress'
-import { forgetAttempts, getAttempts, mergeAttempts, onAttemptEnded, type Attempt, type AttemptKind, type AttemptOutcome } from './attempts'
+import {
+  attemptsSeen,
+  forgetAttempts,
+  getAttempts,
+  mergeAttempts,
+  onAttemptEnded,
+  type Attempt,
+  type AttemptKind,
+  type AttemptOutcome,
+} from './attempts'
 import { applyPrefs, getData, onPlankRecorded, onPrefsChanged, replaceProgress } from './store'
 import { MAX_VOLUME } from './sound'
 import { accountThemes, applyAccountThemes, onThemeSaved, readSaved, type AccountThemes } from './theme'
@@ -131,14 +141,46 @@ const fromRow = (row: CompletionRow): Completion => ({
   ...(row.lights ? { lights: row.lights } : {}),
 })
 
+/**
+ * A sync asks for what the account got since a minute before it last looked, by the account's clock: something
+ * saved while it was looking is never missed that way. Getting one twice is harmless.
+ */
+const OVERLAP_MS = 60_000
+const lookBack = (at: string) => new Date(Date.parse(at) - OVERLAP_MS).toISOString()
+
+/** plank_changes's answer: what the account got after the times asked, and when it looked. */
+interface Changes {
+  at: string
+  completions: CompletionRow[]
+  attempts: PulledAttempt[]
+}
+
+/**
+ * The account's planks (all of them, or only those it got or changed since `planksSince`) and attempts (all, or
+ * since `attemptsSince`), in one question. Null from a database that hasn't had plank_changes added yet.
+ */
+async function fetchChanges(supabase: SupabaseClient, planksSince: string | null, attemptsSince: string | null): Promise<Changes | null> {
+  const { data, error } = await supabase.rpc('plank_changes', {
+    p_planks: planksSince && lookBack(planksSince),
+    p_attempts: attemptsSince && lookBack(attemptsSince),
+  })
+  if (error?.code === MISSING_FUNCTION) return null
+  if (error) throw error
+  return data as Changes
+}
+
+/** Every plank, the old way: from a database that hasn't had plank_changes added yet. */
 async function fetchAllCompletions(supabase: SupabaseClient): Promise<Completion[]> {
   const pageSize = 1000
   const rows: CompletionRow[] = []
   for (let from = 0; ; from += pageSize) {
+    // In the same order every time (the key), or one page could repeat a plank and another skip one.
     const { data, error } = await supabase
       .from('plank_completions')
       .select('*')
       .order('day')
+      .order('mode')
+      .order('song_id')
       .range(from, from + pageSize - 1)
     if (error) throw error
     rows.push(...(data as CompletionRow[]))
@@ -243,42 +285,63 @@ function claimBrowser(userId: string) {
 }
 
 let running: Promise<void> | null = null
-let again = false
+let again: 'look' | 'full' | null = null
 let lastSync = 0
 /** Coming back to the site within this long of a sync doesn't sync again. */
 const FRESH_MS = 30_000
+/** While the site is in view, it looks at the account this often for what other devices did. */
+const LOOK_MS = 2 * 60_000
+/** When the account last answered this page, by its clock: a look asks only for what it got since. Null: not yet. */
+let lookedAt: string | null = null
 
-/** One sync at a time: asked for during one, it runs once more straight after. */
-function sync(user: User) {
+/**
+ * One sync at a time: asked for during one, it runs once more straight after. A full one compares everything,
+ * to send whatever never reached the account; any other only looks for what's new there, since everything
+ * done here goes to the account as it happens, and a failure there makes the next one full.
+ */
+function sync(user: User, full = false) {
   if (running) {
-    again = true
+    again = full || again === 'full' ? 'full' : 'look'
     return
   }
-  again = false
   lastSync = Date.now()
-  running = syncNow(user).finally(() => {
+  running = syncNow(user, full).finally(() => {
     running = null
-    if (again && state.user) sync(state.user)
+    const next = again
+    again = null
+    if (next && state.user) sync(state.user, next === 'full')
   })
 }
 
-// Phones keep a tab open for days: coming back into view (or online) picks up other devices' changes.
+// Phones keep a tab open for days, and a computer's can stay in view all day while its player planks on their
+// phone: coming back to it (into view, online, or clicking back into it) and every couple of minutes while it's
+// in view, it picks up what other devices did.
 function catchUp() {
   if (!state.user || document.visibilityState !== 'visible') return
-  if (state.sync === 'error' || Date.now() - lastSync > FRESH_MS) sync(state.user)
+  if (state.sync === 'error' || Date.now() - lastSync > FRESH_MS) sync(state.user, state.sync === 'error')
 }
 
-/** Two-way merge: pull the account's history, union it with this browser's, push back what's missing. */
-async function syncNow(user: User) {
+const samePlanks = (local: AppData, completions: Completion[], ladder: LadderCursor) =>
+  ladder === local.ladder && completions.length === local.completions.length && completions.every((c, i) => c === local.completions[i])
+
+/**
+ * Two-way merge: pull the account's history (or what's new in it), union it with this browser's, and push back
+ * what the account is missing. Every device ends up with every device's planks and attempts.
+ */
+async function syncNow(user: User, full: boolean) {
   setState({ sync: 'syncing' })
   try {
     const supabase = await client()
-    const [remote, profile] = await Promise.all([
-      fetchAllCompletions(supabase),
+    const [changes, profile] = await Promise.all([
+      // A full sync compares every plank. Attempts come from where this browser left off, wherever that was.
+      fetchChanges(supabase, full ? null : lookedAt, lookedAt ?? attemptsSeen()),
       // The whole row, so a database that hasn't had the settings columns added yet still syncs the rest.
       supabase.from('plank_profiles').select('*').maybeSingle<ProfileRow>(),
     ])
     if (profile.error) throw profile.error
+    const remote = changes ? changes.completions.map(fromRow) : await fetchAllCompletions(supabase)
+    // Signed out, or someone else signed in, meanwhile: this account's planks don't belong here now.
+    if (state.user?.id !== user.id) return
     const row = profile.data
     setState({ profile: { name: row?.display_name ?? null, avatarUrl: photoToShow(row?.avatar_url) } })
 
@@ -288,21 +351,26 @@ async function syncNow(user: User) {
       ? { level: row.ladder_level, updatedAt: new Date(row.updated_at).toISOString() }
       : null
     const ladder = remoteCursor ? newerCursor(local.ladder, remoteCursor) : local.ladder
-    replaceProgress(merged, ladder)
+    // Nothing new (most looks): nothing on screen redraws.
+    if (!samePlanks(local, merged, ladder)) replaceProgress(merged, ladder)
+    if (changes) lookedAt = changes.at
 
-    const remoteByKey = new Map(remote.map((c) => [completionKey(c), c]))
-    const missing = merged.filter((c) => !remoteByKey.has(completionKey(c)))
-    // A replay improved a plank here but that didn't reach the account (offline, say).
-    const improved = merged.filter((c) => {
-      const theirs = remoteByKey.get(completionKey(c))
-      return theirs !== undefined && betterPlank(c, theirs)
-    })
-    if (missing.length > 0) await upsertCompletions(supabase, user.id, missing)
-    if (improved.length > 0) await replaceCompletions(supabase, user.id, improved)
-    if (ladder !== remoteCursor) await pushLadderCursor(supabase, user.id, ladder)
     // Settings and attempts aren't progress: a failure doesn't fail the sync, and the next one retries.
     await syncSettings(supabase, user.id, row).catch((error) => console.error('Could not sync settings with account', error))
-    await pushAttempts(supabase, user.id).catch((error) => console.error('Could not save attempts to account', error))
+    await syncAttempts(supabase, user.id, changes).catch((error) => console.error('Could not sync attempts with account', error))
+
+    if (full || !changes) {
+      const remoteByKey = new Map(remote.map((c) => [completionKey(c), c]))
+      const missing = merged.filter((c) => !remoteByKey.has(completionKey(c)))
+      // A replay improved a plank here but that didn't reach the account (offline, say).
+      const improved = merged.filter((c) => {
+        const theirs = remoteByKey.get(completionKey(c))
+        return theirs !== undefined && betterPlank(c, theirs)
+      })
+      if (missing.length > 0) await upsertCompletions(supabase, user.id, missing)
+      if (improved.length > 0) await replaceCompletions(supabase, user.id, improved)
+    }
+    if (ladder !== remoteCursor) await pushLadderCursor(supabase, user.id, ladder)
     setState({ sync: 'synced' })
   } catch (error) {
     console.error('Sync failed', error)
@@ -315,17 +383,21 @@ function listen(supabase: SupabaseClient) {
     const user = session?.user ?? null
     const changedUser = user?.id !== state.user?.id
     if (user && changedUser) claimBrowser(user.id)
+    if (changedUser) lookedAt = null
     setState({ user, sync: user ? state.sync : 'idle', profile: changedUser ? NO_PROFILE : state.profile })
-    // Supabase warns against awaiting other Supabase calls inside this callback.
-    if (user && (changedUser || event === 'SIGNED_IN')) setTimeout(() => sync(user), 0)
+    // Supabase warns against awaiting other Supabase calls inside this callback. A new player here: compare
+    // everything, so whatever this browser has that the account doesn't goes up.
+    if (user && (changedUser || event === 'SIGNED_IN')) setTimeout(() => sync(user, changedUser), 0)
   })
 
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', catchUp)
     window.addEventListener('online', catchUp)
+    window.addEventListener('focus', catchUp)
     window.addEventListener('pageshow', (event) => {
       if (event.persisted) catchUp()
     })
+    window.setInterval(catchUp, LOOK_MS)
   }
 
   onPlankRecorded((added, updated, ladder) => {
@@ -395,32 +467,47 @@ async function pushAttempts(supabase: SupabaseClient, userId: string) {
   mergeAttempts([], unsaved.map((a) => a.id))
 }
 
-/** The latest attempts from every device, for the history. */
+const ATTEMPT_COLUMNS = 'id, song_id, kind, level, started_at, ended_at, outcome, reached, pauses, breaks'
+type PulledAttempt = Omit<AttemptRow, 'user_id'>
+
+const fromAttemptRow = (row: PulledAttempt): Attempt => ({
+  id: row.id,
+  songId: row.song_id,
+  kind: row.kind,
+  ...(row.level != null ? { level: row.level } : {}),
+  startedAt: new Date(row.started_at).toISOString(),
+  endedAt: new Date(row.ended_at).toISOString(),
+  outcome: row.outcome,
+  reached: Number(row.reached),
+  pauses: row.pauses,
+  ...breaksFromRow(row.breaks, row.pauses),
+})
+
+/**
+ * Sends this browser's new attempts, and keeps every other device's that came with the planks: each device keeps
+ * the account's whole history, so the numbers built from it (planks, time planked, the year) are the same
+ * everywhere. After the first time, only what the account got since.
+ */
+async function syncAttempts(supabase: SupabaseClient, userId: string, changes: Changes | null) {
+  await pushAttempts(supabase, userId)
+  if (!changes) return pullLatestAttempts(supabase, userId)
+  if (state.user?.id === userId) mergeAttempts(changes.attempts.map(fromAttemptRow), [], changes.at)
+}
+
+/** A database that hasn't had plank_changes added yet: the latest hundred, as the history used to show. */
+async function pullLatestAttempts(supabase: SupabaseClient, userId: string) {
+  const { data, error } = await supabase.from('plank_attempts').select(ATTEMPT_COLUMNS).order('started_at', { ascending: false }).limit(100)
+  if (error) throw error
+  if (state.user?.id === userId) mergeAttempts((data as PulledAttempt[]).map(fromAttemptRow))
+}
+
+/** Every device's attempts, for the history: a look at the account, waited for. */
 export async function pullAttempts() {
   const user = state.user
   if (!accountsEnabled || !user) return
-  const supabase = await client()
-  await pushAttempts(supabase, user.id)
-  const { data, error } = await supabase
-    .from('plank_attempts')
-    .select('id, song_id, kind, level, started_at, ended_at, outcome, reached, pauses, breaks')
-    .order('started_at', { ascending: false })
-    .limit(100)
-  if (error) throw error
-  mergeAttempts(
-    (data as Omit<AttemptRow, 'user_id'>[]).map((row) => ({
-      id: row.id,
-      songId: row.song_id,
-      kind: row.kind,
-      ...(row.level != null ? { level: row.level } : {}),
-      startedAt: new Date(row.started_at).toISOString(),
-      endedAt: new Date(row.ended_at).toISOString(),
-      outcome: row.outcome,
-      reached: Number(row.reached),
-      pauses: row.pauses,
-      ...breaksFromRow(row.breaks, row.pauses),
-    })),
-  )
+  if (running) await running
+  if (!running) sync(user)
+  await running
 }
 
 /** A setting changed while signed in goes straight up. If that fails, the next sync sends it. */
@@ -449,7 +536,7 @@ onThemeSaved((theme) => void pushSettings({ theme }))
 if (accountsEnabled) void client()
 
 export function retrySync() {
-  if (state.user) sync(state.user)
+  if (state.user) sync(state.user, true)
 }
 
 export async function saveLadderCursor(ladder: LadderCursor) {

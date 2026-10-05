@@ -27,7 +27,7 @@ export function ProfileStats() {
             )}
             {stats.mostPlanked && <Stat label="Most planked" value={`${stats.mostPlanked.times}×`} note={stats.mostPlanked.song.title} />}
           </dl>
-          {attempts.length >= ATTEMPTS_KEPT && <p className="fine">From your last {ATTEMPTS_KEPT} goes.</p>}
+          {attempts.length >= ATTEMPTS_KEPT && <p className="fine">From your last {ATTEMPTS_KEPT.toLocaleString()} goes.</p>}
         </>
       )}
     </section>

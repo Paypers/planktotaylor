@@ -1,5 +1,6 @@
 -- Checks the rules in schema.sql with made-up players: the groups (Ana and Ben in a group, Cat not in it,
--- Dee with no name, and someone signed out), then photos and the limits on what a player can store.
+-- Dee with no name, and someone signed out), then photos, the limits on what a player can store, and how the
+-- account keeps one record for all of a player's devices.
 -- Paste into Supabase → SQL Editor → Run, after schema.sql.
 -- It keeps nothing: everything it makes is rolled back at the end. A check that fails stops it with its
 -- message; if it finishes with no error, every check held.
@@ -401,9 +402,9 @@ begin
   select current_date - n, 'daily', 'style', 231, 347 from generate_series(1, 10000 - (select count(*) from public.plank_completions where user_id = auth.uid())::int) n;
   assert (select count(*) from public.plank_completions where user_id = auth.uid()) = 10000, '10,000 planks save, at once';
   insert into public.plank_completions (day, mode, song_id, seconds) values (current_date - 1, 'daily', 'style', 231) on conflict do nothing;
-  insert into public.plank_completions (day, mode, song_id, seconds, xp) values (current_date - 1, 'daily', 'style', 231, 300)
+  insert into public.plank_completions (day, mode, song_id, seconds, xp) values (current_date - 1, 'daily', 'style', 231, 400)
     on conflict (user_id, day, mode, song_id) do update set xp = excluded.xp;
-  assert (select xp from public.plank_completions where user_id = auth.uid() and day = current_date - 1 and mode = 'daily') = 300, 'at the limit, planks already saved can still change';
+  assert (select xp from public.plank_completions where user_id = auth.uid() and day = current_date - 1 and mode = 'daily') = 400, 'at the limit, planks already saved can still change';
   assert public.rules_test_refused($q$ insert into public.plank_completions (day, mode, song_id, seconds) values (current_date, 'ladder', 'the-next-one', 231) $q$), 'but a 10,001st is refused';
   insert into public.plank_attempts (id, song_id, kind, started_at, ended_at, outcome, reached)
   select gen_random_uuid(), 'style', 'daily', now(), now(), 'gave-up', 1 from generate_series(1, 20000 - (select count(*) from public.plank_attempts where user_id = auth.uid()));
@@ -415,6 +416,71 @@ do $$
 begin
   insert into public.plank_completions (day, mode, song_id, seconds) values (current_date, 'ladder', 'wood', 150);
   assert (select count(*) from public.plank_completions where user_id = auth.uid() and song_id = 'wood' and day = current_date) = 1, 'Ana at her limit holds nobody else up';
+end;
+$$;
+
+-- One record for every device: the account stamps when it got each plank and attempt, keeps the better copy of a
+-- plank sent twice, and the ladder level set last.
+select public.rules_test_as('ben');
+do $$
+declare
+  plank text := $q$ insert into public.plank_completions (day, mode, song_id, seconds, completed_at, pauses, xp) values (current_date, 'ladder', 'mine', 230, %L, %L, %s)
+    on conflict (user_id, day, mode, song_id) do update set completed_at = excluded.completed_at, pauses = excluded.pauses, xp = excluded.xp $q$;
+  kept text := $q$ select row(xp, jsonb_array_length(coalesce(pauses, '[]')), completed_at)::text from public.plank_completions where user_id = auth.uid() and song_id = 'mine' $q$;
+  shown text;
+begin
+  insert into public.plank_completions (day, mode, song_id, seconds, saved_at) values (current_date, 'ladder', 'clean', 255, '2000-01-01');
+  assert (select saved_at from public.plank_completions where user_id = auth.uid() and song_id = 'clean') = now(), 'a plank is stamped when the account got it, whatever the site says';
+  insert into public.plank_attempts (id, song_id, kind, started_at, ended_at, outcome, reached, saved_at)
+  values (gen_random_uuid(), 'clean', 'ladder', now(), now(), 'gave-up', 12, '2000-01-01');
+  assert (select saved_at from public.plank_attempts where user_id = auth.uid() and song_id = 'clean') = now(), 'and an attempt';
+
+  execute format(plank, '2026-09-01 12:00+00', '[{"at": 30, "ms": 4000}]', 300);
+  execute format(plank, '2026-09-01 12:00+00', '[{"at": 30, "ms": 4000}]', 200);
+  execute kept into shown;
+  assert shown = (select row(300, 1, '2026-09-01 12:00+00'::timestamptz)::text), 'a copy with less XP leaves the better one';
+  execute format(plank, '2026-09-01 12:00+00', '[{"at": 30, "ms": 4000}, {"at": 90, "ms": 4000}]', 300);
+  execute kept into shown;
+  assert shown = (select row(300, 1, '2026-09-01 12:00+00'::timestamptz)::text), 'and one with more breaks';
+  execute format(plank, '2026-09-01 12:05+00', '[{"at": 30, "ms": 4000}]', 300);
+  execute kept into shown;
+  assert shown = (select row(300, 1, '2026-09-01 12:00+00'::timestamptz)::text), 'and a later one, otherwise the same';
+  execute format(plank, '2026-09-01 12:00+00', null, 400);
+  execute kept into shown;
+  assert shown = (select row(400, 0, '2026-09-01 12:00+00'::timestamptz)::text), 'but a better copy replaces it';
+
+  insert into public.plank_profiles (user_id, ladder_level, updated_at) values (auth.uid(), 20, '2026-09-02 12:00+00')
+    on conflict (user_id) do update set ladder_level = excluded.ladder_level, updated_at = excluded.updated_at;
+  insert into public.plank_profiles (user_id, ladder_level, updated_at) values (auth.uid(), 5, '2026-09-01 12:00+00')
+    on conflict (user_id) do update set ladder_level = excluded.ladder_level, updated_at = excluded.updated_at;
+  assert (select ladder_level from public.plank_profiles where user_id = auth.uid()) = 20, 'a device that hasn''t caught up can''t send an older ladder level over a newer one';
+  insert into public.plank_profiles (user_id, ladder_level, updated_at) values (auth.uid(), 1, '2026-09-03 12:00+00')
+    on conflict (user_id) do update set ladder_level = excluded.ladder_level, updated_at = excluded.updated_at;
+  assert (select ladder_level from public.plank_profiles where user_id = auth.uid()) = 1, 'but starting the ladder again, later, does';
+  update public.plank_profiles set display_name = 'Benji' where user_id = auth.uid();
+  assert (select row(ladder_level, display_name)::text from public.plank_profiles where user_id = auth.uid()) = '(1,Benji)', 'and a new name leaves the ladder alone';
+
+  -- What a device asks for: everything, then only what's new.
+  shown := public.plank_changes(null, null)::text;
+  assert (public.plank_changes(null, null) ->> 'at')::timestamptz = now(), 'a look says when it looked, by the account''s clock';
+  assert json_array_length(public.plank_changes(null, null) -> 'completions') = (select count(*) from public.plank_completions where user_id = auth.uid()), 'all his planks';
+  assert json_array_length(public.plank_changes(null, null) -> 'attempts') = (select count(*) from public.plank_attempts where user_id = auth.uid()), 'and attempts';
+  assert shown not like '%00000000-0000-4000-8000-00000000000a%', 'and nobody else''s';
+  assert json_array_length(public.plank_changes(now(), now()) -> 'completions') = 0 and json_array_length(public.plank_changes(now(), now()) -> 'attempts') = 0, 'nothing saved since it last looked: nothing';
+  assert json_array_length(public.plank_changes(now() - interval '1 minute', now()) -> 'completions') > 0 and json_array_length(public.plank_changes(now(), now()) -> 'attempts') = 0, 'planks and attempts each from their own time';
+end;
+$$;
+select public.rules_test_as('anon');
+do $$
+begin
+  assert public.rules_test_refused($q$ select public.plank_changes(null, null) $q$), 'signed out, there''s nothing to ask for';
+end;
+$$;
+reset role;
+do $$
+begin
+  assert (select updated_at from public.plank_profiles where user_id = '00000000-0000-4000-8000-00000000000d') = 'epoch',
+    'a profile made by saving a name first has no ladder time of its own: any device''s level is newer';
 end;
 $$;
 

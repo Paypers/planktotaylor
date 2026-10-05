@@ -181,8 +181,9 @@ export function HelpPage() {
             <dt>Signed in</dt>
             <dd>
               Your streak, ladder, XP, plank history, name, photo, sound settings and color themes follow you to every
-              device you sign in on. Which theme shows is up to each device. Progress from before you signed in comes
-              along too.
+              device you sign in on. Your account holds everything from all of them, and each device shows the same:
+              whichever you plank on, the others catch up when you come back to them, and every couple of minutes while
+              they're open. Which theme shows is up to each device. Progress from before you signed in comes along too.
             </dd>
             <dt>Your planks in numbers</dt>
             <dd>

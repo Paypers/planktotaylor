@@ -40,8 +40,13 @@ interface LiveAttempt extends Omit<Attempt, 'endedAt' | 'outcome'> {
 
 const LOG_KEY = 'plank-to-taylor:attempts'
 const LIVE_KEY = 'plank-to-taylor:attempt-live'
-/** Kept in this browser; the account keeps them all. */
-export const ATTEMPTS_KEPT = 300
+/** When the account last sent this browser its attempts, by the account's clock. */
+const SEEN_KEY = 'plank-to-taylor:attempts-seen'
+/**
+ * Kept in this browser: signed in, the account's whole history, from every device, up to this many (years of
+ * planking), so every device shows the same numbers.
+ */
+export const ATTEMPTS_KEPT = 5000
 /** A live attempt not saved for this long was abandoned (its tab closed, crashed or was put down). */
 const STALE_MS = 15_000
 
@@ -54,22 +59,27 @@ function read<T>(key: string, fallback: T): T {
   }
 }
 
-function write(key: string, value: unknown) {
+function write(key: string, value: unknown): boolean {
   try {
     if (value === null) localStorage.removeItem(key)
     else localStorage.setItem(key, JSON.stringify(value))
+    return true
   } catch {
     // Private mode or full storage: the log just won't outlive the page.
+    return false
   }
 }
 
 let log: Attempt[] = []
+/** The log here is the one in storage: false after a write that failed. */
+let stored = true
+let seen: string | null = null
 const listeners = new Set<() => void>()
 const endedListeners = new Set<() => void>()
 
 function commit(next: Attempt[]) {
   log = [...next].sort((a, b) => a.startedAt.localeCompare(b.startedAt)).slice(-ATTEMPTS_KEPT)
-  write(LOG_KEY, log)
+  stored = write(LOG_KEY, log)
   listeners.forEach((fn) => fn())
 }
 
@@ -84,16 +94,19 @@ function settleAbandoned() {
 }
 
 // On load: pick up the log, and close off any attempt a previous visit left hanging.
-const stored = read<Attempt[]>(LOG_KEY, [])
-log = Array.isArray(stored) ? stored : []
+const kept = read<Attempt[]>(LOG_KEY, [])
+log = Array.isArray(kept) ? kept : []
+seen = read<string | null>(SEEN_KEY, null)
 settleAbandoned()
 
 if (typeof window !== 'undefined') {
   window.addEventListener('storage', (event) => {
     if (event.key === LOG_KEY) {
       log = read<Attempt[]>(LOG_KEY, [])
+      stored = true
       listeners.forEach((fn) => fn())
     }
+    if (event.key === SEEN_KEY) seen = read<string | null>(SEEN_KEY, null)
   })
 }
 
@@ -150,16 +163,39 @@ export function endAttempt(id: string, outcome: AttemptOutcome, reached: number,
   endedListeners.forEach((fn) => fn())
 }
 
-/** Adds attempts from the account (another device's) and marks ones the account now has. */
-export function mergeAttempts(fromAccount: readonly Attempt[], savedIds: readonly string[] = []) {
+/** When the account last sent this browser its attempts (`at` below), or null: then a sync asks for them all. */
+export function attemptsSeen(): string | null {
+  return seen
+}
+
+/**
+ * Adds attempts from the account (another device's) and marks ones the account now has. `at`: these are all the
+ * account had up to then, by its clock, so the next sync asks only for ones after.
+ */
+export function mergeAttempts(fromAccount: readonly Attempt[], savedIds: readonly string[] = [], at?: string) {
   const byId = new Map(log.map((a) => [a.id, a]))
+  let changed = false
   // The account's copy wins, but one saved without its breaks keeps the ones timed here.
-  for (const a of fromAccount) byId.set(a.id, { ...byId.get(a.id), ...a, synced: true })
+  for (const a of fromAccount) {
+    const had = byId.get(a.id)
+    const merged = { ...had, ...a, synced: true }
+    if (had && JSON.stringify(had) === JSON.stringify(merged)) continue
+    byId.set(a.id, merged)
+    changed = true
+  }
   for (const id of savedIds) {
     const a = byId.get(id)
-    if (a) byId.set(id, { ...a, synced: true })
+    if (!a || a.synced) continue
+    byId.set(id, { ...a, synced: true })
+    changed = true
   }
-  commit([...byId.values()])
+  // Nothing new (most syncs): no write, and nothing on screen redraws.
+  if (changed) commit([...byId.values()])
+  // Only once they're in storage too: otherwise the next visit asks for them again.
+  if (at && stored) {
+    seen = at
+    write(SEEN_KEY, at)
+  }
 }
 
 /** A best shorter than this isn't worth a marker. */
@@ -183,6 +219,8 @@ export function ghostFor(songId: string, attempts: readonly Attempt[], finished:
 
 /** Someone else signed in on this browser: the log here was the last account's, so it goes. */
 export function forgetAttempts() {
+  seen = null
+  write(SEEN_KEY, null)
   commit([])
 }
 
