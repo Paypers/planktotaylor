@@ -22,6 +22,12 @@ Sharing a result (level 1) and the daily post in a server (level 2) are built.
 
 **Size:** large.
 
+## 6. Friends
+
+Add people as friends from a code, a link or your groups; see who's online (a green dot) and who's planking now; invite friends straight into a plank-together room or a group, on their phone too. On a computer the home page moves left for a friends list down the right, like Discord's. [Part 13](roadmap-parts/part-13-friends.md) has the plan and what's decided.
+
+**Size:** large.
+
 ## Not doing
 
 - **A public XP leaderboard.** Everything runs on trust, so a public board would fill up with made-up numbers and turn a daily habit into a contest. Groups give people someone to plank with, among friends.
@@ -34,3 +40,4 @@ Sharing a result (level 1) and the daily post in a server (level 2) are built.
 | # | Feature | Size | Notes |
 | --- | --- | --- | --- |
 | 5 | Discord Activity | Large | Plan first |
+| 6 | Friends | Large | Planned, in five parts |

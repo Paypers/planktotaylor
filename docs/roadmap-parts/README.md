@@ -20,6 +20,7 @@ To build one, hand Claude the file: *"Build docs/roadmap-parts/part-01-quick-win
 | [10](part-10-native-app.md) | Native app | Large | 1, 5 | Yes (small, iOS push) | Not doing: the site on the home screen is the app | – |
 | [11](part-11-discord-activity.md) | Discord Activity | Large | 8, 9 | No | Planned: about 80% planking together, 30% with the music inside Discord; test first | |
 | [12](part-12-plank-together.md) | Plank together, from a link | Large | 8, 9 | No | Supabase Realtime; public channels on | ✓ |
+| [13](part-13-friends.md) | Friends: requests, who's online, the friends rail, invites | Large, in five | 5, 8, 9, 12 | Yes | Decided 4 Oct 2026; push in 13.5 | |
 
 **Why it's cut this way**
 
