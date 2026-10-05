@@ -16,6 +16,8 @@ export interface LiveMember {
   joinedAt: number
   /** Seconds of the song they planked this round, once they're done or stepped out. For the room's total, never shown on its own. */
   held?: number
+  /** A signed-in player's friend code, so the people they plank with can add them. Nothing else of their account. */
+  friendCode?: string
 }
 
 /**
@@ -65,6 +67,8 @@ export interface LiveLink {
   resume: () => void
   /** Done or out, it also says how far into the song this device got, on the room's clock. */
   setStatus: (status: LiveStatus) => void
+  /** This device's friend code, once there is one (signed in with a name), for the room's people list. */
+  setFriendCode: (code: string | null) => void
   /** 'reconnecting' while this device has lost the room and is joining it again. Its plank carries on either way. */
   getConnection: () => 'open' | 'reconnecting'
   /** Called whenever the members, the state or the connection change. */

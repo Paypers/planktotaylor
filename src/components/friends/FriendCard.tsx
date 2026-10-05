@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react'
 import { SONG_BY_ID } from '../../data/songs'
-import { blockPlayer, friendCard, removeFriend, type FriendCard as CardData } from '../../lib/account'
+import { blockPlayer, friendCard, inviteFriends, removeFriend, type FriendCard as CardData } from '../../lib/account'
+import { dailySong } from '../../lib/daily'
 import type { DayKey } from '../../lib/dates'
+import { nudgeFriends } from '../../lib/friendInbox'
 import { activityLine, friendStatus, type Friend } from '../../lib/friends'
+import { makeRoomCode } from '../../lib/live/code'
 import { refreshFriends } from '../../lib/myFriends'
-import { followLink, groupRoute, hashFor } from '../../lib/route'
+import { useMyGroups } from '../../lib/myGroups'
+import { followLink, groupRoute, hashFor, navigate, togetherRoute } from '../../lib/route'
 import { streakInfo } from '../../lib/streaks'
 import { Dialog } from '../Dialog'
 import { Flame, HeldMark } from '../Icon'
@@ -14,7 +18,7 @@ type Asking = 'remove' | 'block' | null
 
 /**
  * A friend in full: their streak, today's song, since when you've been friends and the groups you share. Then
- * what you can do: remove them, or block them.
+ * what you can do: plank together, invite them to one of your groups, remove them, or block them.
  */
 export function FriendCard({ friend, today, onClose }: { friend: Friend | null; today: DayKey; onClose: () => void }) {
   return (
@@ -30,6 +34,12 @@ function CardBody({ friend, today, onClose }: { friend: Friend; today: DayKey; o
   const [asking, setAsking] = useState<Asking>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [choosingGroup, setChoosingGroup] = useState(false)
+  const [invitedTo, setInvitedTo] = useState<ReadonlySet<string>>(new Set())
+  const { groups } = useMyGroups(today)
+  // Your groups they aren't in yet: the card knows the ones you share.
+  const shared = new Set(card?.groups.map((g) => g.id) ?? [])
+  const invitable = card ? (groups ?? []).filter((g) => !shared.has(g.id)) : []
 
   useEffect(() => {
     let live = true
@@ -45,6 +55,32 @@ function CardBody({ friend, today, onClose }: { friend: Friend; today: DayKey; o
   const streak = card ? streakInfo(days, today) : null
   const song = friend.planked_song ? SONG_BY_ID.get(friend.planked_song)?.title : undefined
   const since = card?.since ? new Date(card.since).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : null
+
+  /** A room with today's song, with them invited, and on to its lobby. */
+  const plankTogether = () => {
+    const room = makeRoomCode()
+    const song = dailySong(today)
+    setBusy(true)
+    setError(null)
+    inviteFriends([friend.user_id], { room, song: song.id })
+      .then(() => {
+        void nudgeFriends([friend.user_id])
+        onClose()
+        navigate(togetherRoute(room, song.id))
+      })
+      .catch((e) => setError(friendProblemText(e)))
+      .finally(() => setBusy(false))
+  }
+
+  const inviteTo = (groupId: string) => {
+    setError(null)
+    inviteFriends([friend.user_id], { group: groupId })
+      .then(() => {
+        setInvitedTo((was) => new Set(was).add(groupId))
+        void nudgeFriends([friend.user_id])
+      })
+      .catch((e) => setError(friendProblemText(e)))
+  }
 
   const act = (what: () => Promise<void>) => {
     setBusy(true)
@@ -123,6 +159,34 @@ function CardBody({ friend, today, onClose }: { friend: Friend; today: DayKey; o
           </>
         )}
       </dl>
+
+      <div className="button-row">
+        <button type="button" className="btn btn-primary" onClick={plankTogether} disabled={busy}>
+          Plank together
+        </button>
+        {invitable.length > 0 && (
+          <button type="button" className="btn btn-secondary" onClick={() => setChoosingGroup((was) => !was)} aria-expanded={choosingGroup}>
+            Invite to a group
+          </button>
+        )}
+      </div>
+      {choosingGroup && (
+        <ul className="friend-invite-groups">
+          {invitable.map((g) => (
+            <li key={g.id}>
+              <span>{g.name}</span>
+              {invitedTo.has(g.id) ? (
+                <span className="fine">Invited</span>
+              ) : (
+                <button type="button" className="btn btn-secondary btn-small" onClick={() => inviteTo(g.id)}>
+                  Invite
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="fine">Plank together makes a room with today's song and invites {friend.name}: you'll wait in its lobby.</p>
 
       {asking === null ? (
         <div className="button-row friend-card-actions">

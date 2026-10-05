@@ -6,6 +6,7 @@ import { FRIENDS, followLink, friendsRoute, hashFor } from '../../lib/route'
 import { Icon } from '../Icon'
 import { FriendCard } from './FriendCard'
 import { FriendRow } from './FriendRow'
+import { InviteList } from './Invites'
 
 /**
  * The friends rail, down the right of the page on a computer, like Discord's member list: requests waiting,
@@ -46,6 +47,7 @@ export function FriendsRail({ today }: { today: DayKey }) {
         </p>
       ) : (
         <>
+          <InviteList invites={now.invites} today={today} compact />
           {waiting > 0 && (
             <a className="rail-requests" href={hashFor(friendsRoute('pending'))} onClick={(e) => followLink(e, friendsRoute('pending'))}>
               <span className="friends-tab-badge" aria-hidden="true">

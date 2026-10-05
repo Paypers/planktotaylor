@@ -5,6 +5,7 @@ import type { DayKey } from '../../lib/dates'
 import type { LiveLink, TogetherShare } from '../../lib/live/link'
 import { togetherSession } from '../../lib/live/session'
 import { heldThisRound, roomView, timeThisRound, type Held, type RoundTime } from '../../lib/live/view'
+import { useMyFriends } from '../../lib/myFriends'
 import { getData } from '../../lib/store'
 import type { PlankSession } from '../PlankTimer'
 import { Lobby } from './Lobby'
@@ -25,6 +26,9 @@ export function RoomStage({ link, code, song, today, renderPlank, onShareTogethe
   const state = useSyncExternalStore(link.subscribe, link.getState)
   const members = useSyncExternalStore(link.subscribe, link.getMembers)
   const here = link.startedHere()
+  // Signed in with a name: the room gets this device's friend code, so the people here can add you.
+  const friendCode = useMyFriends(today).now?.code ?? null
+  useEffect(() => link.setFriendCode(friendCode), [link, friendCode])
   const live = state.phase === 'stretch' || state.phase === 'countdown' || state.phase === 'running' || state.phase === 'paused'
   const [plank, setPlank] = useState<{ round: number; session: PlankSession } | null>(null)
   const opened = useRef(0)

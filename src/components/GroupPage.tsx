@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { askToSignIn, groupDiscord, leaveGroup, newGroupCode, removeFromGroup, renameGroup, useAccount, type Group } from '../lib/account'
+import { askToSignIn, groupDiscord, inviteFriends, leaveGroup, newGroupCode, removeFromGroup, renameGroup, useAccount, type Group } from '../lib/account'
 import { addDays, fromDayKey, type DayKey } from '../lib/dates'
 import {
   contributions,
@@ -20,6 +20,7 @@ import { Avatar } from './Avatar'
 import { ConfirmDialog } from './ConfirmDialog'
 import { InviteLink, problemOf } from './Groups'
 import { Flame, HeldMark, Icon } from './Icon'
+import { InviteFriendsButton } from './friends/InviteFriendsDialog'
 import { StartTogether } from './live/StartTogether'
 import { PageTop } from './PageTop'
 
@@ -133,6 +134,15 @@ export function GroupPage({ id, today, completions }: Props) {
         </div>
         <div className="section-body">
           <InviteLink group={group} />
+          <div className="button-row group-invite-friends">
+            <InviteFriendsButton
+              today={today}
+              title={`Invite to ${group.name}`}
+              about="They'll get an invite in their friends list, to join with one tap. It lasts a week."
+              exclude={board?.map((m) => m.user_id) ?? []}
+              send={(to) => inviteFriends(to, { group: group.id })}
+            />
+          </div>
           {maker && (
             <div className="group-maker-link">
               <button type="button" className="btn btn-link" onClick={() => setAsking({ what: 'new-link' })}>

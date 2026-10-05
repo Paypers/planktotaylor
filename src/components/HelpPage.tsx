@@ -277,7 +277,19 @@ export function HelpPage() {
           <dt>A friend's card</dt>
           <dd>
             Tap a friend for their card: their streak, whether they've planked today's song, how long you've been friends and
-            the groups you share. Remove or block them from there.
+            the groups you share. Plank together, invite them to one of your groups, or remove or block them from there.
+          </dd>
+          <dt>Invites</dt>
+          <dd>
+            Plank together on a friend's card makes a room with today's song, invites them, and takes you to its lobby to wait.
+            In any room's lobby, Invite friends asks more; on a group's page, Invite friends asks them to join it. An invite
+            shows at the top of their friends list (and at the foot of the screen on a phone), with Join and Not now, and
+            arrives within seconds. A room's invite lasts 30 minutes, a group's a week.
+          </dd>
+          <dt>From a room</dt>
+          <dd>
+            Signed in with a name, your friend code goes to the rooms you plank in, so the people there can add you: Add
+            friend shows beside each of them who's signed in too. Nothing else of your account goes to the room.
           </dd>
           <dt>Blocking</dt>
           <dd>

@@ -32,6 +32,19 @@ describe("who's in a room", () => {
     ])
   })
 
+  it("carries a signed-in player's friend code, and drops anything that isn't one", () => {
+    const read = readPresences({
+      a: [{ name: 'Ana', status: 'lobby', joinedAt: 1, round: 0, friendCode: 'K7QM3XPD' }],
+      b: [{ name: 'Ben', status: 'lobby', joinedAt: 2, round: 0, friendCode: 'not a code' }],
+    })
+    expect(roomMembers(read, 0)).toEqual([
+      { id: 'a', name: 'Ana', status: 'lobby', joinedAt: 1, friendCode: 'K7QM3XPD' },
+      { id: 'b', name: 'Ben', status: 'lobby', joinedAt: 2 },
+    ])
+    const [a] = roomMembers(read, 0)
+    expect(sameMembers([a], [{ ...a, friendCode: undefined }])).toBe(false)
+  })
+
   it("shows a status from an earlier round as waiting for this one", () => {
     const members = roomMembers([person('a', 1, { status: 'done', round: 1 }), person('b', 2, { status: 'planking', round: 2 })], 2)
     expect(members.map((m) => m.status)).toEqual(['lobby', 'planking'])

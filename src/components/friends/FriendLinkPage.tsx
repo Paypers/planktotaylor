@@ -9,6 +9,7 @@ import {
   useAccount,
   type FoundPlayer,
 } from '../../lib/account'
+import { nudgeFriends } from '../../lib/friendInbox'
 import { forgetFriendCode, keepFriendCode, readFriendCode } from '../../lib/friends'
 import { refreshFriends } from '../../lib/myFriends'
 import { FRIENDS, followLink, friendsRoute, hashFor } from '../../lib/route'
@@ -130,7 +131,12 @@ export function FriendLinkPage({ code }: { code: string }) {
             type="button"
             className="btn btn-primary"
             disabled={busy || you.missing}
-            onClick={() => act(() => (asked ? answerFriendRequest(found.user_id, true) : requestFriend(valid!)))}
+            onClick={() =>
+              act(async () => {
+                await (asked ? answerFriendRequest(found.user_id, true) : requestFriend(valid!))
+                void nudgeFriends([found.user_id])
+              })
+            }
           >
             {busy ? 'Just a moment…' : asked ? 'Accept' : 'Send request'}
           </button>

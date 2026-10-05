@@ -1,6 +1,10 @@
+import { useAccount } from '../../lib/account'
+import { useToday } from '../../lib/hooks'
 import type { LiveMember } from '../../lib/live/link'
+import { useMyFriends } from '../../lib/myFriends'
 import { Avatar } from '../Avatar'
 import { Icon } from '../Icon'
+import { RoomFriend } from './RoomFriend'
 
 interface Props {
   members: readonly LiveMember[]
@@ -9,8 +13,11 @@ interface Props {
   showStatus?: boolean
 }
 
-/** Everyone in the room, longest in first. */
+/** Everyone in the room, longest in first. Signed in with a name, anyone else who is too can be added as a friend. */
 export function RoomPeople({ members, me, showStatus = false }: Props) {
+  const { user } = useAccount()
+  const mine = useMyFriends(useToday()).now?.code
+  const canAdd = user !== null && Boolean(mine)
   return (
     <section className="section grid" aria-labelledby="live-people">
       <div className="section-rule" />
@@ -35,6 +42,7 @@ export function RoomPeople({ members, me, showStatus = false }: Props) {
                   <Icon name="check" size={18} />
                 </span>
               )}
+              {canAdd && m.id !== me && m.friendCode && m.friendCode !== mine && <RoomFriend code={m.friendCode} />}
             </li>
           ))}
         </ul>

@@ -2,12 +2,14 @@ import { useState, type FormEvent } from 'react'
 import { answerFriendRequest, askToSignIn, blockPlayer, cancelFriendRequest, saveDisplayName, unblockPlayer, useAccount } from '../../lib/account'
 import type { DayKey } from '../../lib/dates'
 import { FRIENDS_EACH, friendsInOrder, friendStatus, timeAgo, type Friend, type FriendsNow } from '../../lib/friends'
+import { nudgeFriends } from '../../lib/friendInbox'
 import { refreshFriends, useMyFriends } from '../../lib/myFriends'
 import { followLink, friendsRoute, hashFor, type FriendsTab } from '../../lib/route'
 import { PageTop } from '../PageTop'
 import { AddFriend, WhatFriendsSee } from './AddFriend'
 import { FriendCard } from './FriendCard'
 import { FriendRow, friendProblemText, PersonRow } from './FriendRow'
+import { InviteList } from './Invites'
 
 /** Your friends, on tabs as on Discord: everyone, who's online, requests, who you've blocked, and adding someone. */
 export function FriendsPage({ tab, today }: { tab: FriendsTab; today: DayKey }) {
@@ -24,6 +26,18 @@ export function FriendsPage({ tab, today }: { tab: FriendsTab; today: DayKey }) 
     body = (
       <>
         <Tabs tab={tab} now={now} />
+        {now.invites.length > 0 && (
+          <section className="section grid" aria-labelledby="friends-invites">
+            <div className="section-rule" />
+            <div className="section-label">
+              <h2 id="friends-invites">Invites</h2>
+              <p className="label-meta">{now.invites.length}</p>
+            </div>
+            <div className="section-body">
+              <InviteList invites={now.invites} today={today} />
+            </div>
+          </section>
+        )}
         {failed && (
           <div className="grid">
             <p className="page-note error" role="alert">
@@ -235,7 +249,12 @@ function Pending({ now }: { now: FriendsNow }) {
                     type="button"
                     className="btn btn-primary btn-small"
                     disabled={busy === p.user_id}
-                    onClick={() => change(p.user_id, () => answerFriendRequest(p.user_id, true))}
+                    onClick={() =>
+                      change(p.user_id, async () => {
+                        await answerFriendRequest(p.user_id, true)
+                        void nudgeFriends([p.user_id])
+                      })
+                    }
                   >
                     Accept
                   </button>

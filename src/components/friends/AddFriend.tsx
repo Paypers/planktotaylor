@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { findByFriendCode, friendSuggestions, newFriendCode, requestFriend, requestFriendFromGroup, type Suggestion } from '../../lib/account'
+import { nudgeFriends } from '../../lib/friendInbox'
 import { readFriendCode, showFriendCode } from '../../lib/friends'
 import { refreshFriends } from '../../lib/myFriends'
 import { siteLink } from '../../lib/share'
@@ -140,6 +141,7 @@ function AddByCode() {
       if (found.status === 'friends') return setSaid(`You and ${found.name} are friends already.`)
       if (found.status === 'blocked') return setError(`You've blocked ${found.name}. Unblock them first, under Blocked.`)
       const result = await requestFriend(code)
+      void nudgeFriends([found.user_id])
       await refreshFriends()
       setTyped('')
       setSaid(result === 'friends' ? `You and ${found.name} are friends now.` : `Request sent to ${found.name}.`)
@@ -210,6 +212,7 @@ function Suggestions() {
     requestFriendFromGroup(person.user_id)
       .then((result) => {
         setSent((was) => new Map(was).set(person.user_id, result === 'friends' ? 'Friends now' : 'Request sent'))
+        void nudgeFriends([person.user_id])
         return refreshFriends()
       })
       .catch((e) => setError(friendProblemText(e)))

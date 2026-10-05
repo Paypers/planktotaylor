@@ -158,12 +158,30 @@ function openRoom(code: string, name: string, songSeconds: number, report: (stat
     send(pressed.command)
   }
 
+  function setFriendCode(code: string | null) {
+    const friendCode = code ?? undefined
+    if (mine.friendCode === friendCode) return
+    const { friendCode: _old, ...rest } = mine
+    mine = friendCode ? { ...rest, friendCode } : rest
+    if (mine.joinedAt) presence.set(mine)
+    refreshMembers()
+  }
+
   function setStatus(status: LiveStatus) {
     const round = room.state.round
     if (mine.status === status && mine.round === round) return
     // How far this device got, on the room's clock, so breaks never count. Done is the whole song.
     const held = status === 'done' ? songSeconds : status === 'out' ? Math.round(position(room.state, now(), songSeconds)) : undefined
-    mine = { id: mine.id, name: mine.name, joinedAt: mine.joinedAt, status, round, n: mine.n + 1, ...(held !== undefined ? { held } : {}) }
+    mine = {
+      id: mine.id,
+      name: mine.name,
+      joinedAt: mine.joinedAt,
+      status,
+      round,
+      n: mine.n + 1,
+      ...(held !== undefined ? { held } : {}),
+      ...(mine.friendCode ? { friendCode: mine.friendCode } : {}),
+    }
     if (mine.joinedAt) {
       sayStatus()
       presence.set(mine)
@@ -322,6 +340,7 @@ function openRoom(code: string, name: string, songSeconds: number, report: (stat
     pause: () => act('pause'),
     resume: () => act('resume'),
     setStatus,
+    setFriendCode,
     getConnection: () => connection,
     subscribe: (fn) => {
       listeners.add(fn)

@@ -1,11 +1,15 @@
 import { useState } from 'react'
 import type { Song } from '../../data/songs'
+import { inviteFriends } from '../../lib/account'
+import { useToday } from '../../lib/hooks'
 import { roomLink } from '../../lib/live/code'
+import { InviteFriendsButton } from '../friends/InviteFriendsDialog'
 
 /** The room's link, to copy or share the phone's way. Anyone with it can join. */
 export function RoomInvite({ code, song }: { code: string; song: Song }) {
   const [copied, setCopied] = useState(false)
   const link = roomLink(code, song.id)
+  const today = useToday()
   const canShare = typeof navigator.share === 'function'
 
   const copy = async () => {
@@ -46,6 +50,12 @@ export function RoomInvite({ code, song }: { code: string; song: Song }) {
                 Share
               </button>
             )}
+            <InviteFriendsButton
+              today={today}
+              title="Invite friends"
+              about={`They'll get an invite to plank to ${song.title} with you, to join with one tap. It lasts 30 minutes.`}
+              send={(to) => inviteFriends(to, { room: code, song: song.id })}
+            />
             {copied && (
               <span className="fine live-copied" role="status">
                 Copied.

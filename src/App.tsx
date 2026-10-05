@@ -7,6 +7,7 @@ import { FriendLinkPage } from './components/friends/FriendLinkPage'
 import { FriendsLink } from './components/friends/FriendsLink'
 import { FriendsPage } from './components/friends/FriendsPage'
 import { FriendsRail } from './components/friends/FriendsRail'
+import { InviteToast } from './components/friends/InviteToast'
 import { GroupPage } from './components/GroupPage'
 import { GroupsPage, HomeGroups, JoinPage } from './components/Groups'
 import { GroupsLink } from './components/GroupsLink'
@@ -47,6 +48,7 @@ import { dailyNumber } from './lib/daily'
 import { collectionOf, eraStamps, stampNews } from './lib/eras'
 import { forgetFriendCode, keptFriendCode, showFriendCode } from './lib/friends'
 import { forgetInvite, keptInvite } from './lib/groups'
+import { useFriendInbox } from './lib/friendInbox'
 import { useMyFriends } from './lib/myFriends'
 import { isStandalone } from './lib/install'
 import type { TogetherShare } from './lib/live/link'
@@ -256,6 +258,8 @@ export function App() {
   // The friends rail, down the right on a computer (styles.css), on every page but those with their own list of
   // people (friends, a room) or that take the whole screen (Your Plank Year).
   const rail = accountsEnabled && user !== null && friendsNow !== null && !['friends', 'friend', 'together', 'year'].includes(route.page)
+  // Nudges from friends (a request, an invite) check in straight away.
+  useFriendInbox(accountsEnabled && friendsNow ? (user?.id ?? null) : null)
   const dateline = fromDayKey(today).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
 
   return (
@@ -574,6 +578,8 @@ export function App() {
           </div>
           {rail && <FriendsRail today={today} />}
         </div>
+        {/* An invite at the foot of the screen, where the rail isn't showing it. Not over a plank, or the friends page. */}
+        {accountsEnabled && user && friendsNow && !session && route.page !== 'friends' && <InviteToast today={today} />}
       </div>
 
       {session && (

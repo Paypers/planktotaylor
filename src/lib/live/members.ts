@@ -2,6 +2,9 @@ import type { LiveMember, LiveStatus } from './link'
 import { STATUSES } from './messages'
 import { cleanName } from './name'
 
+/** A friend code, as friends.ts makes them readable: anything else in presence is dropped. */
+const FRIEND_CODE = /^[2-9A-HJ-NP-Z]{8}$/
+
 // Who's in a room, from Realtime presence: each device's own say about itself.
 
 /** A status, the round it's for, and how many times that device has changed its status. The higher `n` is the latest. */
@@ -31,7 +34,8 @@ function readPresence(id: string, value: unknown): Presence | null {
     (p.round as number) >= 0
   const n = Number.isSafeInteger(p.n) && (p.n as number) >= 0 ? (p.n as number) : 0
   const held = typeof p.held === 'number' && Number.isFinite(p.held) && p.held >= 0 ? { held: p.held } : {}
-  return valid ? { id, name: p.name as string, status, joinedAt: p.joinedAt as number, round: p.round as number, n, ...held } : null
+  const friendCode = typeof p.friendCode === 'string' && FRIEND_CODE.test(p.friendCode) ? { friendCode: p.friendCode } : {}
+  return valid ? { id, name: p.name as string, status, joinedAt: p.joinedAt as number, round: p.round as number, n, ...held, ...friendCode } : null
 }
 
 /**
@@ -99,7 +103,15 @@ export function joinTime(others: readonly Presence[], now: number): number {
 export function sameMembers(a: readonly LiveMember[], b: readonly LiveMember[]): boolean {
   return (
     a.length === b.length &&
-    a.every((m, i) => m.id === b[i].id && m.name === b[i].name && m.status === b[i].status && m.joinedAt === b[i].joinedAt && m.held === b[i].held)
+    a.every(
+      (m, i) =>
+        m.id === b[i].id &&
+        m.name === b[i].name &&
+        m.status === b[i].status &&
+        m.joinedAt === b[i].joinedAt &&
+        m.held === b[i].held &&
+        m.friendCode === b[i].friendCode,
+    )
   )
 }
 
@@ -110,7 +122,13 @@ export function roomMembers(presences: readonly Presence[], round: number): Live
     .slice(0, MAX_MEMBERS)
     .map((p) => {
       const earlier = p.round < round
-      const member: LiveMember = { id: p.id, name: cleanName(p.name) || 'Someone', status: earlier ? 'lobby' : p.status, joinedAt: p.joinedAt }
+      const member: LiveMember = {
+        id: p.id,
+        name: cleanName(p.name) || 'Someone',
+        status: earlier ? 'lobby' : p.status,
+        joinedAt: p.joinedAt,
+        ...(p.friendCode ? { friendCode: p.friendCode } : {}),
+      }
       return !earlier && p.held !== undefined ? { ...member, held: p.held } : member
     })
 }

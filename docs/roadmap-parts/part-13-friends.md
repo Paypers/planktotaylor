@@ -66,7 +66,7 @@ Friends have no streak of their own and nothing that ranks them. A group is stil
 
 ### 13.3 The rail, and who's online
 
-- The friends rail on wide screens, and the header button on narrow ones. (Built: the rail shows on every page but the friends page, a room and Your Plank Year. Under 414px the header's icon buttons narrow to 30px so the site's name still fits beside the new button on phones 390px and up.)
+- The friends rail on wide screens, and the header button on narrow ones. (Built: the rail shows on every page but the friends page, a room and Your Plank Year. Under 430px the header's icon buttons narrow to 30px so the site's name still fits beside the new button on phones 390px and up.)
 - Checking in every 45 seconds while the page is in view, on every page, and planking now from the plank screen.
 
 ### 13.4 Planking together with friends
@@ -74,6 +74,7 @@ Friends have no streak of their own and nothing that ranks them. A group is stil
 - Invites: Plank with friends in a room's lobby, Plank together on a friend, Invite friends on a group's page, and Join or Not now in the rail.
 - The friend inboxes on Realtime.
 - Adding people from your groups, and from a plank-together room (each signed-in person's friend code goes in the room's presence).
+- (Built: invites also show at the foot of the screen wherever the rail isn't, since on a phone there's no rail to see them in.)
 
 ### 13.5 Invites on your phone, and the check
 

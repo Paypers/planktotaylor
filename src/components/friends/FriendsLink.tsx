@@ -5,7 +5,7 @@ import { FRIENDS, followLink, hashFor } from '../../lib/route'
 import { Icon } from '../Icon'
 
 /**
- * Friends, in the header: how many are online, and a dot when a request is waiting. On a computer with the
+ * Friends, in the header: how many are online, and a dot when a request or an invite is waiting. On a computer with the
  * friends rail showing, the rail does this instead (styles.css hides the button).
  */
 export function FriendsLink({ today, current }: { today: DayKey; current: boolean }) {
@@ -13,7 +13,14 @@ export function FriendsLink({ today, current }: { today: DayKey; current: boolea
   if (!now) return null
   const online = now.friends.filter((f) => friendStatus(f) !== 'offline').length
   const waiting = now.requests_in.length
-  const said = [online > 0 && `${online} online`, waiting > 0 && `${waiting} ${waiting === 1 ? 'request' : 'requests'} waiting`].filter(Boolean).join(', ')
+  const invited = now.invites.length
+  const said = [
+    online > 0 && `${online} online`,
+    invited > 0 && `${invited} ${invited === 1 ? 'invite' : 'invites'}`,
+    waiting > 0 && `${waiting} ${waiting === 1 ? 'request' : 'requests'} waiting`,
+  ]
+    .filter(Boolean)
+    .join(', ')
   return (
     <a
       href={hashFor(FRIENDS)}
@@ -28,7 +35,7 @@ export function FriendsLink({ today, current }: { today: DayKey; current: boolea
           {online}
         </span>
       )}
-      {waiting > 0 && <span className="request-dot" aria-hidden="true" />}
+      {waiting + invited > 0 && <span className="request-dot" aria-hidden="true" />}
     </a>
   )
 }
