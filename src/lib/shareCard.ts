@@ -34,6 +34,14 @@ const FLAME =
 
 export const MARGIN = 96
 
+/**
+ * Someone holding a forearm plank, side on, in a 42×12 box with the floor along its bottom: drawn resting on
+ * the bar, so a card says planking at a glance, not a song listened to.
+ */
+export const PLANKER = { width: 42, height: 12, path: 'M1.4 10.6 32.4 4M32.4 4V10.6H40.4', head: { x: 38.3, y: 3.2, r: 3.2 }, weight: 2.8 }
+/** How tall the planker stands on a card's bar. */
+const PLANKER_HEIGHT = 46
+
 /** Draws the finished-plank card (streak, song, the green and orange bar, the link) and returns it as a PNG. */
 export async function renderShareCard(share: ShareInput): Promise<Blob> {
   const { canvas, ctx } = await newCard(CARD_HEIGHT)
@@ -156,7 +164,10 @@ export function songRow(ctx: CanvasRenderingContext2D, song: Song, left: number,
   return top + height
 }
 
-/** A plank's bar, 32 high from `top`: green while held, orange where paused, to scale, with each break and stretch held labelled over it. */
+/**
+ * A plank's bar, 32 high from `top`: green while held, orange where paused, to scale, with each break and stretch
+ * held labelled over it, and the planker resting on its start.
+ */
 export function bar(ctx: CanvasRenderingContext2D, pauses: readonly Pause[], songSeconds: number, left: number, right: number, top: number) {
   const height = 32
   const gap = 6
@@ -177,9 +188,30 @@ export function bar(ctx: CanvasRenderingContext2D, pauses: readonly Pause[], son
     right: lefts[i] + widths[i],
     text: p.kind === 'pause' ? pauseLabel(p.ms) : Math.round(p.to) > Math.round(p.from) ? stretchLabel(p.from, p.to) : '',
   }))
-  for (const label of barLabels(spans, (value) => ctx.measureText(value).width, left, right)) {
-    text(ctx, label.text, label.left, top - 16, font, label.kind === 'pause' ? COLOR.pausedInk : COLOR.heldInk)
-  }
+  const plankerWidth = planker(ctx, left + 4, top, PLANKER_HEIGHT, COLOR.ink)
+  ctx.font = font
+  const labels = barLabels(spans, (value) => ctx.measureText(value).width, left, right, left + 4 + plankerWidth + LABEL_SPACE * 2)
+  for (const label of labels) text(ctx, label.text, label.left, top - 16, font, label.kind === 'pause' ? COLOR.pausedInk : COLOR.heldInk)
+}
+
+/** The planker, `height` tall, its left at `x` and the floor at `floor`. Returns how wide it drew. */
+export function planker(ctx: CanvasRenderingContext2D, x: number, floor: number, height: number, color: string): number {
+  const scale = height / PLANKER.height
+  const { head } = PLANKER
+  ctx.save()
+  ctx.translate(x, floor - height)
+  ctx.scale(scale, scale)
+  ctx.strokeStyle = color
+  ctx.lineWidth = PLANKER.weight
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.stroke(new Path2D(PLANKER.path))
+  ctx.fillStyle = color
+  ctx.beginPath()
+  ctx.arc(head.x, head.y, head.r, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
+  return PLANKER.width * scale
 }
 
 export interface BarLabel {
@@ -192,21 +224,22 @@ export interface BarLabel {
 const LABEL_SPACE = 12
 
 /**
- * Where the labels over the card's bar go. Every break's length first: centred over it, kept on the
- * card, and skipped if it would run into the one before. Then each stretch held, only where it fits
- * over its own stretch, clear of those.
+ * Where the labels over the card's bar go, from `from` on (clear of the planker). Every break's length first:
+ * centred over it, kept on the card, and skipped if it would run into the one before. Then each stretch held,
+ * only where it fits over its own stretch, clear of those.
  */
 export function barLabels(
   spans: readonly { kind: 'hold' | 'pause'; left: number; right: number; text: string }[],
   measure: (text: string) => number,
   left: number,
   right: number,
+  from = left,
 ): BarLabel[] {
   const breaks = spans
     .filter((s) => s.kind === 'pause')
     .reduce<(BarLabel & { right: number })[]>((placed, s) => {
       const width = measure(s.text)
-      const at = Math.min(Math.max((s.left + s.right) / 2 - width / 2, left), right - width)
+      const at = Math.min(Math.max((s.left + s.right) / 2 - width / 2, from), right - width)
       const last = placed.at(-1)
       return last && at <= last.right + LABEL_SPACE ? placed : [...placed, { kind: 'pause', text: s.text, left: at, right: at + width }]
     }, [])
@@ -221,7 +254,7 @@ export function barLabels(
           ? { ...free, left: Math.max(free.left, b.right + LABEL_SPACE) }
           : { ...free, right: Math.min(free.right, b.left - LABEL_SPACE) }
       },
-      { left: s.left, right: s.right },
+      { left: Math.max(s.left, from), right: s.right },
     )
     return room.right - room.left >= width ? [{ kind: 'hold', text: s.text, left: (room.left + room.right) / 2 - width / 2 }] : []
   })

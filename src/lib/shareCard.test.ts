@@ -44,6 +44,28 @@ describe("the labels over the card's bar", () => {
     ).toEqual(['4s', '3:45'])
   })
 
+  it('keeps every label clear of the planker at the start of the bar', () => {
+    expect(
+      barLabels(
+        [
+          { kind: 'hold', left: 0, right: 200, text: '0:40' },
+          { kind: 'pause', left: 206, right: 224, text: '9s' },
+          { kind: 'hold', left: 230, right: 888, text: '2:45' },
+        ],
+        measure,
+        0,
+        888,
+        160,
+      ),
+    ).toEqual([
+      { kind: 'pause', text: '9s', left: 205 },
+      // The first stretch, less the planker and the break's label: too narrow for its time.
+      { kind: 'hold', text: '2:45', left: 542.5 },
+    ])
+    // A break under the planker still says how long it was, just past it.
+    expect(barLabels([{ kind: 'pause', left: 20, right: 38, text: '12s' }], measure, 0, 888, 160)).toEqual([{ kind: 'pause', text: '12s', left: 160 }])
+  })
+
   it('still skips a break label that would run into the one before', () => {
     expect(
       labels([
